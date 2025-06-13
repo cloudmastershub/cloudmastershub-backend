@@ -11,6 +11,15 @@ export const labQueue = new Bull('lab-queue', {
 });
 
 export const initializeQueue = () => {
+  // Handle queue connection errors
+  labQueue.on('error', (error) => {
+    logger.error('Queue connection error:', error);
+  });
+
+  labQueue.on('ready', () => {
+    logger.info('Queue is ready and connected to Redis');
+  });
+
   // Process lab provisioning
   labQueue.process('provision-lab', async (job) => {
     const { sessionId, labId } = job.data;

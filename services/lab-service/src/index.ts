@@ -18,9 +18,6 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Initialize queue service
-initializeQueue();
-
 app.get('/health', (req, res) => {
   res.json({ status: 'healthy', service: 'lab-service', timestamp: new Date().toISOString() });
 });
@@ -32,4 +29,11 @@ app.use(errorHandler);
 
 app.listen(PORT, () => {
   logger.info(`Lab Service running on port ${PORT}`);
+  // Initialize queue service after server starts
+  try {
+    initializeQueue();
+    logger.info('Queue service initialized');
+  } catch (error) {
+    logger.error('Failed to initialize queue service:', error);
+  }
 });

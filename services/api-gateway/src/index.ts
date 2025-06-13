@@ -21,11 +21,12 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use(rateLimiter);
-
+// Health check endpoint (exclude from rate limiting)
 app.get('/health', (req, res) => {
   res.json({ status: 'healthy', service: 'api-gateway', timestamp: new Date().toISOString() });
 });
+
+app.use(rateLimiter);
 
 app.use('/api', routes);
 
