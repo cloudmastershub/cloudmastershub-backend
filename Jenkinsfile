@@ -64,7 +64,7 @@ pipeline {
                     npm cache clean --force || true
                     
                     # Install dependencies
-                    npm ci
+                    npm install
                 '''
             }
         }
