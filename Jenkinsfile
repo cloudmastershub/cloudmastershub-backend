@@ -194,7 +194,7 @@ pipeline {
                     
                     // Push to registry if credentials are available
                     try {
-                        docker.withRegistry("https://${DOCKER_REGISTRY}", 'dockerhub-credentials') {
+                        docker.withRegistry("https://${DOCKER_REGISTRY}", 'dockerhub-creds') {
                             // Push with specific tag
                             image.push("${env.IMAGE_TAG}")
                             
@@ -206,7 +206,7 @@ pipeline {
                                 image.push('develop-latest')
                             }
                         }
-                        echo "Successfully pushed ${IMAGE_NAME}:${env.IMAGE_TAG}"
+                        echo "Successfully pushed ${IMAGE_NAME}:${env.IMAGE_TAG} and ${IMAGE_NAME}:latest"
                     } catch (Exception e) {
                         echo "Warning: Could not push to registry - ${e.getMessage()}"
                         echo "Image built locally: ${IMAGE_NAME}:${env.IMAGE_TAG}"
@@ -302,7 +302,7 @@ pipeline {
                 echo "✅ CloudMastersHub Backend Pipeline SUCCESS"
                 echo "Branch: ${env.BRANCH_NAME}"
                 echo "Commit: ${env.GIT_COMMIT_SHORT}"
-                echo "Image: ${IMAGE_NAME}:${env.IMAGE_TAG}"
+                echo "Images: ${IMAGE_NAME}:${env.IMAGE_TAG}, ${IMAGE_NAME}:latest"
                 echo "Build: ${BUILD_URL}"
             }
         }
