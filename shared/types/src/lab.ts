@@ -22,6 +22,13 @@ export enum CloudProvider {
   GCP = 'gcp',
 }
 
+export enum DifficultyLevel {
+  BEGINNER = 'beginner',
+  INTERMEDIATE = 'intermediate',
+  ADVANCED = 'advanced',
+  EXPERT = 'expert',
+}
+
 export interface Instruction {
   step: number;
   title: string;

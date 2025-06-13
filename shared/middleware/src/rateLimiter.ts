@@ -1,4 +1,15 @@
 import rateLimit from 'express-rate-limit';
+import { Request } from 'express';
+
+// Extend Request interface to include rateLimit property
+interface RateLimitRequest extends Request {
+  rateLimit?: {
+    resetTime?: Date;
+    remaining?: number;
+    used?: number;
+    limit?: number;
+  };
+}
 
 export const createRateLimiter = (
   windowMs: number = 15 * 60 * 1000,
@@ -11,7 +22,7 @@ export const createRateLimiter = (
     message,
     standardHeaders: true,
     legacyHeaders: false,
-    handler: (req, res) => {
+    handler: (req: RateLimitRequest, res) => {
       res.status(429).json({
         success: false,
         error: {
