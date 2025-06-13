@@ -57,12 +57,6 @@ pipeline {
                 
                 // Check Node.js version and install dependencies
                 sh '''
-                    # Verify Node.js is available
-                    if ! command -v node &> /dev/null; then
-                        echo "❌ Node.js not found - please ensure Node.js is installed on Jenkins agent"
-                        exit 1
-                    fi
-                    
                     echo "Node.js version: $(node --version)"
                     echo "NPM version: $(npm --version)"
                     
