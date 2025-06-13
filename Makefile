@@ -1,7 +1,7 @@
 # CloudMastersHub Backend Makefile
 
 # Variables
-IMAGE_NAME = cloudmastershub/backend
+IMAGE_NAME = mbuaku/cloudmastershub-backend
 IMAGE_TAG ?= latest
 ENVIRONMENT ?= dev
 COMPOSE_FILE = docker-compose.dev.yml

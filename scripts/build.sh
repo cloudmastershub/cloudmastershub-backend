@@ -13,8 +13,8 @@ PROJECT_DIR="${SCRIPT_DIR}/.."
 
 # Docker configuration
 DOCKER_REGISTRY="docker.io"
-DOCKER_REPO="cloudmastershub"
-IMAGE_NAME="${DOCKER_REGISTRY}/${DOCKER_REPO}/backend"
+DOCKER_REPO="mbuaku"
+IMAGE_NAME="${DOCKER_REGISTRY}/${DOCKER_REPO}/cloudmastershub-backend"
 
 # Colors for output
 RED='\033[0;31m'

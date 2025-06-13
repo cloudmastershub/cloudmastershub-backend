@@ -138,7 +138,7 @@ deploy() {
     
     # Create a temporary file with updated image tags
     TEMP_DEPLOYMENT=$(mktemp)
-    sed "s|image: cloudmastershub/backend:latest|image: cloudmastershub/backend:$IMAGE_TAG|g" $K8S_DIR/microservices-deployment.yaml > $TEMP_DEPLOYMENT
+    sed "s|image: mbuaku/cloudmastershub-backend:latest|image: mbuaku/cloudmastershub-backend:$IMAGE_TAG|g" $K8S_DIR/microservices-deployment.yaml > $TEMP_DEPLOYMENT
     
     # Apply microservices deployments
     log "Applying microservices deployments..."

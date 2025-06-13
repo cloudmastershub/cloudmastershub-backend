@@ -48,7 +48,7 @@ spec:
       serviceAccountName: cloudmastershub-backend-sa
       containers:
       - name: api-gateway
-        image: cloudmastershub/backend:latest
+        image: mbuaku/cloudmastershub-backend:latest
         ports:
         - containerPort: 3000
           name: http
@@ -162,7 +162,7 @@ spec:
       serviceAccountName: cloudmastershub-backend-sa
       containers:
       - name: user-service
-        image: cloudmastershub/backend:latest
+        image: mbuaku/cloudmastershub-backend:latest
         ports:
         - containerPort: 3001
           name: http
@@ -289,7 +289,7 @@ spec:
       serviceAccountName: cloudmastershub-backend-sa
       containers:
       - name: course-service
-        image: cloudmastershub/backend:latest
+        image: mbuaku/cloudmastershub-backend:latest
         ports:
         - containerPort: 3002
           name: http
@@ -411,7 +411,7 @@ spec:
       serviceAccountName: cloudmastershub-backend-sa
       containers:
       - name: lab-service
-        image: cloudmastershub/backend:latest
+        image: mbuaku/cloudmastershub-backend:latest
         ports:
         - containerPort: 3003
           name: http

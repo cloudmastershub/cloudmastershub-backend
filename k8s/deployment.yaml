@@ -27,7 +27,7 @@ spec:
       serviceAccountName: cloudmastershub-backend-sa
       containers:
       - name: backend
-        image: cloudmastershub/cloudmastershub-backend:latest  # This will be updated by Jenkins
+        image: mbuaku/cloudmastershub-backend:latest  # This will be updated by Jenkins
         ports:
         - containerPort: 5000
           name: http
