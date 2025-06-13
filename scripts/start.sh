@@ -31,11 +31,12 @@ esac
 if [ "$SERVICE_NAME" != "api-gateway" ]; then
   echo "Waiting for dependencies to be ready..."
   
-  # Install netcat if not available (for health checks)
-  if ! command -v nc >/dev/null 2>&1; then
-    echo "Installing netcat for health checks..."
-    apk add --no-cache netcat-openbsd || apt-get update && apt-get install -y netcat || true
-  fi
+  # Function to test connectivity without netcat
+  test_connection() {
+    host=$1
+    port=$2
+    timeout 5 sh -c "cat < /dev/null > /dev/tcp/$host/$port" 2>/dev/null
+  }
   
   # Wait for database connections with timeout
   case "$SERVICE_NAME" in
@@ -45,7 +46,7 @@ if [ "$SERVICE_NAME" != "api-gateway" ]; then
         echo "Waiting for PostgreSQL..."
         timeout=60
         while [ $timeout -gt 0 ]; do
-          if nc -z postgres.cloudmastershub-dev.svc.cluster.local 5432 2>/dev/null || nc -z postgres 5432 2>/dev/null; then
+          if test_connection postgres.cloudmastershub-dev.svc.cluster.local 5432 || test_connection postgres 5432; then
             echo "PostgreSQL is up!"
             break
           fi
@@ -64,7 +65,7 @@ if [ "$SERVICE_NAME" != "api-gateway" ]; then
         echo "Waiting for MongoDB..."
         timeout=60
         while [ $timeout -gt 0 ]; do
-          if nc -z mongodb.cloudmastershub-dev.svc.cluster.local 27017 2>/dev/null || nc -z mongodb 27017 2>/dev/null; then
+          if test_connection mongodb.cloudmastershub-dev.svc.cluster.local 27017 || test_connection mongodb 27017; then
             echo "MongoDB is up!"
             break
           fi
@@ -83,7 +84,7 @@ if [ "$SERVICE_NAME" != "api-gateway" ]; then
         echo "Waiting for Redis..."
         timeout=60
         while [ $timeout -gt 0 ]; do
-          if nc -z "${REDIS_HOST:-redis.cloudmastershub-dev.svc.cluster.local}" "${REDIS_PORT:-6379}" 2>/dev/null || nc -z "${REDIS_HOST:-redis}" "${REDIS_PORT:-6379}" 2>/dev/null; then
+          if test_connection "${REDIS_HOST:-redis.cloudmastershub-dev.svc.cluster.local}" "${REDIS_PORT:-6379}" || test_connection "${REDIS_HOST:-redis}" "${REDIS_PORT:-6379}"; then
             echo "Redis is up!"
             break
           fi
