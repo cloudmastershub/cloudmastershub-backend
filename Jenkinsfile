@@ -55,16 +55,15 @@ pipeline {
                     echo "=== Node.js Setup Stage ==="
                 }
                 
-                // Check if Node.js is available
+                // Check Node.js version and install dependencies
                 sh '''
-                    echo "Node.js version: $(node --version || echo 'Node.js not found')"
-                    echo "NPM version: $(npm --version || echo 'NPM not found')"
+                    echo "Node.js version: $(node --version)"
+                    echo "NPM version: $(npm --version)"
                     
-                    # Install Node.js if not available
+                    # Verify Node.js is available
                     if ! command -v node &> /dev/null; then
-                        echo "Installing Node.js ${NODE_VERSION}..."
-                        curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | sudo -E bash -
-                        sudo apt-get install -y nodejs
+                        echo "❌ Node.js not found - please ensure Node.js is installed on Jenkins agent"
+                        exit 1
                     fi
                     
                     # Clear npm cache to avoid conflicts
