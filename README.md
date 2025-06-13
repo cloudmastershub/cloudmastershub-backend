@@ -3,6 +3,7 @@
 > 🚀 **Production-ready microservices backend for CloudMastersHub LMS**
 
 [![Status](https://img.shields.io/badge/Status-Production%20Ready-success)](./Dockerfile)
+[![Docker](https://img.shields.io/docker/v/mbuaku/cloudmastershub-backend?label=Docker%20Hub&logo=docker)](https://hub.docker.com/r/mbuaku/cloudmastershub-backend)
 [![CI/CD](https://img.shields.io/badge/CI%2FCD-Jenkins-blue)](./Jenkinsfile)
 [![Docker](https://img.shields.io/badge/Docker-Multi--stage-blue)](./Dockerfile)
 [![K8s](https://img.shields.io/badge/Kubernetes-HPA%20Ready-blue)](./k8s/)
