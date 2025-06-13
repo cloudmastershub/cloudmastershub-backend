@@ -201,11 +201,12 @@ pipeline {
                     
                     // Push to registry if credentials are available
                     try {
-                        docker.withRegistry("https://${DOCKER_REGISTRY}", 'dockerhub-creds') {
+                        // Try with empty registry URL for Docker Hub
+                        docker.withRegistry('', 'dockerhub-creds') {
                             // Push with specific tag
                             image.push("${env.IMAGE_TAG}")
                             
-                            // Always push latest tag for now (since branch detection has issues)
+                            // Always push latest tag
                             image.push('latest')
                             
                             // Push branch-latest for develop
@@ -217,6 +218,21 @@ pipeline {
                     } catch (Exception e) {
                         echo "Warning: Could not push to registry - ${e.getMessage()}"
                         echo "Image built locally: ${IMAGE_NAME}:${env.IMAGE_TAG}"
+                        
+                        // Try alternative push method
+                        echo "Attempting alternative push method..."
+                        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                            sh """
+                                echo "Logging in to Docker Hub..."
+                                echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin
+                                
+                                echo "Pushing images..."
+                                docker push ${IMAGE_NAME}:${env.IMAGE_TAG}
+                                docker push ${IMAGE_NAME}:latest
+                                
+                                echo "Docker push completed!"
+                            """
+                        }
                     }
                 }
             }
