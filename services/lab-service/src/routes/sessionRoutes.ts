@@ -1,10 +1,10 @@
 import { Router } from 'express';
-import { 
+import {
   startLabSession,
   getSessionStatus,
   stopLabSession,
   getSessionLogs,
-  submitLabSolution
+  submitLabSolution,
 } from '../controllers/sessionController';
 
 const router = Router();

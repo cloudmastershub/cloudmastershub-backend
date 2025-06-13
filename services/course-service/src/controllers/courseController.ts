@@ -7,7 +7,8 @@ export const getAllCourses = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { category, level, search, page = 1, limit = 20 } = req.query;
+    const { page = 1, limit = 20 } = req.query;
+    // TODO: Apply filters for category, level, search when implementing database queries
 
     // TODO: Fetch courses from MongoDB with filters
 

@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import bcrypt from 'bcryptjs';
+// import bcrypt from 'bcryptjs'; // TODO: Uncomment when implementing actual password hashing
 import jwt from 'jsonwebtoken';
 import logger from '../utils/logger';
 
@@ -7,18 +7,17 @@ const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 const JWT_EXPIRES_IN = '15m';
 const REFRESH_TOKEN_EXPIRES_IN = '30d';
 
-export const register = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
+export const register = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { email, password, firstName, lastName } = req.body;
+    const { email, firstName, lastName } = req.body;
+    // TODO: Use password from req.body for actual user registration
+    // const { password } = req.body;
 
     // TODO: Check if user exists in database
     // TODO: Hash password and save user to database
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // TODO: Hash password and save user to database when implementing actual user registration
+    // const hashedPassword = await bcrypt.hash(password, 10);
 
     // Mock user creation
     const user = {
@@ -29,17 +28,13 @@ export const register = async (
       createdAt: new Date(),
     };
 
-    const accessToken = jwt.sign(
-      { userId: user.id, email: user.email },
-      JWT_SECRET,
-      { expiresIn: JWT_EXPIRES_IN }
-    );
+    const accessToken = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, {
+      expiresIn: JWT_EXPIRES_IN,
+    });
 
-    const refreshToken = jwt.sign(
-      { userId: user.id, type: 'refresh' },
-      JWT_SECRET,
-      { expiresIn: REFRESH_TOKEN_EXPIRES_IN }
-    );
+    const refreshToken = jwt.sign({ userId: user.id, type: 'refresh' }, JWT_SECRET, {
+      expiresIn: REFRESH_TOKEN_EXPIRES_IN,
+    });
 
     res.status(201).json({
       success: true,
@@ -54,16 +49,11 @@ export const register = async (
   }
 };
 
-export const login = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
+export const login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { email, password } = req.body;
-
-    // TODO: Find user in database
-    // TODO: Verify password
+    const { email } = req.body;
+    // TODO: Use password from req.body to verify user credentials when implementing actual authentication
+    // const { password } = req.body;
 
     // Mock user login
     const user = {
@@ -73,17 +63,13 @@ export const login = async (
       lastName: 'Doe',
     };
 
-    const accessToken = jwt.sign(
-      { userId: user.id, email: user.email },
-      JWT_SECRET,
-      { expiresIn: JWT_EXPIRES_IN }
-    );
+    const accessToken = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, {
+      expiresIn: JWT_EXPIRES_IN,
+    });
 
-    const refreshToken = jwt.sign(
-      { userId: user.id, type: 'refresh' },
-      JWT_SECRET,
-      { expiresIn: REFRESH_TOKEN_EXPIRES_IN }
-    );
+    const refreshToken = jwt.sign({ userId: user.id, type: 'refresh' }, JWT_SECRET, {
+      expiresIn: REFRESH_TOKEN_EXPIRES_IN,
+    });
 
     res.json({
       success: true,
@@ -101,7 +87,7 @@ export const login = async (
 export const refreshToken = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ): Promise<void> => {
   try {
     const { refreshToken } = req.body;
@@ -115,7 +101,7 @@ export const refreshToken = async (
     }
 
     const decoded = jwt.verify(refreshToken, JWT_SECRET) as any;
-    
+
     if (decoded.type !== 'refresh') {
       res.status(401).json({
         success: false,
@@ -124,11 +110,9 @@ export const refreshToken = async (
       return;
     }
 
-    const accessToken = jwt.sign(
-      { userId: decoded.userId },
-      JWT_SECRET,
-      { expiresIn: JWT_EXPIRES_IN }
-    );
+    const accessToken = jwt.sign({ userId: decoded.userId }, JWT_SECRET, {
+      expiresIn: JWT_EXPIRES_IN,
+    });
 
     res.json({
       success: true,

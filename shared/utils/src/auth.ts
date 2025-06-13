@@ -24,7 +24,7 @@ export const generateToken = (
   secret: string,
   expiresIn: string = '15m'
 ): string => {
-  const options: SignOptions = { expiresIn };
+  const options: SignOptions = { expiresIn: expiresIn as any };
   return jwt.sign(payload, secret, options);
 };
 
@@ -37,6 +37,6 @@ export const generateRefreshToken = (
   secret: string,
   expiresIn: string = '30d'
 ): string => {
-  const options: SignOptions = { expiresIn };
+  const options: SignOptions = { expiresIn: expiresIn as any };
   return jwt.sign({ userId, type: 'refresh' }, secret, options);
 };

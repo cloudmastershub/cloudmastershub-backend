@@ -7,11 +7,7 @@ export interface AuthRequest extends Request {
   userRoles?: string[];
 }
 
-export const authenticate = (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-): void => {
+export const authenticate = (req: AuthRequest, res: Response, next: NextFunction): void => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
 
@@ -32,7 +28,7 @@ export const authenticate = (
 
 export const authorize = (...roles: string[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction): void => {
-    if (!req.userRoles || !req.userRoles.some(role => roles.includes(role))) {
+    if (!req.userRoles || !req.userRoles.some((role) => roles.includes(role))) {
       next(new UnauthorizedError('Insufficient permissions'));
       return;
     }

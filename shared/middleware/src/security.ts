@@ -24,10 +24,10 @@ export const securityHeaders = helmet({
 
 export const preventXSS = (req: Request, res: Response, next: NextFunction): void => {
   // Sanitize common input fields
-  ['body', 'query', 'params'].forEach(key => {
+  ['body', 'query', 'params'].forEach((key) => {
     const data = req[key as keyof Request];
     if (data && typeof data === 'object') {
-      Object.keys(data).forEach(field => {
+      Object.keys(data).forEach((field) => {
         if (typeof data[field] === 'string') {
           data[field] = data[field].replace(/[<>]/g, '');
         }

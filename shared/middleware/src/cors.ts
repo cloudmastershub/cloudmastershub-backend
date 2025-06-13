@@ -1,7 +1,8 @@
 import cors from 'cors';
 
 export const createCorsMiddleware = (allowedOrigins?: string[]) => {
-  const origins = allowedOrigins || process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'];
+  const origins = allowedOrigins ||
+    process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'];
 
   return cors({
     origin: (origin, callback) => {

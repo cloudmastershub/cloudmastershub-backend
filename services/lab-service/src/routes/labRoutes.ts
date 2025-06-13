@@ -1,11 +1,11 @@
 import { Router } from 'express';
-import { 
+import {
   getAllLabs,
   getLabById,
   createLab,
   updateLab,
   deleteLab,
-  getLabByCourse
+  getLabByCourse,
 } from '../controllers/labController';
 
 const router = Router();

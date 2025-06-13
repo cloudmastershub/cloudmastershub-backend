@@ -1,3 +1,5 @@
+import { DifficultyLevel } from './course';
+
 export interface Lab {
   id: string;
   courseId?: string;
@@ -20,13 +22,6 @@ export enum CloudProvider {
   AWS = 'aws',
   AZURE = 'azure',
   GCP = 'gcp',
-}
-
-export enum DifficultyLevel {
-  BEGINNER = 'beginner',
-  INTERMEDIATE = 'intermediate',
-  ADVANCED = 'advanced',
-  EXPERT = 'expert',
 }
 
 export interface Instruction {

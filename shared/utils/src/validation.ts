@@ -33,6 +33,6 @@ export const validatePagination = (
 ): { page: number; limit: number } => {
   const validPage = Math.max(1, page || 1);
   const validLimit = Math.min(100, Math.max(1, limit || 20));
-  
+
   return { page: validPage, limit: validLimit };
 };

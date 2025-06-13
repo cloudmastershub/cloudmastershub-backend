@@ -1,9 +1,9 @@
 import { Router } from 'express';
-import { 
+import {
   getUserProgress,
   updateProgress,
   getCourseProgress,
-  getCompletedCourses
+  getCompletedCourses,
 } from '../controllers/progressController';
 
 const router = Router();

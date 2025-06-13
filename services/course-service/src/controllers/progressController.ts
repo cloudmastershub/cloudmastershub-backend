@@ -110,9 +110,8 @@ export const getCompletedCourses = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { userId } = req.params;
-
-    // TODO: Fetch completed courses from database
+    // TODO: Use userId from req.params to fetch completed courses from database
+    // const { userId } = req.params;
 
     const completedCourses = [
       {

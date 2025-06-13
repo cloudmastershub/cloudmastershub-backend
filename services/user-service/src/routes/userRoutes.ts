@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
-import { 
-  getProfile, 
-  updateProfile, 
-  getProgress, 
-  updateSubscription 
+import {
+  getProfile,
+  updateProfile,
+  getProgress,
+  updateSubscription,
 } from '../controllers/userController';
 import { authenticate } from '../middleware/authenticate';
 import { validateRequest } from '../middleware/validateRequest';

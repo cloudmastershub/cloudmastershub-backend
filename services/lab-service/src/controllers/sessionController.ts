@@ -117,9 +117,8 @@ export const getSessionLogs = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { sessionId } = req.params;
-
-    // TODO: Fetch logs from CloudWatch/monitoring service
+    // TODO: Use sessionId from req.params to fetch logs from CloudWatch/monitoring service
+    // const { sessionId } = req.params;
 
     const logs = [
       {
@@ -155,10 +154,8 @@ export const submitLabSolution = async (
 ): Promise<void> => {
   try {
     const { sessionId } = req.params;
-    const { solution } = req.body;
-
-    // TODO: Validate solution against lab requirements
-    // TODO: Run automated tests
+    // TODO: Use solution from req.body to validate against lab requirements and run automated tests
+    // const { solution } = req.body;
 
     logger.info(`Validating solution for session ${sessionId}`);
 
@@ -173,9 +170,7 @@ export const submitLabSolution = async (
           { name: 'Security group configured', passed: true },
           { name: 'Web server accessible', passed: true },
         ],
-        suggestions: [
-          'Consider using a more specific security group rule',
-        ],
+        suggestions: ['Consider using a more specific security group rule'],
       },
       completedAt: new Date(),
     };

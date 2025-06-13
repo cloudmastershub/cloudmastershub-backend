@@ -63,9 +63,8 @@ export const getProgress = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const userId = req.userId;
-
-    // TODO: Fetch user progress from database
+    // TODO: Use userId from req.userId to fetch user progress from database
+    // const userId = req.userId;
 
     // Mock progress data
     const progress = {
@@ -97,10 +96,9 @@ export const updateSubscription = async (
 ): Promise<void> => {
   try {
     const userId = req.userId;
-    const { plan, paymentMethodId } = req.body;
-
-    // TODO: Process subscription with Stripe
-    // TODO: Update user subscription in database
+    const { plan } = req.body;
+    // TODO: Use paymentMethodId from req.body when implementing actual Stripe payment processing
+    // const { paymentMethodId } = req.body;
 
     logger.info(`Updating subscription for user ${userId} to ${plan}`);
 

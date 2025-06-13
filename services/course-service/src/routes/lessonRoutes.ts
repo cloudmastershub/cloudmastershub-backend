@@ -1,11 +1,11 @@
 import { Router } from 'express';
-import { 
+import {
   getLessonsByCourse,
   getLessonById,
   createLesson,
   updateLesson,
   deleteLesson,
-  markLessonComplete
+  markLessonComplete,
 } from '../controllers/lessonController';
 
 const router = Router({ mergeParams: true });

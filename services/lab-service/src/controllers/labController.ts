@@ -7,9 +7,8 @@ export const getAllLabs = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { provider, difficulty, search } = req.query;
-
-    // TODO: Fetch labs from database with filters
+    // TODO: Apply filters for provider, difficulty, search when implementing database queries
+    // const { provider, difficulty, search } = req.query;
 
     // Mock lab data
     const labs = [
@@ -21,11 +20,7 @@ export const getAllLabs = async (
         difficulty: 'beginner',
         estimatedTime: 30, // minutes
         prerequisites: ['AWS Account', 'Basic Linux knowledge'],
-        objectives: [
-          'Launch an EC2 instance',
-          'Connect via SSH',
-          'Install a web server',
-        ],
+        objectives: ['Launch an EC2 instance', 'Connect via SSH', 'Install a web server'],
         tags: ['ec2', 'compute', 'aws'],
       },
       {
@@ -36,11 +31,7 @@ export const getAllLabs = async (
         difficulty: 'beginner',
         estimatedTime: 25,
         prerequisites: ['Azure Account'],
-        objectives: [
-          'Create a resource group',
-          'Deploy a VM',
-          'Configure networking',
-        ],
+        objectives: ['Create a resource group', 'Deploy a VM', 'Configure networking'],
         tags: ['vm', 'compute', 'azure'],
       },
     ];
@@ -72,11 +63,7 @@ export const getLabById = async (
       difficulty: 'beginner',
       estimatedTime: 30,
       prerequisites: ['AWS Account', 'Basic Linux knowledge'],
-      objectives: [
-        'Launch an EC2 instance',
-        'Connect via SSH',
-        'Install a web server',
-      ],
+      objectives: ['Launch an EC2 instance', 'Connect via SSH', 'Install a web server'],
       instructions: [
         {
           step: 1,
@@ -148,11 +135,7 @@ export const getLabByCourse = async (
   }
 };
 
-export const createLab = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
+export const createLab = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const labData = req.body;
 
@@ -173,11 +156,7 @@ export const createLab = async (
   }
 };
 
-export const updateLab = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
+export const updateLab = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
     const updates = req.body;
@@ -199,11 +178,7 @@ export const updateLab = async (
   }
 };
 
-export const deleteLab = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
+export const deleteLab = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
 

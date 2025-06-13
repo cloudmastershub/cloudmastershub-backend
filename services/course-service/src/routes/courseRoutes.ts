@@ -1,11 +1,11 @@
 import { Router } from 'express';
-import { 
-  getAllCourses, 
-  getCourseById, 
-  createCourse, 
+import {
+  getAllCourses,
+  getCourseById,
+  createCourse,
   updateCourse,
   deleteCourse,
-  enrollInCourse 
+  enrollInCourse,
 } from '../controllers/courseController';
 
 const router = Router();
