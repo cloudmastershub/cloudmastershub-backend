@@ -1,0 +1,26 @@
+{
+  "name": "@cloudmastershub/middleware",
+  "version": "1.0.0",
+  "description": "Shared middleware for CloudMastersHub",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "eslint src/**/*.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cloudmastershub/types": "^1.0.0",
+    "@cloudmastershub/utils": "^1.0.0",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "helmet": "^7.1.0",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/cors": "^2.8.17",
+    "typescript": "^5.3.0"
+  }
+}

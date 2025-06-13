@@ -1,0 +1,99 @@
+# CloudMastersHub Configuration and Secrets
+# This file should be placed in: k8s/config.yaml in your backend repository
+
+---
+# ConfigMap for non-sensitive configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cloudmastershub-config
+  namespace: cloudmastershub-dev
+  labels:
+    app: cloudmastershub
+    environment: dev
+data:
+  # Application URLs
+  api-url: "https://api.cloudmastershub.com"
+  frontend-url: "https://cloudmastershub.com"
+  
+  # Database configuration
+  database-name: "cloudmastershub"
+  redis-ttl: "3600"
+  
+  # Environment settings
+  environment: "dev"
+  log-level: "info"
+  
+  # CORS configuration
+  cors-origins: "https://cloudmastershub.com"
+  cors-methods: "GET,POST,PUT,DELETE,OPTIONS"
+  cors-headers: "Authorization,Content-Type,X-Requested-With"
+  
+  # File upload settings
+  max-upload-size: "50MB"
+  allowed-file-types: "jpg,jpeg,png,gif,pdf,doc,docx"
+  
+  # API rate limiting
+  rate-limit-window: "900"  # 15 minutes
+  rate-limit-max: "1000"    # requests per window
+  
+  # Session configuration
+  session-timeout: "86400"  # 24 hours
+  
+  # Feature flags
+  enable-analytics: "true"
+  enable-notifications: "true"
+  enable-file-upload: "true"
+
+---
+# Secret for sensitive data
+# Note: In production, use proper secret management (kubectl create secret, Helm, etc.)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cloudmastershub-secrets
+  namespace: cloudmastershub-dev
+  labels:
+    app: cloudmastershub
+    environment: dev
+type: Opaque
+data:
+  # Base64 encoded values
+  # To generate: echo -n "your-password" | base64
+  
+  # Database credentials
+  mongodb-username: YWRtaW4=  # admin
+  mongodb-password: Y2xvdWRtYXN0ZXJzMjAyNA==  # cloudmasters2024
+  
+  # Application secrets
+  jwt-secret: Y2xvdWRtYXN0ZXJzaHViLWp3dC1zZWNyZXQtdmVyeS1sb25nLWFuZC1zZWN1cmU=  # cloudmastershub-jwt-secret-very-long-and-secure
+  api-key: Y2xvdWRtYXN0ZXJzaHViLWFwaS1rZXktMjAyNA==  # cloudmastershub-api-key-2024
+  
+  # Encryption keys
+  encryption-key: Y2xvdWRtYXN0ZXJzaHViLWVuY3J5cHRpb24ta2V5LTMyLWNoYXJz  # cloudmastershub-encryption-key-32-chars
+  
+  # Third-party API keys (add as needed)
+  # stripe-secret-key: your-stripe-secret-key-base64-encoded
+  # sendgrid-api-key: your-sendgrid-api-key-base64-encoded
+  # aws-access-key: your-aws-access-key-base64-encoded
+  # aws-secret-key: your-aws-secret-key-base64-encoded
+
+---
+# Docker registry secret (if using private registry)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dockerhub-secret
+  namespace: cloudmastershub-dev
+  labels:
+    app: cloudmastershub
+type: kubernetes.io/dockerconfigjson
+data:
+  # This should be created via Jenkins or kubectl command:
+  # kubectl create secret docker-registry dockerhub-secret \
+  #   --docker-server=https://index.docker.io/v1/ \
+  #   --docker-username=your-dockerhub-username \
+  #   --docker-password=your-dockerhub-password \
+  #   --docker-email=your-email@example.com \
+  #   -n cloudmastershub-dev
+  .dockerconfigjson: eyJhdXRocyI6eyJodHRwczovL2luZGV4LmRvY2tlci5pby92MS8iOnsidXNlcm5hbWUiOiJ5b3VyLXVzZXJuYW1lIiwicGFzc3dvcmQiOiJ5b3VyLXBhc3N3b3JkIiwiZW1haWwiOiJ5b3VyLWVtYWlsQGV4YW1wbGUuY29tIiwiYXV0aCI6ImVXOTFjaTExYzJWeWJtRnRaVHB6YjIxbExYQmhjM04zYjNKayJ9fX0=

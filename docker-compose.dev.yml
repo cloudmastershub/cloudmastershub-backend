@@ -1,0 +1,169 @@
+version: '3.8'
+
+services:
+  # API Gateway with hot reload
+  api-gateway:
+    build:
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
+      target: builder
+    volumes:
+      - ./services/api-gateway/src:/app/services/api-gateway/src
+      - ./shared:/app/shared
+    command: npm run dev --workspace=@cloudmastershub/api-gateway
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - USER_SERVICE_URL=http://user-service:3001
+      - COURSE_SERVICE_URL=http://course-service:3002
+      - LAB_SERVICE_URL=http://lab-service:3003
+      - LOG_LEVEL=debug
+    depends_on:
+      - user-service
+      - course-service
+      - lab-service
+    networks:
+      - cloudmastershub
+
+  # User Service with hot reload
+  user-service:
+    build:
+      context: .
+      dockerfile: services/user-service/Dockerfile
+      target: builder
+    volumes:
+      - ./services/user-service/src:/app/services/user-service/src
+      - ./shared:/app/shared
+    command: npm run dev --workspace=@cloudmastershub/user-service
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/cloudmastershub_users
+      - JWT_SECRET=dev-secret-key
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=debug
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - cloudmastershub
+
+  # Course Service with hot reload
+  course-service:
+    build:
+      context: .
+      dockerfile: services/course-service/Dockerfile
+      target: builder
+    volumes:
+      - ./services/course-service/src:/app/services/course-service/src
+      - ./shared:/app/shared
+    command: npm run dev --workspace=@cloudmastershub/course-service
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=development
+      - PORT=3002
+      - MONGODB_URI=mongodb://mongodb:27017/cloudmastershub_courses
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=debug
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - cloudmastershub
+
+  # Lab Service with hot reload
+  lab-service:
+    build:
+      context: .
+      dockerfile: services/lab-service/Dockerfile
+      target: builder
+    volumes:
+      - ./services/lab-service/src:/app/services/lab-service/src
+      - ./shared:/app/shared
+    command: npm run dev --workspace=@cloudmastershub/lab-service
+    ports:
+      - "3003:3003"
+    environment:
+      - NODE_ENV=development
+      - PORT=3003
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - AWS_ACCESS_KEY_ID=mock-access-key
+      - AWS_SECRET_ACCESS_KEY=mock-secret-key
+      - AWS_REGION=us-east-1
+      - LOG_LEVEL=debug
+    depends_on:
+      - redis
+    networks:
+      - cloudmastershub
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=cloudmastershub_users
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - cloudmastershub
+
+  # MongoDB Database
+  mongodb:
+    image: mongo:6-jammy
+    environment:
+      - MONGO_INITDB_DATABASE=cloudmastershub_courses
+    volumes:
+      - mongodb_data:/data/db
+    ports:
+      - "27017:27017"
+    networks:
+      - cloudmastershub
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - cloudmastershub
+
+  # Adminer for database management
+  adminer:
+    image: adminer
+    ports:
+      - "8080:8080"
+    networks:
+      - cloudmastershub
+
+  # Redis Commander
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - cloudmastershub
+
+networks:
+  cloudmastershub:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  mongodb_data:
+  redis_data:

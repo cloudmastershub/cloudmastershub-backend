@@ -1,0 +1,272 @@
+# CloudMastersHub Database Services
+# This file can be placed in: k8s/database.yaml in your backend repository
+# Or in a separate database repository
+
+---
+# MongoDB Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb
+  namespace: cloudmastershub-dev
+  labels:
+    app: cloudmastershub
+    tier: database
+    component: mongodb
+    environment: dev
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate  # Use Recreate for databases to avoid data conflicts
+  selector:
+    matchLabels:
+      app: cloudmastershub
+      tier: database
+      component: mongodb
+  template:
+    metadata:
+      labels:
+        app: cloudmastershub
+        tier: database
+        component: mongodb
+        environment: dev
+    spec:
+      serviceAccountName: cloudmastershub-database-sa
+      containers:
+      - name: mongodb
+        image: mongo:6.0
+        ports:
+        - containerPort: 27017
+          name: mongodb
+        env:
+        - name: TIER
+          value: "database"
+        - name: MONGO_INITDB_DATABASE
+          value: "cloudmastershub"
+        - name: MONGO_INITDB_ROOT_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: cloudmastershub-secrets
+              key: mongodb-username
+        - name: MONGO_INITDB_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: cloudmastershub-secrets
+              key: mongodb-password
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        volumeMounts:
+        - name: mongodb-data
+          mountPath: /data/db
+        - name: mongodb-config
+          mountPath: /data/configdb
+        livenessProbe:
+          exec:
+            command:
+            - mongo
+            - --eval
+            - "db.adminCommand('ping')"
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - mongo
+            - --eval
+            - "db.adminCommand('ping')"
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        securityContext:
+          runAsNonRoot: false  # MongoDB needs to run as root
+          readOnlyRootFilesystem: false  # MongoDB needs to write to filesystem
+      volumes:
+      - name: mongodb-data
+        persistentVolumeClaim:
+          claimName: mongodb-data-pvc
+      - name: mongodb-config
+        emptyDir: {}
+      restartPolicy: Always
+
+---
+# MongoDB Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb
+  namespace: cloudmastershub-dev
+  labels:
+    app: cloudmastershub
+    tier: database
+    component: mongodb
+spec:
+  type: ClusterIP
+  selector:
+    app: cloudmastershub
+    tier: database
+    component: mongodb
+  ports:
+  - port: 27017
+    targetPort: 27017
+    protocol: TCP
+    name: mongodb
+
+---
+# MongoDB Persistent Volume Claim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodb-data-pvc
+  namespace: cloudmastershub-dev
+  labels:
+    app: cloudmastershub
+    tier: database
+    component: mongodb
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard  # Adjust based on your cluster's storage classes
+
+---
+# Redis Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: cloudmastershub-dev
+  labels:
+    app: cloudmastershub
+    tier: database
+    component: redis
+    environment: dev
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: cloudmastershub
+      tier: database
+      component: redis
+  template:
+    metadata:
+      labels:
+        app: cloudmastershub
+        tier: database
+        component: redis
+        environment: dev
+    spec:
+      serviceAccountName: cloudmastershub-database-sa
+      containers:
+      - name: redis
+        image: redis:7.0-alpine
+        ports:
+        - containerPort: 6379
+          name: redis
+        env:
+        - name: TIER
+          value: "database"
+        command:
+        - redis-server
+        - --appendonly
+        - "yes"
+        - --maxmemory
+        - "512mb"
+        - --maxmemory-policy
+        - "allkeys-lru"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "150m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+        livenessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 999
+          readOnlyRootFilesystem: false  # Redis needs to write to data directory
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: redis-data
+        persistentVolumeClaim:
+          claimName: redis-data-pvc
+      restartPolicy: Always
+
+---
+# Redis Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: cloudmastershub-dev
+  labels:
+    app: cloudmastershub
+    tier: database
+    component: redis
+spec:
+  type: ClusterIP
+  selector:
+    app: cloudmastershub
+    tier: database
+    component: redis
+  ports:
+  - port: 6379
+    targetPort: 6379
+    protocol: TCP
+    name: redis
+
+---
+# Redis Persistent Volume Claim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-data-pvc
+  namespace: cloudmastershub-dev
+  labels:
+    app: cloudmastershub
+    tier: database
+    component: redis
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: standard  # Adjust based on your cluster's storage classes
