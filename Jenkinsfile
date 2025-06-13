@@ -172,14 +172,15 @@ pipeline {
         }
         
         stage('Docker Build & Push') {
-            when {
-                anyOf {
-                    branch 'main'
-                    branch 'master'
-                    branch 'develop'
-                    changeRequest()
-                }
-            }
+            // Always run Docker build and push for now
+            // when {
+            //     anyOf {
+            //         branch 'main'
+            //         branch 'master'
+            //         branch 'develop'
+            //         changeRequest()
+            //     }
+            // }
             
             steps {
                 script {
@@ -197,10 +198,8 @@ pipeline {
                             // Push with specific tag
                             image.push("${env.IMAGE_TAG}")
                             
-                            // Also push latest for main/master branch
-                            if (env.BRANCH_NAME == 'main' || env.BRANCH_NAME == 'master') {
-                                image.push('latest')
-                            }
+                            // Always push latest tag for now (since branch detection has issues)
+                            image.push('latest')
                             
                             // Push branch-latest for develop
                             if (env.BRANCH_NAME == 'develop') {
