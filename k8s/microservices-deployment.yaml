@@ -32,7 +32,7 @@ metadata:
     service: api-gateway
     environment: dev
 spec:
-  replicas: 2
+  replicas: 3
   selector:
     matchLabels:
       app: cloudmastershub
@@ -146,7 +146,7 @@ metadata:
     service: user-service
     environment: dev
 spec:
-  replicas: 2
+  replicas: 3
   selector:
     matchLabels:
       app: cloudmastershub
@@ -201,7 +201,7 @@ spec:
             cpu: "250m"
           limits:
             memory: "2Gi"
-            cpu: "1500m"
+            cpu: "500m"
         livenessProbe:
           httpGet:
             path: /health
@@ -273,7 +273,7 @@ metadata:
     service: course-service
     environment: dev
 spec:
-  replicas: 2
+  replicas: 3
   selector:
     matchLabels:
       app: cloudmastershub
@@ -323,7 +323,7 @@ spec:
             cpu: "250m"
           limits:
             memory: "2Gi"
-            cpu: "1500m"
+            cpu: "500m"
         livenessProbe:
           httpGet:
             path: /health
@@ -395,7 +395,7 @@ metadata:
     service: lab-service
     environment: dev
 spec:
-  replicas: 2
+  replicas: 3
   selector:
     matchLabels:
       app: cloudmastershub
@@ -449,7 +449,7 @@ spec:
             cpu: "250m"
           limits:
             memory: "2Gi"
-            cpu: "1500m"
+            cpu: "500m"
         livenessProbe:
           httpGet:
             path: /health
