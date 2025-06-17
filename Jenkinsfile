@@ -27,6 +27,26 @@ pipeline {
     }
     
     stages {
+        stage('Setup Environment') {
+            steps {
+                script {
+                    echo "=== Environment Setup Stage ==="
+                }
+                
+                // Install required tools in Alpine container
+                sh '''
+                    echo "Installing required tools in Alpine container..."
+                    apk update
+                    apk add --no-cache git docker docker-cli curl
+                    
+                    echo "Node.js version: $(node --version)"
+                    echo "NPM version: $(npm --version)"
+                    echo "Git version: $(git --version)"
+                    echo "Docker version: $(docker --version)"
+                '''
+            }
+        }
+        
         stage('Checkout') {
             steps {
                 script {
@@ -61,21 +81,15 @@ pipeline {
             }
         }
         
-        stage('Setup Environment') {
+        stage('Install Dependencies') {
             steps {
                 script {
-                    echo "=== Environment Setup Stage ==="
+                    echo "=== Install Dependencies Stage ==="
                 }
                 
-                // Install Docker and dependencies in Alpine container
+                // Install npm dependencies
                 sh '''
-                    echo "Installing required tools in Alpine container..."
-                    apk update
-                    apk add --no-cache docker docker-cli curl
-                    
-                    echo "Node.js version: $(node --version)"
-                    echo "NPM version: $(npm --version)"
-                    echo "Docker version: $(docker --version)"
+                    echo "Installing npm dependencies..."
                     
                     # Clear npm cache to avoid conflicts
                     npm cache clean --force || true
@@ -475,12 +489,16 @@ pipeline {
                 echo "Cleaning up workspace and temporary resources"
             }
             
-            // Clean up Docker images
-            sh """
-                docker rmi ${IMAGE_NAME}:${env.IMAGE_TAG} || true
-                docker rmi ${IMAGE_NAME}:scan || true
-                docker system prune -f || true
-            """
+            // Clean up Docker images if they exist
+            sh '''
+                if command -v docker > /dev/null && [ -n "${IMAGE_NAME:-}" ] && [ -n "${IMAGE_TAG:-}" ]; then
+                    docker rmi ${IMAGE_NAME}:${IMAGE_TAG} || true
+                    docker rmi ${IMAGE_NAME}:scan || true
+                    docker system prune -f || true
+                else
+                    echo "Skipping Docker cleanup - Docker not available or variables not set"
+                fi
+            '''
             
             // Archive build artifacts if they exist
             archiveArtifacts artifacts: 'dist/**/*', allowEmptyArchive: true
