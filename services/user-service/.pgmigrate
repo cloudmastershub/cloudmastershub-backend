@@ -1,0 +1,11 @@
+{
+  "database-url": {
+    "ENV": "DATABASE_URL"
+  },
+  "migrations-dir": "migrations",
+  "migrations-table": "pgmigrations",
+  "migration-filename-format": "utc",
+  "migration-file-language": "js",
+  "ignore-pattern": "\\..*",
+  "template-file-name": "template.js"
+}

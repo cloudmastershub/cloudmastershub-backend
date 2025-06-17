@@ -15,7 +15,12 @@
     "typecheck": "npm run typecheck --workspaces",
     "docker:build": "docker-compose build",
     "docker:up": "docker-compose up",
-    "docker:down": "docker-compose down"
+    "docker:down": "docker-compose down",
+    "migrate:postgres": "npm run migrate --workspace=@cloudmastershub/user-service",
+    "migrate:mongo": "npm run migrate --workspace=@cloudmastershub/course-service",
+    "migrate:up": "npm run migrate:postgres && npm run migrate:mongo",
+    "migrate:rollback": "npm run migrate:rollback --workspace=@cloudmastershub/user-service",
+    "setup:db": "npm run migrate:up && npm run seed --workspaces"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
@@ -25,7 +30,9 @@
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.4.1",
     "prettier": "^3.5.3",
-    "typescript": "^5.3.0"
+    "typescript": "^5.3.0",
+    "node-pg-migrate": "^7.7.1",
+    "migrate-mongo": "^11.0.0"
   },
   "engines": {
     "node": ">=18.0.0",

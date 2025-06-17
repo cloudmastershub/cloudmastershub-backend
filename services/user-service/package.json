@@ -9,7 +9,13 @@
     "start": "node dist/index.js",
     "test": "jest --passWithNoTests",
     "lint": "eslint src/**/*.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "migrate": "node-pg-migrate -m migrations",
+    "migrate:up": "node-pg-migrate -m migrations up",
+    "migrate:down": "node-pg-migrate -m migrations down",
+    "migrate:create": "node-pg-migrate -m migrations create",
+    "db:reset": "node-pg-migrate -m migrations down 0 && node-pg-migrate -m migrations up",
+    "seed": "ts-node scripts/seed.ts"
   },
   "dependencies": {
     "express": "^4.18.2",
@@ -20,7 +26,8 @@
     "bcryptjs": "^2.4.3",
     "jsonwebtoken": "^9.0.2",
     "express-validator": "^7.0.1",
-    "@prisma/client": "^5.7.0"
+    "pg": "^8.11.3",
+    "redis": "^4.6.12"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
@@ -35,6 +42,7 @@
     "ts-jest": "^29.1.1",
     "supertest": "^6.3.3",
     "@types/supertest": "^2.0.16",
-    "prisma": "^5.7.0"
+    "@types/pg": "^8.10.9",
+    "node-pg-migrate": "^7.7.1"
   }
 }

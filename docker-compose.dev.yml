@@ -1,5 +1,9 @@
 version: '3.8'
 
+# Development environment with hot-reload and database integration
+# Usage: docker-compose -f docker-compose.dev.yml up
+# Requires: .env file (copy from .env.example)
+
 services:
   # API Gateway with hot reload
   api-gateway:
@@ -15,12 +19,14 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=${NODE_ENV:-development}
       - PORT=3000
       - USER_SERVICE_URL=http://user-service:3001
       - COURSE_SERVICE_URL=http://course-service:3002
       - LAB_SERVICE_URL=http://lab-service:3003
-      - LOG_LEVEL=debug
+      - LOG_LEVEL=${LOG_LEVEL:-debug}
+      - JWT_SECRET=${JWT_SECRET}
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001
     depends_on:
       - user-service
       - course-service
@@ -42,12 +48,16 @@ services:
     ports:
       - "3001:3001"
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=${NODE_ENV:-development}
       - PORT=3001
-      - DATABASE_URL=postgresql://postgres:password@postgres:5432/cloudmastershub_users
-      - JWT_SECRET=dev-secret-key
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=15m
+      - REFRESH_TOKEN_SECRET=${REFRESH_TOKEN_SECRET}
+      - REFRESH_TOKEN_EXPIRES_IN=30d
       - REDIS_URL=redis://redis:6379
-      - LOG_LEVEL=debug
+      - LOG_LEVEL=${LOG_LEVEL:-debug}
+      - BCRYPT_ROUNDS=10
     depends_on:
       - postgres
       - redis
@@ -68,11 +78,15 @@ services:
     ports:
       - "3002:3002"
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=${NODE_ENV:-development}
       - PORT=3002
-      - MONGODB_URI=mongodb://mongodb:27017/cloudmastershub_courses
+      - MONGODB_URI=mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongodb:27017/${MONGO_INITDB_DATABASE}?authSource=admin
       - REDIS_URL=redis://redis:6379
-      - LOG_LEVEL=debug
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
+      - AWS_S3_BUCKET=${AWS_S3_BUCKET}
+      - LOG_LEVEL=${LOG_LEVEL:-debug}
     depends_on:
       - mongodb
       - redis
@@ -93,14 +107,17 @@ services:
     ports:
       - "3003:3003"
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=${NODE_ENV:-development}
       - PORT=3003
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - AWS_ACCESS_KEY_ID=mock-access-key
-      - AWS_SECRET_ACCESS_KEY=mock-secret-key
-      - AWS_REGION=us-east-1
-      - LOG_LEVEL=debug
+      - REDIS_URL=redis://redis:6379/2
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
+      - MAX_LAB_DURATION=3600
+      - MAX_CONCURRENT_LABS=100
+      - LOG_LEVEL=${LOG_LEVEL:-debug}
     depends_on:
       - redis
     networks:
@@ -110,13 +127,13 @@ services:
   postgres:
     image: postgres:15-alpine
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=cloudmastershub_users
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     networks:
       - cloudmastershub
 
@@ -124,11 +141,13 @@ services:
   mongodb:
     image: mongo:6-jammy
     environment:
-      - MONGO_INITDB_DATABASE=cloudmastershub_courses
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+      - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE}
     volumes:
       - mongodb_data:/data/db
     ports:
-      - "27017:27017"
+      - "${MONGODB_PORT:-27017}:27017"
     networks:
       - cloudmastershub
 
@@ -139,7 +158,7 @@ services:
     volumes:
       - redis_data:/data
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     networks:
       - cloudmastershub
 
@@ -147,7 +166,7 @@ services:
   adminer:
     image: adminer
     ports:
-      - "8080:8080"
+      - "${ADMINER_PORT:-8080}:8080"
     networks:
       - cloudmastershub
 
@@ -157,7 +176,7 @@ services:
     environment:
       - REDIS_HOSTS=local:redis:6379
     ports:
-      - "8081:8081"
+      - "${REDIS_COMMANDER_PORT:-8081}:8081"
     depends_on:
       - redis
     networks:
