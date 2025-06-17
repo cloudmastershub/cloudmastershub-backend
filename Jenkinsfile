@@ -2,7 +2,7 @@ pipeline {
     agent {
         docker {
             image 'node:18-alpine'
-            args '-v /var/run/docker.sock:/var/run/docker.sock'
+            args '-v /var/run/docker.sock:/var/run/docker.sock -u root:root'
         }
     }
     
@@ -38,6 +38,12 @@ pipeline {
                     echo "Installing required tools in Alpine container..."
                     apk update
                     apk add --no-cache git docker docker-cli curl
+                    
+                    # Add docker group if it doesn't exist and add root to it
+                    if ! getent group docker > /dev/null; then
+                        addgroup -g 999 docker
+                    fi
+                    adduser root docker || true
                     
                     echo "Node.js version: $(node --version)"
                     echo "NPM version: $(npm --version)"
