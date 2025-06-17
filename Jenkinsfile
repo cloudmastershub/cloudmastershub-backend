@@ -2,7 +2,7 @@ pipeline {
     agent {
         docker {
             image 'node:18-alpine'
-            args '-v /var/run/docker.sock:/var/run/docker.sock --user root:root'
+            args '-v /var/run/docker.sock:/var/run/docker.sock'
         }
     }
     
@@ -67,11 +67,11 @@ pipeline {
                     echo "=== Environment Setup Stage ==="
                 }
                 
-                // Install Docker and other tools needed for the pipeline
+                // Install Docker and dependencies in Alpine container
                 sh '''
-                    echo "Installing required tools..."
+                    echo "Installing required tools in Alpine container..."
                     apk update
-                    apk add --no-cache docker docker-cli curl kubectl
+                    apk add --no-cache docker docker-cli curl
                     
                     echo "Node.js version: $(node --version)"
                     echo "NPM version: $(npm --version)"
@@ -81,7 +81,7 @@ pipeline {
                     npm cache clean --force || true
                     
                     # Install dependencies
-                    npm install
+                    npm ci
                 '''
             }
         }
