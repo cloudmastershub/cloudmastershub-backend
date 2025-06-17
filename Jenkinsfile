@@ -1,5 +1,10 @@
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'node:18-alpine'
+            args '-v /var/run/docker.sock:/var/run/docker.sock --user root:root'
+        }
+    }
     
     environment {
         // Docker registry configuration
@@ -56,16 +61,21 @@ pipeline {
             }
         }
         
-        stage('Setup Node.js') {
+        stage('Setup Environment') {
             steps {
                 script {
-                    echo "=== Node.js Setup Stage ==="
+                    echo "=== Environment Setup Stage ==="
                 }
                 
-                // Check Node.js version and install dependencies
+                // Install Docker and other tools needed for the pipeline
                 sh '''
+                    echo "Installing required tools..."
+                    apk update
+                    apk add --no-cache docker docker-cli curl kubectl
+                    
                     echo "Node.js version: $(node --version)"
                     echo "NPM version: $(npm --version)"
+                    echo "Docker version: $(docker --version)"
                     
                     # Clear npm cache to avoid conflicts
                     npm cache clean --force || true
