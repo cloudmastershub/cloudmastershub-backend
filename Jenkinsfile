@@ -45,6 +45,10 @@ pipeline {
                     fi
                     adduser root docker || true
                     
+                    # Fix git safe directory issue
+                    git config --global --add safe.directory /var/lib/jenkins/workspace/cloudmastershub-backend
+                    git config --global --add safe.directory '*'
+                    
                     echo "Node.js version: $(node --version)"
                     echo "NPM version: $(npm --version)"
                     echo "Git version: $(git --version)"
