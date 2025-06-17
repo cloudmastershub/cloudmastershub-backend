@@ -253,20 +253,9 @@ pipeline {
                         echo "Warning: Could not push to registry - ${e.getMessage()}"
                         echo "Image built locally: ${IMAGE_NAME}:${env.IMAGE_TAG}"
                         
-                        // Try alternative push method
-                        echo "Attempting alternative push method..."
-                        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                            sh """
-                                echo "Logging in to Docker Hub..."
-                                echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin
-                                
-                                echo "Pushing images..."
-                                docker push ${IMAGE_NAME}:${env.IMAGE_TAG}
-                                docker push ${IMAGE_NAME}:latest
-                                
-                                echo "Docker push completed!"
-                            """
-                        }
+                        // Continue without failing the build
+                        echo "Note: Docker image is built but not pushed to registry"
+                        echo "To push manually, run: docker push ${IMAGE_NAME}:${env.IMAGE_TAG}"
                     }
                 }
             }
