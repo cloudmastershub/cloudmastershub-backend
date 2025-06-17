@@ -39,6 +39,12 @@ pipeline {
                     apk update
                     apk add --no-cache git docker docker-cli curl
                     
+                    # Install kubectl
+                    echo "Installing kubectl..."
+                    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+                    chmod +x kubectl
+                    mv kubectl /usr/local/bin/
+                    
                     # Add docker group if it doesn't exist and add root to it
                     if ! getent group docker > /dev/null; then
                         addgroup -g 999 docker
@@ -53,6 +59,7 @@ pipeline {
                     echo "NPM version: $(npm --version)"
                     echo "Git version: $(git --version)"
                     echo "Docker version: $(docker --version)"
+                    echo "Kubectl version: $(kubectl version --client --short)"
                 '''
             }
         }
@@ -300,9 +307,11 @@ pipeline {
                     echo "🏷️  Application: cloudmastershub-backend"
                     echo "🐳 Image: ${IMAGE_NAME}:${env.IMAGE_TAG}"
                     
-                    sh '''
-                        if command -v kubectl > /dev/null; then
-                            echo "✅ Kubectl available - proceeding with backend deployment"
+                    // Try to deploy with kubeconfig if available
+                    try {
+                        withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG')]) {
+                            sh '''
+                                echo "✅ Kubectl and kubeconfig available - proceeding with backend deployment"
                             
                             # Check if namespace exists
                             if kubectl get namespace cloudmastershub-dev > /dev/null 2>&1; then
@@ -384,6 +393,12 @@ pipeline {
                             echo "⚠️  Note: kubectl CLI needed for actual deployment"
                         fi
                     '''
+                        }
+                    } catch (Exception e) {
+                        echo "⚠️  Kubernetes credentials not found or kubectl not available"
+                        echo "   Please add 'kubeconfig' credential in Jenkins to enable automatic deployment"
+                        echo "   Or deploy manually using: kubectl apply -f k8s/ -n cloudmastershub-dev"
+                    }
                 }
             }
         }
