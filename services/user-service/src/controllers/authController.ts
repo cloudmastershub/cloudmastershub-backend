@@ -9,9 +9,20 @@ const REFRESH_TOKEN_EXPIRES_IN = '30d';
 
 export const register = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { email, firstName, lastName } = req.body;
+    const { email, name, firstName, lastName } = req.body;
     // TODO: Use password from req.body for actual user registration
     // const { password } = req.body;
+
+    // Handle both single 'name' field and separate firstName/lastName fields
+    let userFirstName = firstName;
+    let userLastName = lastName;
+    
+    if (name && !firstName && !lastName) {
+      // Split single name field into firstName and lastName
+      const nameParts = name.trim().split(' ');
+      userFirstName = nameParts[0] || '';
+      userLastName = nameParts.slice(1).join(' ') || nameParts[0] || '';
+    }
 
     // TODO: Check if user exists in database
     // TODO: Hash password and save user to database
@@ -23,8 +34,8 @@ export const register = async (req: Request, res: Response, next: NextFunction):
     const user = {
       id: '1234',
       email,
-      firstName,
-      lastName,
+      firstName: userFirstName,
+      lastName: userLastName,
       createdAt: new Date(),
     };
 
