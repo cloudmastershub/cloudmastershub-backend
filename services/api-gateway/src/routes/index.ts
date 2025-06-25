@@ -5,6 +5,10 @@ import logger from '../utils/logger';
 const router = Router();
 
 const serviceRoutes = {
+  '/auth': {
+    target: process.env.USER_SERVICE_URL || 'http://user-service:3001',
+    changeOrigin: true,
+  },
   '/users': {
     target: process.env.USER_SERVICE_URL || 'http://user-service:3001',
     changeOrigin: true,
