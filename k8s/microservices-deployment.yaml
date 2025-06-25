@@ -65,6 +65,8 @@ spec:
           value: "http://cloudmastershub-course-service.cloudmastershub-dev.svc.cluster.local:3002"
         - name: LAB_SERVICE_URL
           value: "http://cloudmastershub-lab-service.cloudmastershub-dev.svc.cluster.local:3003"
+        - name: ALLOWED_ORIGINS
+          value: "https://cloudmastershub.com,https://www.cloudmastershub.com,https://api.cloudmastershub.com"
         envFrom:
         - configMapRef:
             name: cloudmastershub-config
@@ -525,10 +527,10 @@ metadata:
 spec:
   tls:
   - hosts:
-    - api-dev.cloudmastershub.com
+    - api.cloudmastershub.com
     secretName: cloudmastershub-tls
   rules:
-  - host: api-dev.cloudmastershub.com
+  - host: api.cloudmastershub.com
     http:
       paths:
       - path: /
