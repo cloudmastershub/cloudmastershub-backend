@@ -21,15 +21,33 @@ app.use(cors({
   origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3001'],
   credentials: true,
 }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
 // Health check endpoint (exclude from rate limiting)
 app.get('/health', (req, res) => {
   res.json({ status: 'healthy', service: 'api-gateway', timestamp: new Date().toISOString() });
 });
 
+// Apply rate limiter before body parsing
 app.use(rateLimiter);
+
+// Apply body parsing only to non-proxy routes
+app.use((req, res, next) => {
+  // Skip body parsing for proxy routes
+  if (req.path.startsWith('/api/')) {
+    next();
+  } else {
+    express.json()(req, res, next);
+  }
+});
+
+app.use((req, res, next) => {
+  // Skip body parsing for proxy routes
+  if (req.path.startsWith('/api/')) {
+    next();
+  } else {
+    express.urlencoded({ extended: true })(req, res, next);
+  }
+});
 
 app.use('/api', routes);
 
