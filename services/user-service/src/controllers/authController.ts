@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 // import bcrypt from 'bcryptjs'; // TODO: Uncomment when implementing actual password hashing
 import jwt from 'jsonwebtoken';
 import logger from '../utils/logger';
+import { getUserEventPublisher } from '../events/userEventPublisher';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 const JWT_EXPIRES_IN = '15m';
@@ -71,6 +72,15 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
       expiresIn: REFRESH_TOKEN_EXPIRES_IN,
     });
 
+    // Publish login event
+    const eventPublisher = getUserEventPublisher();
+    await eventPublisher.publishUserLogin(user.id, {
+      email: user.email,
+      loginMethod: 'email_password',
+      ipAddress: req.ip || req.connection.remoteAddress,
+      userAgent: req.get('User-Agent')
+    });
+
     res.json({
       success: true,
       data: {
@@ -78,6 +88,41 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
         accessToken,
         refreshToken,
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const logout = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    // In a real implementation, you would:
+    // 1. Invalidate the refresh token in the database
+    // 2. Add the JWT to a blacklist (if using stateful approach)
+    // 3. Clear any session data
+
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        
+        // Publish logout event
+        const eventPublisher = getUserEventPublisher();
+        await eventPublisher.publishUserLogout(decoded.userId, {
+          email: decoded.email
+        });
+        
+        logger.info('User logged out', { userId: decoded.userId, email: decoded.email });
+      } catch (tokenError) {
+        // Token might be expired or invalid, but that's okay for logout
+        logger.debug('Token verification failed during logout:', tokenError);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Logged out successfully'
     });
   } catch (error) {
     next(error);

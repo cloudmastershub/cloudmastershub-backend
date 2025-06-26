@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
-import { register, login, refreshToken } from '../controllers/authController';
+import { register, login, logout, refreshToken } from '../controllers/authController';
 import { validateRequest } from '../middleware/validateRequest';
 
 const router = Router();
@@ -24,6 +24,7 @@ router.post(
   login
 );
 
+router.post('/logout', logout);
 router.post('/refresh', refreshToken);
 
 export default router;

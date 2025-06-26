@@ -1,4 +1,5 @@
 import logger from '../utils/logger';
+import { getUserEventPublisher } from '../events/userEventPublisher';
 
 // Mock user database - in production, this would be PostgreSQL
 interface User {
@@ -78,6 +79,7 @@ export const updateUser = async (userId: string, updates: Partial<User>): Promis
       return null;
     }
 
+    const previousData = { ...user };
     const updatedUser: User = {
       ...user,
       ...updates,
@@ -90,6 +92,33 @@ export const updateUser = async (userId: string, updates: Partial<User>): Promis
       userId,
       updatedFields: Object.keys(updates)
     });
+
+    // Publish events for specific updates
+    const eventPublisher = getUserEventPublisher();
+    
+    // Check for email change
+    if (updates.email && updates.email !== user.email) {
+      await eventPublisher.publishEmailChanged(userId, updates.email, user.email);
+    }
+    
+    // Check for role change
+    if (updates.roles && JSON.stringify(updates.roles) !== JSON.stringify(user.roles)) {
+      await eventPublisher.publishRoleChanged(userId, updates.roles, user.roles);
+    }
+    
+    // Check for profile updates
+    const profileFields = ['firstName', 'lastName', 'bio'];
+    const profileUpdates = Object.keys(updates).filter(key => profileFields.includes(key));
+    if (profileUpdates.length > 0) {
+      const profileData = profileUpdates.reduce((obj: any, key: string) => {
+        obj[key] = updates[key as keyof User];
+        return obj;
+      }, {});
+      await eventPublisher.publishProfileUpdated(userId, profileData);
+    }
+    
+    // General user updated event
+    await eventPublisher.publishUserUpdated(userId, updates);
 
     return updatedUser;
   } catch (error) {
@@ -171,6 +200,15 @@ export const createUser = async (userData: {
     logger.info('User created successfully', {
       userId: newUser.id,
       email: newUser.email
+    });
+
+    // Publish user created event
+    const eventPublisher = getUserEventPublisher();
+    await eventPublisher.publishUserCreated(newUser.id, {
+      email: newUser.email,
+      firstName: newUser.firstName,
+      lastName: newUser.lastName,
+      roles: newUser.roles
     });
 
     return newUser;
