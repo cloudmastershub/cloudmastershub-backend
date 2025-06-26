@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import logger from '../utils/logger';
+import { getCourseEventPublisher } from '../events/courseEventPublisher';
 
 export const getAllCourses = async (
   req: Request,
@@ -133,13 +134,30 @@ export const createCourse = async (
     // TODO: Validate course data
     // TODO: Save to MongoDB
 
+    const courseId = `course-${Date.now()}`;
+    const instructorId = req.body.instructorId || 'instructor-123'; // In real app, get from auth token
+
     logger.info('Creating new course:', courseData.title);
+
+    // Publish course created event
+    const eventPublisher = getCourseEventPublisher();
+    await eventPublisher.publishCourseCreated(courseId, {
+      title: courseData.title,
+      description: courseData.description,
+      instructorId,
+      category: courseData.category || 'general',
+      difficulty: courseData.difficulty || 'beginner',
+      duration: courseData.duration,
+      price: courseData.price
+    });
 
     res.status(201).json({
       success: true,
       data: {
-        id: 'new-course-id',
+        id: courseId,
         ...courseData,
+        instructorId,
+        status: 'draft',
         createdAt: new Date(),
       },
     });
@@ -159,7 +177,20 @@ export const updateCourse = async (
 
     // TODO: Update course in MongoDB
 
+    const instructorId = req.body.instructorId || 'instructor-123'; // In real app, get from auth token
+
     logger.info(`Updating course ${id}`);
+
+    // Publish course updated event
+    const eventPublisher = getCourseEventPublisher();
+    await eventPublisher.publishCourseUpdated(id, updates, instructorId);
+
+    // Check if status was changed to published
+    if (updates.status === 'published') {
+      await eventPublisher.publishCoursePublished(id, instructorId);
+    } else if (updates.status === 'unpublished') {
+      await eventPublisher.publishCourseUnpublished(id, instructorId, updates.reason);
+    }
 
     res.json({
       success: true,
@@ -184,7 +215,14 @@ export const deleteCourse = async (
 
     // TODO: Delete course from MongoDB
 
+    const instructorId = req.body.instructorId || 'instructor-123'; // In real app, get from auth token
+    const reason = req.body.reason || 'Course deletion requested';
+
     logger.info(`Deleting course ${id}`);
+
+    // Publish course deleted event
+    const eventPublisher = getCourseEventPublisher();
+    await eventPublisher.publishCourseDeleted(id, instructorId, reason);
 
     res.json({
       success: true,
@@ -202,12 +240,16 @@ export const enrollInCourse = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const { userId } = req.body;
+    const { userId, enrollmentType = 'free' } = req.body;
 
     // TODO: Create enrollment record
     // TODO: Send notification
 
     logger.info(`User ${userId} enrolling in course ${id}`);
+
+    // Publish course enrolled event
+    const eventPublisher = getCourseEventPublisher();
+    await eventPublisher.publishCourseEnrolled(id, userId, enrollmentType);
 
     res.json({
       success: true,
@@ -215,6 +257,7 @@ export const enrollInCourse = async (
         enrollmentId: 'enrollment-123',
         courseId: id,
         userId,
+        enrollmentType,
         enrolledAt: new Date(),
       },
     });

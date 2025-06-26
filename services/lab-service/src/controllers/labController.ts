@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import logger from '../utils/logger';
+import { getLabEventPublisher } from '../events/labEventPublisher';
 
 export const getAllLabs = async (
   req: Request,
@@ -141,13 +142,28 @@ export const createLab = async (req: Request, res: Response, next: NextFunction)
 
     // TODO: Validate and save lab to database
 
+    const labId = `lab-${Date.now()}`;
+    const instructorId = req.body.instructorId || 'instructor-123'; // In real app, get from auth token
+
     logger.info('Creating new lab:', labData.title);
+
+    // Publish lab created event
+    const eventPublisher = getLabEventPublisher();
+    await eventPublisher.publishLabCreated(labId, {
+      title: labData.title,
+      type: labData.type || 'aws',
+      difficulty: labData.difficulty || 'beginner',
+      duration: labData.estimatedTime || 30,
+      instructorId
+    });
 
     res.status(201).json({
       success: true,
       data: {
-        id: 'new-lab-id',
+        id: labId,
         ...labData,
+        instructorId,
+        status: 'draft',
         createdAt: new Date(),
       },
     });
@@ -163,7 +179,18 @@ export const updateLab = async (req: Request, res: Response, next: NextFunction)
 
     // TODO: Update lab in database
 
+    const instructorId = req.body.instructorId || 'instructor-123'; // In real app, get from auth token
+
     logger.info(`Updating lab ${id}`);
+
+    // Publish lab updated event
+    const eventPublisher = getLabEventPublisher();
+    await eventPublisher.publishLabUpdated(id, updates, instructorId);
+
+    // Check if status was changed to published
+    if (updates.status === 'published') {
+      await eventPublisher.publishLabPublished(id, instructorId);
+    }
 
     res.json({
       success: true,
@@ -184,7 +211,14 @@ export const deleteLab = async (req: Request, res: Response, next: NextFunction)
 
     // TODO: Delete lab from database
 
+    const instructorId = req.body.instructorId || 'instructor-123'; // In real app, get from auth token
+    const reason = req.body.reason || 'Lab deletion requested';
+
     logger.info(`Deleting lab ${id}`);
+
+    // Publish lab deleted event
+    const eventPublisher = getLabEventPublisher();
+    await eventPublisher.publishLabDeleted(id, instructorId, reason);
 
     res.json({
       success: true,

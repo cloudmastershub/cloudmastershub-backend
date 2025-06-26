@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { labQueue } from '../services/queueService';
 import logger from '../utils/logger';
+import { getLabEventPublisher } from '../events/labEventPublisher';
 
 export const startLabSession = async (
   req: Request,
@@ -24,6 +25,16 @@ export const startLabSession = async (
     });
 
     logger.info(`Starting lab session ${sessionId} for user ${userId}`);
+
+    // Publish lab session started event
+    const eventPublisher = getLabEventPublisher();
+    await eventPublisher.publishLabSessionStarted(labId, userId, {
+      sessionId,
+      cloudProvider: 'aws', // TODO: Get from lab configuration
+      region: 'us-east-1', // TODO: Get from lab configuration
+      environmentId: `env-${sessionId}`,
+      resources: ['ec2-instance'] // TODO: Get from lab configuration
+    });
 
     res.json({
       success: true,
@@ -89,6 +100,7 @@ export const stopLabSession = async (
 ): Promise<void> => {
   try {
     const { sessionId } = req.params;
+    const { labId, userId } = req.body; // TODO: In real app, get from session data
 
     // Add to queue for cleanup
     await labQueue.add('cleanup-lab', {
@@ -97,6 +109,15 @@ export const stopLabSession = async (
     });
 
     logger.info(`Stopping lab session ${sessionId}`);
+
+    // Publish lab session stopped event
+    const eventPublisher = getLabEventPublisher();
+    await eventPublisher.publishLabSessionStopped(labId || 'lab-unknown', userId || 'user-unknown', {
+      sessionId,
+      sessionDuration: 1800, // TODO: Calculate actual duration
+      reason: 'User requested stop',
+      cost: 2.50 // TODO: Get actual cost calculation
+    });
 
     res.json({
       success: true,
@@ -154,10 +175,24 @@ export const submitLabSolution = async (
 ): Promise<void> => {
   try {
     const { sessionId } = req.params;
+    const { labId, userId, solutionId } = req.body; // TODO: Get from session/request data
     // TODO: Use solution from req.body to validate against lab requirements and run automated tests
     // const { solution } = req.body;
 
     logger.info(`Validating solution for session ${sessionId}`);
+
+    const eventPublisher = getLabEventPublisher();
+
+    // Publish solution submitted event
+    await eventPublisher.publishLabSolutionSubmitted(
+      labId || 'lab-unknown',
+      userId || 'user-unknown',
+      {
+        sessionId,
+        solutionId: solutionId || `solution-${Date.now()}`,
+        submissionTime: 1200 // TODO: Calculate actual submission time
+      }
+    );
 
     // Mock validation result
     const result = {
@@ -174,6 +209,33 @@ export const submitLabSolution = async (
       },
       completedAt: new Date(),
     };
+
+    // Publish solution graded event
+    await eventPublisher.publishLabSolutionGraded(
+      labId || 'lab-unknown',
+      userId || 'user-unknown',
+      {
+        sessionId,
+        solutionId: solutionId || `solution-${Date.now()}`,
+        score: result.score,
+        maxScore: 100,
+        feedback: 'Excellent work! All checkpoints passed.'
+      }
+    );
+
+    // If the lab is completed successfully, publish completion event
+    if (result.passed && result.score >= 70) {
+      await eventPublisher.publishLabSessionCompleted(
+        labId || 'lab-unknown',
+        userId || 'user-unknown',
+        {
+          sessionId,
+          sessionDuration: 1800, // TODO: Calculate actual duration
+          solutionScore: result.score,
+          cost: 2.50 // TODO: Get actual cost
+        }
+      );
+    }
 
     res.json({
       success: true,
