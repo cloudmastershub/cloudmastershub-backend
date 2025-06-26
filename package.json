@@ -19,14 +19,16 @@
     "migrate:postgres": "npm run migrate --workspace=@cloudmastershub/user-service",
     "migrate:mongo": "npm run migrate --workspace=@cloudmastershub/course-service",
     "migrate:payments": "npm run db:setup --workspace=@cloudmastershub/payment-service",
-    "migrate:up": "npm run migrate:postgres && npm run migrate:mongo && npm run migrate:payments",
+    "migrate:admin": "npm run migrate --workspace=@cloudmastershub/admin-service",
+    "migrate:up": "npm run migrate:postgres && npm run migrate:mongo && npm run migrate:payments && npm run migrate:admin",
     "migrate:rollback": "npm run migrate:rollback --workspace=@cloudmastershub/user-service",
     "setup:db": "npm run migrate:up && npm run seed --workspaces",
     "start:api-gateway": "npm run start --workspace=@cloudmastershub/api-gateway",
     "start:user-service": "npm run start --workspace=@cloudmastershub/user-service",
     "start:course-service": "npm run start --workspace=@cloudmastershub/course-service",
     "start:lab-service": "npm run start --workspace=@cloudmastershub/lab-service",
-    "start:payment-service": "npm run start --workspace=@cloudmastershub/payment-service"
+    "start:payment-service": "npm run start --workspace=@cloudmastershub/payment-service",
+    "start:admin-service": "npm run start --workspace=@cloudmastershub/admin-service"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",

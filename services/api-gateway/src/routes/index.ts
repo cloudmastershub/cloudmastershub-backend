@@ -86,6 +86,15 @@ const serviceRoutes = {
       '^/api/webhooks': '/webhooks'
     }
   },
+  '/admin': {
+    target: process.env.ADMIN_SERVICE_URL || 'http://admin-service:3005',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/admin': '/admin'
+    }
+  },
 };
 
 Object.entries(serviceRoutes).forEach(([path, config]) => {
