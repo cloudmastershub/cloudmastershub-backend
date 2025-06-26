@@ -270,6 +270,7 @@ export interface EventConfig {
   enableEventStore: boolean;
   enableMetrics: boolean;
   enableDeadLetterQueue: boolean;
+  enableValidation: boolean;
   channels: {
     payment: string;
     user: string;

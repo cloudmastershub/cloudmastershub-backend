@@ -15,6 +15,7 @@
     "@cloudmastershub/types": "^1.0.0",
     "axios": "^1.6.2",
     "bcryptjs": "^2.4.3",
+    "ioredis": "^5.3.2",
     "jsonwebtoken": "^9.0.2",
     "redis": "^4.6.12",
     "uuid": "^9.0.0",

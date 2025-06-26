@@ -3,3 +3,6 @@ export * from './validation';
 export * from './logger';
 export * from './errors';
 export * from './httpClient';
+export * from './eventBus';
+export * from './eventValidation';
+export * from './eventReplay';

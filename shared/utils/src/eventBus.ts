@@ -12,6 +12,8 @@ import {
   EventMetrics
 } from '@cloudmastershub/types';
 import logger from './logger';
+import { getEventValidator, ValidationResult } from './eventValidation';
+import { RedisEventStore } from './eventReplay';
 
 export class EventBus implements EventPublisher, EventSubscriber {
   private publishClient: RedisClientType;
@@ -20,6 +22,8 @@ export class EventBus implements EventPublisher, EventSubscriber {
   private handlers: Map<string, EventHandler[]> = new Map();
   private metrics: Map<string, EventMetrics> = new Map();
   private isConnected: boolean = false;
+  private eventValidator = getEventValidator();
+  private eventStore?: RedisEventStore;
 
   constructor(config: EventConfig) {
     this.config = config;
@@ -56,6 +60,11 @@ export class EventBus implements EventPublisher, EventSubscriber {
         this.startMetricsCollection();
       }
 
+      // Initialize event store if enabled
+      if (this.config.enableEventStore) {
+        this.eventStore = new RedisEventStore(this.publishClient as any, 'cloudmasters:events');
+      }
+
     } catch (error) {
       logger.error('Failed to initialize event bus:', error);
       throw error;
@@ -73,6 +82,14 @@ export class EventBus implements EventPublisher, EventSubscriber {
     }
 
     try {
+      // Validate event schema
+      if (this.config.enableValidation !== false) {
+        const validationResult = this.eventValidator.validate(event);
+        if (!validationResult.isValid) {
+          throw new Error(`Event validation failed: ${validationResult.errors.join(', ')}`);
+        }
+      }
+
       // Create event envelope
       const envelope: EventEnvelope = {
         event,
@@ -105,8 +122,8 @@ export class EventBus implements EventPublisher, EventSubscriber {
       }
 
       // Store event if event store is enabled
-      if (this.config.enableEventStore) {
-        await this.storeEvent(event, envelope);
+      if (this.config.enableEventStore && this.eventStore) {
+        await this.eventStore.save(event);
       }
 
       // Update metrics
@@ -359,14 +376,18 @@ export class EventBus implements EventPublisher, EventSubscriber {
     return 'events:general';
   }
 
-  private async storeEvent(event: CloudMastersEvent, envelope: EventEnvelope): Promise<void> {
-    try {
-      const key = `event:${event.id}`;
-      const data = JSON.stringify({ event, envelope });
-      await this.publishClient.setex(key, 86400, data); // Store for 24 hours
-    } catch (error) {
-      logger.error('Failed to store event:', error);
-    }
+  /**
+   * Get event store instance (for replay functionality)
+   */
+  getEventStore(): RedisEventStore | undefined {
+    return this.eventStore;
+  }
+
+  /**
+   * Validate an event manually
+   */
+  validateEvent(event: CloudMastersEvent): ValidationResult {
+    return this.eventValidator.validate(event);
   }
 
   private updateMetrics(eventType: string, operation: 'published' | 'received' | 'processed' | 'failed' | 'retried', processingTime?: number): void {
@@ -457,6 +478,7 @@ export const createEventBus = (config: Partial<EventConfig>): EventBus => {
     enableEventStore: true,
     enableMetrics: true,
     enableDeadLetterQueue: true,
+    enableValidation: true,
     channels: {
       payment: 'events:payment',
       user: 'events:user',
