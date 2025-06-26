@@ -3,7 +3,8 @@ import { authenticateToken } from '@cloudmastershub/middleware';
 import {
   createPurchase,
   getPurchaseHistory,
-  getPurchaseStatus
+  getPurchaseStatus,
+  refundPurchase
 } from '../controllers/purchase.controller';
 
 const router = Router();
@@ -14,5 +15,6 @@ router.use(authenticateToken);
 router.post('/create', createPurchase);
 router.get('/history/:userId', getPurchaseHistory);
 router.get('/:purchaseId/status', getPurchaseStatus);
+router.post('/:purchaseId/refund', refundPurchase);
 
 export default router;

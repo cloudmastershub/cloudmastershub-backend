@@ -5,7 +5,8 @@ import {
   createCheckoutSession,
   cancelSubscription,
   getSubscriptionPlans,
-  createSubscription
+  createSubscription,
+  updateSubscription
 } from '../controllers/subscription.controller';
 
 const router = Router();
@@ -20,5 +21,6 @@ router.get('/status/:userId', getSubscriptionStatus);
 router.post('/checkout-session', createCheckoutSession);
 router.post('/create', createSubscription);
 router.post('/:subscriptionId/cancel', cancelSubscription);
+router.put('/:subscriptionId', updateSubscription);
 
 export default router;

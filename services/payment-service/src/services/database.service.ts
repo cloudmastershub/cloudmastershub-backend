@@ -5,8 +5,8 @@ let pool: Pool | null = null;
 
 export const connectDatabase = async (): Promise<void> => {
   try {
-    const connectionString = process.env.PAYMENT_DATABASE_URL || 
-      `postgresql://${process.env.POSTGRES_USER}:${process.env.POSTGRES_PASSWORD}@${process.env.POSTGRES_HOST}:${process.env.POSTGRES_PORT}/${process.env.POSTGRES_DB}`;
+    const connectionString = process.env.DATABASE_URL || 
+      `postgresql://${process.env.DB_USER || process.env.POSTGRES_USER}:${process.env.DB_PASSWORD || process.env.POSTGRES_PASSWORD}@${process.env.DB_HOST || process.env.POSTGRES_HOST || 'localhost'}:${process.env.DB_PORT || process.env.POSTGRES_PORT || '5432'}/${process.env.DB_NAME || process.env.POSTGRES_DB || 'cloudmastershub_payments'}`;
 
     pool = new Pool({
       connectionString,

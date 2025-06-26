@@ -5,7 +5,8 @@ import {
   getPaymentMethods,
   addPaymentMethod,
   removePaymentMethod,
-  setDefaultPaymentMethod
+  setDefaultPaymentMethod,
+  createSetupIntent
 } from '../controllers/payment.controller';
 
 const router = Router();
@@ -18,5 +19,6 @@ router.get('/methods/:userId', getPaymentMethods);
 router.post('/methods', addPaymentMethod);
 router.delete('/methods/:paymentMethodId', removePaymentMethod);
 router.post('/methods/:paymentMethodId/default', setDefaultPaymentMethod);
+router.post('/setup-intent', createSetupIntent);
 
 export default router;
