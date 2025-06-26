@@ -65,6 +65,8 @@ spec:
           value: "http://cloudmastershub-course-service.cloudmastershub-dev.svc.cluster.local:3002"
         - name: LAB_SERVICE_URL
           value: "http://cloudmastershub-lab-service.cloudmastershub-dev.svc.cluster.local:3003"
+        - name: PAYMENT_SERVICE_URL
+          value: "http://cloudmastershub-payment-service.cloudmastershub-dev.svc.cluster.local:3004"
         - name: ALLOWED_ORIGINS
           value: "https://cloudmastershub.com,https://www.cloudmastershub.com,https://api.cloudmastershub.com"
         envFrom:
@@ -546,3 +548,149 @@ spec:
             name: cloudmastershub-api-gateway
             port:
               number: 3000
+
+---
+# Payment Service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudmastershub-payment-service
+  namespace: cloudmastershub-dev
+  labels:
+    app: cloudmastershub
+    tier: backend
+    service: payment-service
+    environment: dev
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: cloudmastershub
+      service: payment-service
+  template:
+    metadata:
+      labels:
+        app: cloudmastershub
+        tier: backend
+        service: payment-service
+        environment: dev
+    spec:
+      serviceAccountName: cloudmastershub-backend-sa
+      containers:
+      - name: payment-service
+        image: mbuaku/cloudmastershub-backend:latest
+        ports:
+        - containerPort: 3004
+          name: http
+        env:
+        - name: SERVICE_NAME
+          value: "payment-service"
+        - name: PORT
+          value: "3004"
+        - name: NODE_ENV
+          value: "production"
+        - name: DATABASE_URL
+          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres.cloudmastershub-dev.svc.cluster.local:5432/cloudmastershub_payments"
+        - name: PAYMENT_DATABASE_URL
+          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres.cloudmastershub-dev.svc.cluster.local:5432/cloudmastershub_payments"
+        - name: REDIS_URL
+          value: "redis://redis.cloudmastershub-dev.svc.cluster.local:6379/3"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: cloudmastershub-secrets
+              key: postgres-username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: cloudmastershub-secrets
+              key: postgres-password
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: cloudmastershub-secrets
+              key: jwt-secret
+        - name: STRIPE_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: cloudmastershub-secrets
+              key: stripe-secret-key
+        - name: STRIPE_WEBHOOK_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: cloudmastershub-secrets
+              key: stripe-webhook-secret
+        - name: STRIPE_PUBLISHABLE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: cloudmastershub-secrets
+              key: stripe-publishable-key
+        - name: CORS_ORIGIN
+          value: "https://cloudmastershub.com,https://www.cloudmastershub.com,https://api.cloudmastershub.com"
+        envFrom:
+        - configMapRef:
+            name: cloudmastershub-config
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3004
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3004
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1001
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: logs
+          mountPath: /app/logs
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: logs
+        emptyDir: {}
+      restartPolicy: Always
+
+---
+# Payment Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloudmastershub-payment-service
+  namespace: cloudmastershub-dev
+  labels:
+    app: cloudmastershub
+    service: payment-service
+spec:
+  type: ClusterIP
+  selector:
+    app: cloudmastershub
+    service: payment-service
+  ports:
+  - port: 3004
+    targetPort: 3004
+    protocol: TCP
+    name: http

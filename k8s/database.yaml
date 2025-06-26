@@ -137,7 +137,7 @@ spec:
   resources:
     requests:
       storage: 20Gi
-  storageClassName: local-path  # Using local-path storage provisioner
+  storageClassName: standard  # Using standard storage provisioner
 
 ---
 # Redis Deployment
@@ -269,7 +269,7 @@ spec:
   resources:
     requests:
       storage: 20Gi
-  storageClassName: local-path  # Using local-path storage provisioner
+  storageClassName: standard  # Using standard storage provisioner
 
 ---
 # PostgreSQL Deployment
@@ -407,4 +407,4 @@ spec:
   resources:
     requests:
       storage: 20Gi
-  storageClassName: local-path  # Using local-path storage provisioner
+  storageClassName: standard  # Using standard storage provisioner

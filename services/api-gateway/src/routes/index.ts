@@ -41,6 +41,42 @@ const serviceRoutes = {
       '^/api/labs': '/labs'
     }
   },
+  '/payments': {
+    target: process.env.PAYMENT_SERVICE_URL || 'http://payment-service:3004',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/payments': '/payments'
+    }
+  },
+  '/subscriptions': {
+    target: process.env.PAYMENT_SERVICE_URL || 'http://payment-service:3004',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/subscriptions': '/subscriptions'
+    }
+  },
+  '/purchases': {
+    target: process.env.PAYMENT_SERVICE_URL || 'http://payment-service:3004',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/purchases': '/purchases'
+    }
+  },
+  '/webhooks': {
+    target: process.env.PAYMENT_SERVICE_URL || 'http://payment-service:3004',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/webhooks': '/webhooks'
+    }
+  },
 };
 
 Object.entries(serviceRoutes).forEach(([path, config]) => {
