@@ -1,5 +1,11 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/authenticate';
+import { 
+  getUserById, 
+  updateUser, 
+  getUserSubscriptionInfo, 
+  updateUserSubscriptionStatus 
+} from '../services/userService';
 import logger from '../utils/logger';
 
 export const getProfile = async (
@@ -10,24 +16,52 @@ export const getProfile = async (
   try {
     const userId = req.userId;
 
-    // TODO: Fetch user from database
+    if (!userId) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'User ID is required' }
+      });
+      return;
+    }
 
-    // Mock user profile
-    const user = {
-      id: userId,
-      email: req.userEmail,
-      firstName: 'John',
-      lastName: 'Doe',
-      bio: 'Cloud enthusiast',
-      subscription: 'free',
-      createdAt: new Date('2024-01-01'),
+    const user = await getUserById(userId);
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        error: { message: 'User not found' }
+      });
+      return;
+    }
+
+    // Get subscription info
+    const subscriptionInfo = await getUserSubscriptionInfo(userId);
+
+    const userProfile = {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      bio: user.bio,
+      roles: user.roles,
+      subscription: {
+        status: user.subscriptionStatus,
+        plan: user.subscriptionPlan,
+        isActive: subscriptionInfo?.isActive || false,
+        startDate: user.subscriptionStartDate,
+        endDate: user.subscriptionEndDate,
+        lastPaymentDate: user.lastPaymentDate,
+        paymentStatus: user.paymentStatus
+      },
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt
     };
 
     res.json({
       success: true,
-      data: user,
+      data: userProfile,
     });
   } catch (error) {
+    logger.error('Error in getProfile:', error);
     next(error);
   }
 };
@@ -41,18 +75,48 @@ export const updateProfile = async (
     const userId = req.userId;
     const updates = req.body;
 
-    // TODO: Update user in database
+    if (!userId) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'User ID is required' }
+      });
+      return;
+    }
 
-    logger.info(`Updating profile for user ${userId}:`, updates);
+    // Filter allowed update fields
+    const allowedFields = ['firstName', 'lastName', 'bio'];
+    const filteredUpdates = Object.keys(updates)
+      .filter(key => allowedFields.includes(key))
+      .reduce((obj: any, key: string) => {
+        obj[key] = updates[key];
+        return obj;
+      }, {});
+
+    const updatedUser = await updateUser(userId, filteredUpdates);
+    
+    if (!updatedUser) {
+      res.status(404).json({
+        success: false,
+        error: { message: 'User not found' }
+      });
+      return;
+    }
+
+    logger.info(`Profile updated for user ${userId}:`, filteredUpdates);
 
     res.json({
       success: true,
       data: {
-        id: userId,
-        ...updates,
+        id: updatedUser.id,
+        email: updatedUser.email,
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        bio: updatedUser.bio,
+        updatedAt: updatedUser.updatedAt
       },
     });
   } catch (error) {
+    logger.error('Error in updateProfile:', error);
     next(error);
   }
 };

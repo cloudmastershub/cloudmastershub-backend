@@ -4,3 +4,4 @@ export * from './rateLimiter';
 export * from './validateRequest';
 export * from './cors';
 export * from './security';
+export * from './requireSubscription';

@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import labRoutes from './routes/labRoutes';
 import sessionRoutes from './routes/sessionRoutes';
 import { errorHandler } from './middleware/errorHandler';
+import { initializeLabPaymentEventSubscriber } from './events/paymentEventSubscriber';
 import logger from './utils/logger';
 import { initializeQueue } from './services/queueService';
 
@@ -29,6 +30,7 @@ app.use(errorHandler);
 
 app.listen(PORT, () => {
   logger.info(`Lab Service running on port ${PORT}`);
+  
   // Initialize queue service after server starts
   try {
     initializeQueue();
@@ -36,4 +38,8 @@ app.listen(PORT, () => {
   } catch (error) {
     logger.error('Failed to initialize queue service:', error);
   }
+  
+  // Initialize payment event subscriber
+  initializeLabPaymentEventSubscriber();
+  logger.info('Lab service payment event subscriber initialized');
 });

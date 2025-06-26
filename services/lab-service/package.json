@@ -19,7 +19,11 @@
     "winston": "^3.11.0",
     "express-validator": "^7.0.1",
     "bull": "^4.11.5",
-    "ioredis": "^5.3.2"
+    "ioredis": "^5.3.2",
+    "redis": "^4.6.12",
+    "@cloudmastershub/types": "workspace:*",
+    "@cloudmastershub/middleware": "workspace:*",
+    "@cloudmastershub/utils": "workspace:*"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",

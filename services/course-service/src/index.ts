@@ -7,6 +7,7 @@ import lessonRoutes from './routes/lessonRoutes';
 import progressRoutes from './routes/progressRoutes';
 import learningPathRoutes from './routes/learningPathRoutes';
 import { errorHandler } from './middleware/errorHandler';
+import { initializeCoursePaymentEventSubscriber } from './events/paymentEventSubscriber';
 import logger from './utils/logger';
 
 dotenv.config();
@@ -32,4 +33,8 @@ app.use(errorHandler);
 
 app.listen(PORT, () => {
   logger.info(`Course Service running on port ${PORT}`);
+  
+  // Initialize payment event subscriber
+  initializeCoursePaymentEventSubscriber();
+  logger.info('Course service payment event subscriber initialized');
 });

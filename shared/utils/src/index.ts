@@ -2,3 +2,4 @@ export * from './auth';
 export * from './validation';
 export * from './logger';
 export * from './errors';
+export * from './httpClient';
