@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { body, param, query, validationResult } from 'express-validator';
-import { UserRole, SubscriptionPlan, UserStatus, ContentModerationStatus, AnalyticsTimeframe } from '@cloudmastershub/types';
+import { UserRole, SubscriptionPlanType } from '@cloudmastershub/types';
+import { UserStatus, ContentModerationStatus, AnalyticsTimeframe } from '@cloudmastershub/types';
 import logger from '../utils/logger';
 
 export const handleValidationErrors = (
@@ -54,7 +55,7 @@ export const validateUserList = [
   
   query('subscription')
     .optional()
-    .isIn(Object.values(SubscriptionPlan))
+    .isIn(Object.values(SubscriptionPlanType))
     .withMessage('Invalid subscription plan'),
   
   query('search')

@@ -37,7 +37,7 @@ class ContentServiceClient {
       });
 
       const data = await response.json();
-      return data;
+      return data as ServiceResponse;
     } catch (error) {
       logger.error('Failed to fetch content for moderation:', error);
       return { 
@@ -58,7 +58,7 @@ class ContentServiceClient {
       });
 
       const data = await response.json();
-      return data;
+      return data as ServiceResponse;
     } catch (error) {
       logger.error('Failed to fetch content by ID:', error);
       return { 
@@ -86,7 +86,7 @@ class ContentServiceClient {
       });
 
       const data = await response.json();
-      return data;
+      return data as ServiceResponse;
     } catch (error) {
       logger.error('Failed to moderate content:', error);
       return { 
@@ -117,7 +117,7 @@ class ContentServiceClient {
       });
 
       const data = await response.json();
-      return data;
+      return data as ServiceResponse;
     } catch (error) {
       logger.error('Failed to fetch flagged content:', error);
       return { 
@@ -137,7 +137,7 @@ class ContentServiceClient {
       });
 
       const data = await response.json();
-      return data;
+      return data as ServiceResponse;
     } catch (error) {
       logger.error('Failed to fetch content analytics:', error);
       return { 
@@ -168,7 +168,7 @@ class ContentServiceClient {
       });
 
       const data = await response.json();
-      return data;
+      return data as ServiceResponse;
     } catch (error) {
       logger.error('Failed to fetch popular content:', error);
       return { 
@@ -196,7 +196,7 @@ class ContentServiceClient {
       });
 
       const data = await response.json();
-      return data;
+      return data as ServiceResponse;
     } catch (error) {
       logger.error('Failed to bulk moderate content:', error);
       return { 

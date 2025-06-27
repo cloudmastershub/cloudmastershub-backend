@@ -109,7 +109,7 @@ export const getSubscriptionStatus = async (req: Request, res: Response) => {
 export const createCheckoutSession = async (req: AuthRequest, res: Response) => {
   try {
     const body = req.body as CreateCheckoutSessionRequest;
-    const userId = req.user?.userId;
+    const userId = req.user?.id;
     
     if (!userId) {
       return res.status(401).json({
@@ -135,7 +135,7 @@ export const createCheckoutSession = async (req: AuthRequest, res: Response) => 
       });
     }
 
-    let stripe_price_id: string;
+    let stripe_price_id!: string;
     let metadata: Record<string, string> = {
       user_id: userId,
       type
@@ -232,7 +232,7 @@ export const createCheckoutSession = async (req: AuthRequest, res: Response) => 
 export const createSubscription = async (req: AuthRequest, res: Response) => {
   try {
     const body = req.body as CreateSubscriptionRequest;
-    const userId = req.user?.userId;
+    const userId = req.user?.id;
     
     if (!userId) {
       return res.status(401).json({
@@ -334,7 +334,7 @@ export const createSubscription = async (req: AuthRequest, res: Response) => {
 export const cancelSubscription = async (req: AuthRequest, res: Response) => {
   try {
     const { subscriptionId } = req.params;
-    const userId = req.user?.userId;
+    const userId = req.user?.id;
 
     if (!userId) {
       return res.status(401).json({
@@ -434,7 +434,7 @@ export const updateSubscription = async (req: AuthRequest, res: Response) => {
   try {
     const { subscriptionId } = req.params;
     const { plan_id } = req.body;
-    const userId = req.user?.userId;
+    const userId = req.user?.id;
 
     if (!userId) {
       return res.status(401).json({

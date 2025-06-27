@@ -254,7 +254,7 @@ export const getAnalyticsSummary = async (
       overview: overview.status === 'fulfilled' && overview.value.success ? overview.value.data : null,
       engagement: engagement.status === 'fulfilled' && engagement.value.success ? engagement.value.data : null,
       systemHealth: health.status === 'fulfilled' && health.value.success ? health.value.data : null,
-      errors: []
+      errors: [] as string[]
     };
 
     // Collect any errors

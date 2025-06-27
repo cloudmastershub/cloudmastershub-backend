@@ -25,7 +25,7 @@ class AnalyticsServiceClient {
       });
 
       const data = await response.json();
-      return data;
+      return data as ServiceResponse;
     } catch (error) {
       logger.error('Failed to fetch revenue analytics:', error);
       return { 
@@ -45,7 +45,7 @@ class AnalyticsServiceClient {
       });
 
       const data = await response.json();
-      return data;
+      return data as ServiceResponse;
     } catch (error) {
       logger.error('Failed to fetch subscription analytics:', error);
       return { 
@@ -211,10 +211,13 @@ class AnalyticsServiceClient {
       const healthChecks = await Promise.allSettled(
         services.map(async (service) => {
           try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
             const response = await fetch(`${service.url}/health`, {
               method: 'GET',
-              timeout: 5000
+              signal: controller.signal
             });
+            clearTimeout(timeoutId);
             return {
               service: service.name,
               status: response.ok ? 'healthy' : 'unhealthy',

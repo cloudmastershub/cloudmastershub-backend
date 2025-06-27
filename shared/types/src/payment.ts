@@ -115,8 +115,10 @@ export interface CheckoutSessionRequest {
 
 export interface CreatePurchaseRequest {
   userId: string;
-  purchasableType: 'course' | 'learning_path';
-  purchasableId: string;
+  purchasable_type: 'course' | 'learning_path';
+  purchasable_id: string;
+  amount: number;
+  currency?: string;
   success_url: string;
   cancel_url: string;
   metadata?: Record<string, string>;

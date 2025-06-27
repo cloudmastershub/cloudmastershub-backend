@@ -39,7 +39,7 @@ class UserServiceClient {
       });
 
       const data = await response.json();
-      return data;
+      return data as ServiceResponse;
     } catch (error) {
       logger.error('Failed to fetch users from user service:', error);
       return { 
@@ -59,7 +59,7 @@ class UserServiceClient {
       });
 
       const data = await response.json();
-      return data;
+      return data as ServiceResponse;
     } catch (error) {
       logger.error('Failed to fetch user by ID from user service:', error);
       return { 
@@ -85,7 +85,7 @@ class UserServiceClient {
       });
 
       const data = await response.json();
-      return data;
+      return data as ServiceResponse;
     } catch (error) {
       logger.error('Failed to update user status:', error);
       return { 
@@ -106,7 +106,7 @@ class UserServiceClient {
       });
 
       const data = await response.json();
-      return data;
+      return data as ServiceResponse;
     } catch (error) {
       logger.error('Failed to promote user:', error);
       return { 
@@ -137,7 +137,7 @@ class UserServiceClient {
       });
 
       const data = await response.json();
-      return data;
+      return data as ServiceResponse;
     } catch (error) {
       logger.error('Failed to fetch instructor applications:', error);
       return { 
@@ -162,7 +162,7 @@ class UserServiceClient {
       });
 
       const data = await response.json();
-      return data;
+      return data as ServiceResponse;
     } catch (error) {
       logger.error('Failed to review instructor application:', error);
       return { 
@@ -182,7 +182,7 @@ class UserServiceClient {
       });
 
       const data = await response.json();
-      return data;
+      return data as ServiceResponse;
     } catch (error) {
       logger.error('Failed to fetch user analytics:', error);
       return { 
