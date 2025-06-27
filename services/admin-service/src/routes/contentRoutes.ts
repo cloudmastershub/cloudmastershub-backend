@@ -74,4 +74,46 @@ router.post('/bulk-moderate',
   bulkModerateContent
 );
 
+// Course-specific approval endpoints
+router.get('/courses/pending',
+  requirePermission(AdminPermission.MODERATE_CONTENT),
+  logAdminAction('VIEW_PENDING_COURSES'),
+  async (req, res, next) => {
+    req.query.type = 'course';
+    req.query.status = 'pending';
+    return getContentForModeration(req, res, next);
+  }
+);
+
+router.get('/courses/:courseId/approval',
+  requirePermission(AdminPermission.MODERATE_CONTENT),
+  logAdminAction('VIEW_COURSE_APPROVAL'),
+  async (req, res, next) => {
+    req.query.contentType = 'course';
+    return getContentDetails(req, res, next);
+  }
+);
+
+router.post('/courses/:courseId/approve',
+  requirePermission(AdminPermission.MODERATE_CONTENT),
+  logAdminAction('APPROVE_COURSE'),
+  async (req, res, next) => {
+    req.body.action = 'approve';
+    req.body.contentType = 'course';
+    req.params.contentId = req.params.courseId;
+    return moderateContent(req, res, next);
+  }
+);
+
+router.post('/courses/:courseId/reject',
+  requirePermission(AdminPermission.MODERATE_CONTENT),
+  logAdminAction('REJECT_COURSE'),
+  async (req, res, next) => {
+    req.body.action = 'reject';
+    req.body.contentType = 'course';
+    req.params.contentId = req.params.courseId;
+    return moderateContent(req, res, next);
+  }
+);
+
 export default router;
