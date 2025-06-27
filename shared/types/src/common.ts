@@ -1,3 +1,5 @@
+import { Request } from 'express';
+
 export interface ApiResponse<T = any> {
   success: boolean;
   data?: T;
@@ -44,4 +46,12 @@ export interface EventPayload {
   userId?: string;
   data: any;
   metadata?: Record<string, any>;
+}
+
+export interface AuthRequest extends Request {
+  user?: {
+    id: string;
+    email: string;
+    roles: string[];
+  };
 }

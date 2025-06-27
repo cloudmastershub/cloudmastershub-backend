@@ -35,3 +35,6 @@ export const authorize = (...roles: string[]) => {
     next();
   };
 };
+
+// Alias for backward compatibility
+export const authenticateToken = authenticate;

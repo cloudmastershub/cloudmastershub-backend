@@ -1,4 +1,4 @@
-import { User, UserRole, SubscriptionPlan } from './user';
+import { User, UserRole, SubscriptionPlanType } from './user';
 import { Course, CourseStatus } from './course';
 import { LearningPath } from './learning-path';
 
@@ -27,7 +27,7 @@ export interface UserListItem {
   firstName: string;
   lastName: string;
   roles: UserRole[];
-  subscription: SubscriptionPlan;
+  subscription: SubscriptionPlanType;
   status: UserStatus;
   createdAt: Date;
   lastActiveAt: Date;
@@ -368,7 +368,7 @@ export interface UserListRequest {
   limit?: number;
   role?: UserRole;
   status?: UserStatus;
-  subscription?: SubscriptionPlan;
+  subscription?: SubscriptionPlanType;
   search?: string;
   sortBy?: 'createdAt' | 'lastActiveAt' | 'email' | 'totalSpent';
   sortOrder?: 'asc' | 'desc';

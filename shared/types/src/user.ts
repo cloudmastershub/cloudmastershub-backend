@@ -5,13 +5,13 @@ export interface User {
   lastName: string;
   bio?: string;
   avatar?: string;
-  subscription: SubscriptionPlan;
+  subscription: SubscriptionPlanType;
   roles: UserRole[];
   createdAt: Date;
   updatedAt: Date;
 }
 
-export enum SubscriptionPlan {
+export enum SubscriptionPlanType {
   FREE = 'free',
   PREMIUM = 'premium',
   ENTERPRISE = 'enterprise',
@@ -34,7 +34,7 @@ export interface UserProgress {
 
 export interface Subscription {
   userId: string;
-  plan: SubscriptionPlan;
+  plan: SubscriptionPlanType;
   status: 'active' | 'canceled' | 'past_due';
   startDate: Date;
   endDate?: Date;

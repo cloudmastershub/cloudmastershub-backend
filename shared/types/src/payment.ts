@@ -113,6 +113,15 @@ export interface CheckoutSessionRequest {
   metadata?: Record<string, string>;
 }
 
+export interface CreatePurchaseRequest {
+  userId: string;
+  purchasableType: 'course' | 'learning_path';
+  purchasableId: string;
+  success_url: string;
+  cancel_url: string;
+  metadata?: Record<string, string>;
+}
+
 export interface CheckoutSessionResponse {
   success: boolean;
   sessionId?: string;
@@ -173,19 +182,6 @@ export interface UsageLimitsResponse {
   suggestedPlan?: SubscriptionPlan;
 }
 
-export interface PaymentEvent {
-  type: 'subscription.created' | 'subscription.updated' | 'subscription.cancelled' | 
-        'purchase.completed' | 'payment.succeeded' | 'payment.failed' |
-        'access.granted' | 'access.revoked';
-  userId: string;
-  subscriptionId?: string;
-  purchaseId?: string;
-  paymentId?: string;
-  resourceType?: string;
-  resourceId?: string;
-  timestamp: Date;
-  metadata: Record<string, any>;
-}
 
 export interface RefundRequest {
   purchaseId?: string;
@@ -206,11 +202,6 @@ export interface RefundResponse {
   };
 }
 
-export enum SubscriptionPlanType {
-  FREE = 'free',
-  PREMIUM = 'premium',
-  ENTERPRISE = 'enterprise'
-}
 
 export enum PaymentStatus {
   PENDING = 'pending',

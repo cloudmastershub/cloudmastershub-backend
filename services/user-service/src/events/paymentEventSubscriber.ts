@@ -75,27 +75,27 @@ class PaymentEventSubscriber {
       });
 
       switch (event.type) {
-        case 'subscription.created':
+        case 'payment.subscription.created':
           await this.handleSubscriptionCreated(event);
           break;
           
-        case 'subscription.updated':
+        case 'payment.subscription.updated':
           await this.handleSubscriptionUpdated(event);
           break;
           
-        case 'subscription.cancelled':
+        case 'payment.subscription.cancelled':
           await this.handleSubscriptionCancelled(event);
           break;
           
-        case 'purchase.completed':
+        case 'payment.purchase.completed':
           await this.handlePurchaseCompleted(event);
           break;
           
-        case 'payment.succeeded':
+        case 'payment.payment.succeeded':
           await this.handlePaymentSucceeded(event);
           break;
           
-        case 'payment.failed':
+        case 'payment.payment.failed':
           await this.handlePaymentFailed(event);
           break;
           
@@ -124,7 +124,7 @@ class PaymentEventSubscriber {
         subscriptionStatus: 'active',
         subscriptionPlan: metadata.planId || metadata.plan,
         subscriptionStartDate: new Date(event.timestamp),
-        subscriptionEndDate: metadata.expiresAt ? new Date(metadata.expiresAt) : null,
+        subscriptionEndDate: metadata.expiresAt ? new Date(metadata.expiresAt) : undefined,
         lastPaymentDate: new Date(event.timestamp)
       };
 
@@ -237,7 +237,7 @@ class PaymentEventSubscriber {
       
       logger.info('Processing payment succeeded event', { userId, subscriptionId });
 
-      const updateData = {
+      const updateData: any = {
         lastPaymentDate: new Date(event.timestamp),
         paymentStatus: 'current',
         updatedAt: new Date(event.timestamp)
@@ -266,7 +266,7 @@ class PaymentEventSubscriber {
       
       logger.warn('Processing payment failed event', { userId, subscriptionId });
 
-      const updateData = {
+      const updateData: any = {
         paymentStatus: 'past_due',
         lastPaymentAttempt: new Date(event.timestamp),
         failedPaymentCount: (metadata.failedPaymentCount || 0) + 1,

@@ -18,4 +18,8 @@ const createLogger = (service: string) => {
   });
 };
 
-export { createLogger };
+// Default logger instance
+const logger = createLogger('cloudmastershub');
+
+export { createLogger, logger };
+export default logger;
