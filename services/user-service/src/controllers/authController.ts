@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 // import bcrypt from 'bcryptjs'; // TODO: Uncomment when implementing actual password hashing
 import jwt from 'jsonwebtoken';
+import axios from 'axios';
 import logger from '../utils/logger';
 import { getUserEventPublisher } from '../events/userEventPublisher';
 
@@ -125,6 +126,101 @@ export const logout = async (req: Request, res: Response, next: NextFunction): P
       message: 'Logged out successfully'
     });
   } catch (error) {
+    next(error);
+  }
+};
+
+// Google OAuth authentication
+export const googleAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { googleToken, email, firstName, lastName, avatar } = req.body;
+
+    if (!googleToken || !email) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Google token and email are required' },
+      });
+      return;
+    }
+
+    // Verify Google token
+    try {
+      const googleResponse = await axios.get(
+        `https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${googleToken}`
+      );
+
+      if (googleResponse.data.email !== email) {
+        res.status(401).json({
+          success: false,
+          error: { message: 'Google token does not match provided email' },
+        });
+        return;
+      }
+    } catch (googleError) {
+      logger.error('Google token verification failed:', googleError);
+      res.status(401).json({
+        success: false,
+        error: { message: 'Invalid Google token' },
+      });
+      return;
+    }
+
+    // TODO: Check if user exists in database and create/update accordingly
+    // For now, create mock user with Google data
+    const user = {
+      id: `google_${email.replace(/[^a-zA-Z0-9]/g, '_')}`,
+      email,
+      firstName: firstName || 'User',
+      lastName: lastName || '',
+      avatar,
+      roles: ['student'],
+      subscriptionTier: 'free',
+      authProvider: 'google',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const accessToken = jwt.sign(
+      { 
+        userId: user.id, 
+        email: user.email, 
+        roles: user.roles,
+        authProvider: 'google'
+      }, 
+      JWT_SECRET, 
+      { expiresIn: JWT_EXPIRES_IN }
+    );
+
+    const refreshToken = jwt.sign(
+      { userId: user.id, type: 'refresh' }, 
+      JWT_SECRET, 
+      { expiresIn: REFRESH_TOKEN_EXPIRES_IN }
+    );
+
+    // Publish login event
+    const eventPublisher = getUserEventPublisher();
+    await eventPublisher.publishUserLogin(user.id, {
+      email: user.email,
+      loginMethod: 'google_oauth',
+      ipAddress: req.ip || req.connection.remoteAddress,
+      userAgent: req.get('User-Agent')
+    });
+
+    logger.info('Google OAuth login successful', { 
+      userId: user.id, 
+      email: user.email 
+    });
+
+    res.json({
+      success: true,
+      data: {
+        user,
+        accessToken,
+        refreshToken,
+      },
+    });
+  } catch (error) {
+    logger.error('Google OAuth error:', error);
     next(error);
   }
 };

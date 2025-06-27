@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
-import { register, login, logout, refreshToken } from '../controllers/authController';
+import { register, login, logout, refreshToken, googleAuth } from '../controllers/authController';
 import { validateRequest } from '../middleware/validateRequest';
 
 const router = Router();
@@ -26,5 +26,19 @@ router.post(
 
 router.post('/logout', logout);
 router.post('/refresh', refreshToken);
+
+// Google OAuth route
+router.post(
+  '/google',
+  [
+    body('googleToken').notEmpty().withMessage('Google token is required'),
+    body('email').isEmail().normalizeEmail(),
+    body('firstName').optional().trim(),
+    body('lastName').optional().trim(),
+    body('avatar').optional().isURL().withMessage('Avatar must be a valid URL'),
+  ],
+  validateRequest,
+  googleAuth
+);
 
 export default router;
