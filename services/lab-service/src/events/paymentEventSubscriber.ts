@@ -75,23 +75,23 @@ class LabPaymentEventSubscriber {
       });
 
       switch (event.type) {
-        case 'subscription.created':
+        case 'payment.subscription.created':
           await this.handleSubscriptionCreated(event);
           break;
           
-        case 'subscription.updated':
+        case 'payment.subscription.updated':
           await this.handleSubscriptionUpdated(event);
           break;
           
-        case 'subscription.cancelled':
+        case 'payment.subscription.cancelled':
           await this.handleSubscriptionCancelled(event);
           break;
           
-        case 'access.granted':
+        case 'payment.access.granted':
           await this.handleAccessGranted(event);
           break;
           
-        case 'access.revoked':
+        case 'payment.access.revoked':
           await this.handleAccessRevoked(event);
           break;
           

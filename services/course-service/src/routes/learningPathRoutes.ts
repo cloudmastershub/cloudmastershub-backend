@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import {
   getAllLearningPaths,
   getLearningPathById,
@@ -57,11 +57,11 @@ router.delete('/:id/steps/:stepId', authenticate, validatePathId, removePathwayS
 // Progress tracking and enrollment (user-specific)
 router.get('/:id/progress', authenticate, validatePathId, getLearningPathProgress);
 router.post('/:id/enroll', authenticate, validateEnrollment, validateBusinessRules, enrollInLearningPath);
-router.post('/:id/steps/:stepId/progress', authenticate, (req, res, next) => {
+router.post('/:id/steps/:stepId/progress', authenticate, (req: Request, res: Response, next: NextFunction) => {
   const pathId = req.params.id;
   return requireLearningPathAccess(pathId)(req, res, next);
 }, validateStepProgress, updateStepProgress);
-router.get('/:id/certificate', authenticate, (req, res, next) => {
+router.get('/:id/certificate', authenticate, (req: Request, res: Response, next: NextFunction) => {
   const pathId = req.params.id;
   return requireLearningPathAccess(pathId)(req, res, next);
 }, validatePathId, getLearningPathCertificate);
