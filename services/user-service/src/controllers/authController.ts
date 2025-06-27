@@ -174,7 +174,8 @@ export const googleAuth = async (req: Request, res: Response, next: NextFunction
       lastName: lastName || '',
       avatar,
       roles: ['student'],
-      subscriptionTier: 'free',
+      subscriptionTier: 'free', // This will be the key field for middleware
+      subscriptionStatus: 'free',
       authProvider: 'google',
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -185,6 +186,8 @@ export const googleAuth = async (req: Request, res: Response, next: NextFunction
         userId: user.id, 
         email: user.email, 
         roles: user.roles,
+        subscriptionTier: user.subscriptionTier,
+        subscriptionStatus: user.subscriptionStatus,
         authProvider: 'google'
       }, 
       JWT_SECRET, 
