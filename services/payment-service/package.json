@@ -14,9 +14,9 @@
     "db:migrate": "node scripts/setup-database.js"
   },
   "dependencies": {
-    "@cloudmastershub/types": "workspace:*",
-    "@cloudmastershub/utils": "workspace:*",
-    "@cloudmastershub/middleware": "workspace:*",
+    "@cloudmastershub/types": "file:../../shared/types",
+    "@cloudmastershub/utils": "file:../../shared/utils",
+    "@cloudmastershub/middleware": "file:../../shared/middleware",
     "express": "^4.18.2",
     "cors": "^2.8.5",
     "helmet": "^7.1.0",

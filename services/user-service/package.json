@@ -29,9 +29,9 @@
     "pg": "^8.11.3",
     "redis": "^4.6.12",
     "uuid": "^9.0.0",
-    "@cloudmastershub/types": "workspace:*",
-    "@cloudmastershub/middleware": "workspace:*",
-    "@cloudmastershub/utils": "workspace:*"
+    "@cloudmastershub/types": "file:../../shared/types",
+    "@cloudmastershub/middleware": "file:../../shared/middleware",
+    "@cloudmastershub/utils": "file:../../shared/utils"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
