@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import axios from 'axios';
 import logger from '../utils/logger';
 import { getUserEventPublisher } from '../events/userEventPublisher';
+import * as userService from '../services/userService';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 const JWT_EXPIRES_IN = '15m';
@@ -165,20 +166,46 @@ export const googleAuth = async (req: Request, res: Response, next: NextFunction
       return;
     }
 
-    // TODO: Check if user exists in database and create/update accordingly
-    // For now, create mock user with Google data
+    // Check if user exists in database, create if not
+    let userRecord = await userService.getUserByEmail(email);
+    
+    if (!userRecord) {
+      // Create new user with Google data
+      userRecord = await userService.createUser({
+        email,
+        firstName: firstName || 'User',
+        lastName: lastName || '',
+        profilePicture: avatar,
+        emailVerified: true, // Google users are pre-verified
+        roles: ['student'], // Default role for new users
+        subscriptionType: 'free'
+      });
+      logger.info('New Google user created', { userId: userRecord.id, email });
+    } else {
+      // Update existing user with latest Google data
+      await userService.updateUser(userRecord.id, {
+        firstName: firstName || userRecord.firstName,
+        lastName: lastName || userRecord.lastName,
+        profilePicture: avatar || userRecord.profilePicture,
+        lastLoginAt: new Date()
+      });
+      logger.info('Existing Google user updated', { userId: userRecord.id, email });
+    }
+
+    // Convert database user to API format
     const user = {
-      id: `google_${email.replace(/[^a-zA-Z0-9]/g, '_')}`,
-      email,
-      firstName: firstName || 'User',
-      lastName: lastName || '',
-      avatar,
-      roles: ['student'],
-      subscriptionTier: 'free', // This will be the key field for middleware
-      subscriptionStatus: 'free',
+      id: userRecord.id,
+      email: userRecord.email,
+      firstName: userRecord.firstName,
+      lastName: userRecord.lastName,
+      avatar: userRecord.profilePicture,
+      roles: userRecord.roles || ['student'],
+      subscriptionTier: userRecord.subscriptionPlan || 'free',
+      subscriptionStatus: userRecord.subscriptionStatus || 'free',
       authProvider: 'google',
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      emailVerified: userRecord.emailVerified,
+      createdAt: userRecord.createdAt,
+      updatedAt: userRecord.updatedAt,
     };
 
     const accessToken = jwt.sign(

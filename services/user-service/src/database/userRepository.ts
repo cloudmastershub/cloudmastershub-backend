@@ -10,7 +10,7 @@ export interface UserRecord {
   last_name: string;
   profile_picture?: string;
   roles: string[]; // Array of roles: 'student', 'instructor', 'admin'
-  subscription_type: 'free' | 'premium' | 'enterprise';
+  subscription_type: 'free' | 'premium' | 'premium_plus' | 'enterprise';
   subscription_expires_at?: Date;
   email_verified: boolean;
   email_verification_token?: string;
@@ -66,7 +66,7 @@ export interface CreateUserInput {
   last_name: string;
   profile_picture?: string;
   roles?: string[]; // Default to ['student'] if not provided
-  subscription_type?: 'free' | 'premium' | 'enterprise';
+  subscription_type?: 'free' | 'premium' | 'premium_plus' | 'enterprise';
   email_verified?: boolean;
 }
 
@@ -77,7 +77,7 @@ export interface UpdateUserInput {
   last_name?: string;
   profile_picture?: string;
   roles?: string[]; // Array of roles
-  subscription_type?: 'free' | 'premium' | 'enterprise';
+  subscription_type?: 'free' | 'premium' | 'premium_plus' | 'enterprise';
   subscription_expires_at?: Date;
   email_verified?: boolean;
   email_verification_token?: string;
@@ -209,7 +209,7 @@ export class UserRepository {
     
     try {
       const result = await db.query(query, [userId]);
-      const deleted = result.rowCount > 0;
+      const deleted = (result.rowCount || 0) > 0;
       logger.info('User deleted from database', { userId, deleted });
       return deleted;
     } catch (error) {
@@ -474,7 +474,7 @@ export class UserRepository {
     
     try {
       const result = await db.query(query, [tokenHash]);
-      return result.rowCount > 0;
+      return (result.rowCount || 0) > 0;
     } catch (error) {
       logger.error('Failed to revoke refresh token', { error });
       throw error;

@@ -80,7 +80,7 @@ export class DatabaseConnection {
   /**
    * Execute a query with automatic connection management
    */
-  public async query<T = any>(text: string, params?: any[]): Promise<QueryResult<T>> {
+  public async query<T extends Record<string, any> = any>(text: string, params?: any[]): Promise<QueryResult<T>> {
     if (!this.isConnected) {
       throw new Error('Database not connected. Call connect() first.');
     }

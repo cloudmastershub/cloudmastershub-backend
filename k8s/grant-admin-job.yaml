@@ -1,0 +1,56 @@
+# Kubernetes Job to grant admin privileges
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: grant-admin-privileges
+  namespace: cloudmastershub-dev
+  labels:
+    app: cloudmastershub
+    component: migration
+spec:
+  template:
+    metadata:
+      labels:
+        app: cloudmastershub
+        component: migration
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: grant-admin
+        image: mbuaku/cloudmastershub-backend:latest
+        command: ["/bin/sh"]
+        args:
+        - -c
+        - |
+          echo "🚀 Starting Admin Grant Process..."
+          
+          # Update DATABASE_URL to point to temporary postgres
+          export DATABASE_URL="postgresql://cloudmaster:cloudpass@postgres-temp.cloudmastershub-dev.svc.cluster.local:5432/cloudmastershub"
+          export SERVICE_NAME="user-service"
+          
+          echo "📊 Database URL: $DATABASE_URL"
+          
+          # Navigate to user service
+          cd services/user-service
+          
+          # Install dependencies
+          npm ci --only=production
+          
+          # Run the grant admin script
+          echo "🔑 Running admin grant script..."
+          npx ts-node src/scripts/grant-admin.ts
+          
+          echo "✅ Admin grant process completed!"
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: LOG_LEVEL
+          value: "info"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+  backoffLimit: 3

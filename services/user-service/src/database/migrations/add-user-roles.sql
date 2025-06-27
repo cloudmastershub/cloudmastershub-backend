@@ -22,9 +22,15 @@ CHECK (
   AND array_length(roles, 1) > 0
 );
 
+-- Add constraint for valid subscription types
+ALTER TABLE users 
+ADD CONSTRAINT IF NOT EXISTS check_valid_subscription_types 
+CHECK (subscription_type IN ('free', 'premium', 'premium_plus', 'enterprise'));
+
 -- Grant admin role to specific user (mbuaku@gmail.com)
 UPDATE users 
-SET roles = ARRAY['admin', 'student']::TEXT[]
+SET roles = ARRAY['admin', 'student']::TEXT[],
+    subscription_type = 'enterprise'
 WHERE email = 'mbuaku@gmail.com';
 
 -- Insert user if doesn't exist (for testing purposes)
