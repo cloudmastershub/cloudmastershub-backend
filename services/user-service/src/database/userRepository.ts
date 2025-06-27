@@ -9,6 +9,7 @@ export interface UserRecord {
   first_name: string;
   last_name: string;
   profile_picture?: string;
+  roles: string[]; // Array of roles: 'student', 'instructor', 'admin'
   subscription_type: 'free' | 'premium' | 'enterprise';
   subscription_expires_at?: Date;
   email_verified: boolean;
@@ -64,6 +65,7 @@ export interface CreateUserInput {
   first_name: string;
   last_name: string;
   profile_picture?: string;
+  roles?: string[]; // Default to ['student'] if not provided
   subscription_type?: 'free' | 'premium' | 'enterprise';
   email_verified?: boolean;
 }
@@ -74,6 +76,7 @@ export interface UpdateUserInput {
   first_name?: string;
   last_name?: string;
   profile_picture?: string;
+  roles?: string[]; // Array of roles
   subscription_type?: 'free' | 'premium' | 'enterprise';
   subscription_expires_at?: Date;
   email_verified?: boolean;
@@ -112,8 +115,8 @@ export class UserRepository {
     const query = `
       INSERT INTO users (
         email, password_hash, first_name, last_name, profile_picture, 
-        subscription_type, email_verified
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        roles, subscription_type, email_verified
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *
     `;
 
@@ -123,6 +126,7 @@ export class UserRepository {
       input.first_name,
       input.last_name,
       input.profile_picture,
+      input.roles || ['student'],
       input.subscription_type || 'free',
       input.email_verified || false
     ];
@@ -490,6 +494,117 @@ export class UserRepository {
       return deletedCount;
     } catch (error) {
       logger.error('Failed to cleanup expired tokens', { error });
+      throw error;
+    }
+  }
+
+  /**
+   * Grant admin privileges to a user by email
+   */
+  async grantAdminPrivileges(email: string): Promise<UserRecord | null> {
+    const query = `
+      UPDATE users 
+      SET roles = CASE 
+        WHEN 'admin' = ANY(roles) THEN roles
+        ELSE array_append(roles, 'admin')
+      END,
+      subscription_type = 'enterprise',
+      email_verified = true,
+      updated_at = CURRENT_TIMESTAMP
+      WHERE email = $1
+      RETURNING *
+    `;
+
+    try {
+      const result = await db.query<UserRecord>(query, [email]);
+      const user = result.rows[0] || null;
+      
+      if (user) {
+        logger.info('Admin privileges granted to user', { 
+          userId: user.id, 
+          email: user.email,
+          roles: user.roles 
+        });
+      } else {
+        logger.warn('User not found for admin privileges grant', { email });
+      }
+      
+      return user;
+    } catch (error) {
+      logger.error('Failed to grant admin privileges', { error, email });
+      throw error;
+    }
+  }
+
+  /**
+   * Add role to user
+   */
+  async addUserRole(userId: string, role: string): Promise<UserRecord | null> {
+    const validRoles = ['student', 'instructor', 'admin'];
+    
+    if (!validRoles.includes(role)) {
+      throw new Error(`Invalid role: ${role}. Valid roles are: ${validRoles.join(', ')}`);
+    }
+
+    const query = `
+      UPDATE users 
+      SET roles = CASE 
+        WHEN $2 = ANY(roles) THEN roles
+        ELSE array_append(roles, $2)
+      END,
+      updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1
+      RETURNING *
+    `;
+
+    try {
+      const result = await db.query<UserRecord>(query, [userId, role]);
+      const user = result.rows[0] || null;
+      
+      if (user) {
+        logger.info('Role added to user', { 
+          userId: user.id, 
+          email: user.email,
+          addedRole: role,
+          roles: user.roles 
+        });
+      }
+      
+      return user;
+    } catch (error) {
+      logger.error('Failed to add role to user', { error, userId, role });
+      throw error;
+    }
+  }
+
+  /**
+   * Remove role from user
+   */
+  async removeUserRole(userId: string, role: string): Promise<UserRecord | null> {
+    const query = `
+      UPDATE users 
+      SET roles = array_remove(roles, $2),
+      updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1
+      RETURNING *
+    `;
+
+    try {
+      const result = await db.query<UserRecord>(query, [userId, role]);
+      const user = result.rows[0] || null;
+      
+      if (user) {
+        logger.info('Role removed from user', { 
+          userId: user.id, 
+          email: user.email,
+          removedRole: role,
+          roles: user.roles 
+        });
+      }
+      
+      return user;
+    } catch (error) {
+      logger.error('Failed to remove role from user', { error, userId, role });
       throw error;
     }
   }

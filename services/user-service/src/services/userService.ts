@@ -38,7 +38,7 @@ function transformUserRecord(record: UserRecord): User {
     firstName: record.first_name,
     lastName: record.last_name,
     profilePicture: record.profile_picture,
-    roles: ['STUDENT'], // Default role, can be enhanced with roles table
+    roles: record.roles || ['student'], // Use actual roles from database
     subscriptionStatus: record.subscription_type === 'free' ? 'free' : 'active',
     subscriptionPlan: record.subscription_type,
     subscriptionEndDate: record.subscription_expires_at,

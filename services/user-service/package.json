@@ -15,7 +15,8 @@
     "migrate:down": "node-pg-migrate -m migrations down",
     "migrate:create": "node-pg-migrate -m migrations create",
     "db:reset": "node-pg-migrate -m migrations down 0 && node-pg-migrate -m migrations up",
-    "seed": "ts-node scripts/seed.ts"
+    "seed": "ts-node scripts/seed.ts",
+    "grant-admin": "ts-node src/scripts/grant-admin.ts"
   },
   "dependencies": {
     "express": "^4.18.2",
