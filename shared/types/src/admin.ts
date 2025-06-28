@@ -1,6 +1,4 @@
 import { User, UserRole, SubscriptionPlanType } from './user';
-import { Course, CourseStatus } from './course';
-import { LearningPath } from './learning-path';
 
 // Admin User Interface (extends base User)
 export interface AdminUser extends User {

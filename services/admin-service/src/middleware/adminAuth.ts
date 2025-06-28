@@ -17,14 +17,10 @@ interface JWTPayload {
   permissions?: AdminPermission[];
 }
 
-export const requireAdmin = (
-  req: AdminRequest,
-  res: Response,
-  next: NextFunction
-): void => {
+export const requireAdmin = (req: AdminRequest, res: Response, next: NextFunction): void => {
   try {
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       res.status(401).json({
         success: false,
@@ -50,7 +46,7 @@ export const requireAdmin = (
     }
 
     const decoded = verify(token, jwtSecret) as JWTPayload;
-    
+
     // Check if user has admin role
     if (!decoded.roles || !decoded.roles.includes(UserRole.ADMIN)) {
       logger.warn('Non-admin user attempted to access admin endpoint', {
@@ -60,7 +56,7 @@ export const requireAdmin = (
         endpoint: req.originalUrl,
         ip: req.ip,
       });
-      
+
       res.status(403).json({
         success: false,
         error: {
@@ -86,7 +82,7 @@ export const requireAdmin = (
     next();
   } catch (error) {
     logger.error('Admin authentication failed:', error);
-    
+
     if (error instanceof Error && error.name === 'TokenExpiredError') {
       res.status(401).json({
         success: false,
@@ -188,7 +184,7 @@ export const logAdminAction = (action: string) => {
     const originalSend = res.send;
 
     // Override send to log the result
-    res.send = function(body) {
+    res.send = function (body) {
       logger.info('Admin action completed', {
         action,
         adminId: req.adminId,

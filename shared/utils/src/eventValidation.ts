@@ -1,4 +1,4 @@
-import { CloudMastersEvent, UserEvent, CourseEvent, LabEvent, PaymentEvent, AdminEvent, LearningPathEvent } from '@cloudmastershub/types';
+import { CloudMastersEvent } from '@cloudmastershub/types';
 
 export interface ValidationResult {
   isValid: boolean;
@@ -22,7 +22,7 @@ export interface EventDataSchema {
 const baseEventSchema: EventSchema = {
   type: 'base',
   requiredFields: ['id', 'type', 'version', 'timestamp', 'source', 'metadata'],
-  optionalFields: ['correlationId', 'causationId']
+  optionalFields: ['correlationId', 'causationId'],
 };
 
 // User event schemas
@@ -39,9 +39,9 @@ const userEventSchemas: Record<string, EventSchema> = {
         registrationMethod: 'string',
         firstName: 'string',
         lastName: 'string',
-        provider: 'string'
-      }
-    }
+        provider: 'string',
+      },
+    },
   },
   'user.profile.updated': {
     type: 'user.profile.updated',
@@ -49,7 +49,15 @@ const userEventSchemas: Record<string, EventSchema> = {
     optionalFields: baseEventSchema.optionalFields,
     dataSchema: {
       requiredFields: [],
-      optionalFields: ['firstName', 'lastName', 'email', 'phone', 'avatar', 'bio', 'previousValues'],
+      optionalFields: [
+        'firstName',
+        'lastName',
+        'email',
+        'phone',
+        'avatar',
+        'bio',
+        'previousValues',
+      ],
       fieldTypes: {
         firstName: 'string',
         lastName: 'string',
@@ -57,9 +65,9 @@ const userEventSchemas: Record<string, EventSchema> = {
         phone: 'string',
         avatar: 'string',
         bio: 'string',
-        previousValues: 'object'
-      }
-    }
+        previousValues: 'object',
+      },
+    },
   },
   'user.subscription.updated': {
     type: 'user.subscription.updated',
@@ -74,10 +82,10 @@ const userEventSchemas: Record<string, EventSchema> = {
         previousType: 'string',
         previousStatus: 'string',
         expiresAt: 'string',
-        billingCycle: 'string'
-      }
-    }
-  }
+        billingCycle: 'string',
+      },
+    },
+  },
 };
 
 // Course event schemas
@@ -96,9 +104,9 @@ const courseEventSchemas: Record<string, EventSchema> = {
         difficulty: 'string',
         status: 'string',
         duration: 'number',
-        price: 'number'
-      }
-    }
+        price: 'number',
+      },
+    },
   },
   'course.enrolled': {
     type: 'course.enrolled',
@@ -110,9 +118,9 @@ const courseEventSchemas: Record<string, EventSchema> = {
       fieldTypes: {
         enrollmentType: 'string',
         enrolledAt: 'string',
-        progress: 'number'
-      }
-    }
+        progress: 'number',
+      },
+    },
   },
   'course.completed': {
     type: 'course.completed',
@@ -126,10 +134,10 @@ const courseEventSchemas: Record<string, EventSchema> = {
         completedAt: 'string',
         finalScore: 'number',
         completionTime: 'number',
-        certificateEligible: 'boolean'
-      }
-    }
-  }
+        certificateEligible: 'boolean',
+      },
+    },
+  },
 };
 
 // Lab event schemas
@@ -146,9 +154,9 @@ const labEventSchemas: Record<string, EventSchema> = {
         type: 'string',
         difficulty: 'string',
         duration: 'number',
-        status: 'string'
-      }
-    }
+        status: 'string',
+      },
+    },
   },
   'lab.session.started': {
     type: 'lab.session.started',
@@ -163,9 +171,9 @@ const labEventSchemas: Record<string, EventSchema> = {
         startedAt: 'string',
         status: 'string',
         environmentId: 'string',
-        resources: 'array'
-      }
-    }
+        resources: 'array',
+      },
+    },
   },
   'lab.session.completed': {
     type: 'lab.session.completed',
@@ -179,10 +187,10 @@ const labEventSchemas: Record<string, EventSchema> = {
         completedAt: 'string',
         status: 'string',
         solutionScore: 'number',
-        cost: 'number'
-      }
-    }
-  }
+        cost: 'number',
+      },
+    },
+  },
 };
 
 // Payment event schemas
@@ -202,9 +210,9 @@ const paymentEventSchemas: Record<string, EventSchema> = {
         processedAt: 'string',
         subscriptionId: 'string',
         courseId: 'string',
-        description: 'string'
-      }
-    }
+        description: 'string',
+      },
+    },
   },
   'subscription.created': {
     type: 'subscription.created',
@@ -220,10 +228,10 @@ const paymentEventSchemas: Record<string, EventSchema> = {
         billingCycle: 'string',
         endDate: 'string',
         trialEndDate: 'string',
-        amount: 'number'
-      }
-    }
-  }
+        amount: 'number',
+      },
+    },
+  },
 };
 
 // Learning Path event schemas
@@ -239,9 +247,9 @@ const learningPathEventSchemas: Record<string, EventSchema> = {
         title: 'string',
         description: 'string',
         totalSteps: 'number',
-        status: 'string'
-      }
-    }
+        status: 'string',
+      },
+    },
   },
   'path.completed': {
     type: 'path.completed',
@@ -256,10 +264,10 @@ const learningPathEventSchemas: Record<string, EventSchema> = {
         totalSteps: 'number',
         completedAt: 'string',
         completionTime: 'number',
-        certificateEligible: 'boolean'
-      }
-    }
-  }
+        certificateEligible: 'boolean',
+      },
+    },
+  },
 };
 
 // Admin event schemas
@@ -276,10 +284,10 @@ const adminEventSchemas: Record<string, EventSchema> = {
         performedAt: 'string',
         reason: 'string',
         previousValue: 'string',
-        newValue: 'string'
-      }
-    }
-  }
+        newValue: 'string',
+      },
+    },
+  },
 };
 
 // Combined schema registry
@@ -289,7 +297,7 @@ const eventSchemas: Record<string, EventSchema> = {
   ...labEventSchemas,
   ...paymentEventSchemas,
   ...learningPathEventSchemas,
-  ...adminEventSchemas
+  ...adminEventSchemas,
 };
 
 export class EventValidator {
@@ -322,7 +330,7 @@ export class EventValidator {
 
     return {
       isValid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
@@ -332,7 +340,11 @@ export class EventValidator {
   private validateBaseEvent(event: CloudMastersEvent, schema: EventSchema, errors: string[]): void {
     // Check required fields
     for (const field of schema.requiredFields) {
-      if (!(field in event) || event[field as keyof CloudMastersEvent] === undefined || event[field as keyof CloudMastersEvent] === null) {
+      if (
+        !(field in event) ||
+        event[field as keyof CloudMastersEvent] === undefined ||
+        event[field as keyof CloudMastersEvent] === null
+      ) {
         errors.push(`Missing required field: ${field}`);
       }
     }
@@ -347,7 +359,11 @@ export class EventValidator {
     if (event.version && typeof event.version !== 'string') {
       errors.push('Field "version" must be a string');
     }
-    if (event.timestamp && !(event.timestamp instanceof Date) && typeof event.timestamp !== 'string') {
+    if (
+      event.timestamp &&
+      !(event.timestamp instanceof Date) &&
+      typeof event.timestamp !== 'string'
+    ) {
       errors.push('Field "timestamp" must be a Date or ISO string');
     }
     if (event.source && typeof event.source !== 'string') {

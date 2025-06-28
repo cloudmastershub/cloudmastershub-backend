@@ -136,7 +136,11 @@ export interface CheckoutSessionResponse {
 
 export interface PaymentServiceRequest {
   userId: string;
-  action: 'get_subscription_status' | 'verify_access' | 'check_usage_limits' | 'update_subscription';
+  action:
+    | 'get_subscription_status'
+    | 'verify_access'
+    | 'check_usage_limits'
+    | 'update_subscription';
   resourceType?: 'course' | 'learning_path' | 'lab' | 'platform';
   resourceId?: string;
   metadata?: Record<string, any>;
@@ -184,7 +188,6 @@ export interface UsageLimitsResponse {
   suggestedPlan?: SubscriptionPlan;
 }
 
-
 export interface RefundRequest {
   purchaseId?: string;
   paymentId?: string;
@@ -204,12 +207,11 @@ export interface RefundResponse {
   };
 }
 
-
 export enum PaymentStatus {
   PENDING = 'pending',
   SUCCEEDED = 'succeeded',
   FAILED = 'failed',
-  REFUNDED = 'refunded'
+  REFUNDED = 'refunded',
 }
 
 export enum SubscriptionStatusType {
@@ -217,19 +219,19 @@ export enum SubscriptionStatusType {
   INACTIVE = 'inactive',
   CANCELLED = 'cancelled',
   PAST_DUE = 'past_due',
-  TRIALING = 'trialing'
+  TRIALING = 'trialing',
 }
 
 export enum AccessType {
   PLATFORM = 'platform',
   COURSE = 'course',
   LEARNING_PATH = 'learning_path',
-  LAB = 'lab'
+  LAB = 'lab',
 }
 
 export enum AccessSource {
   SUBSCRIPTION = 'subscription',
   PURCHASE = 'purchase',
   TRIAL = 'trial',
-  ADMIN_GRANT = 'admin_grant'
+  ADMIN_GRANT = 'admin_grant',
 }

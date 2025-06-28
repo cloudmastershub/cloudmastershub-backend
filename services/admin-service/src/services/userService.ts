@@ -42,9 +42,9 @@ class UserServiceClient {
       return data as ServiceResponse;
     } catch (error) {
       logger.error('Failed to fetch users from user service:', error);
-      return { 
-        success: false, 
-        error: 'Failed to communicate with user service' 
+      return {
+        success: false,
+        error: 'Failed to communicate with user service',
       };
     }
   }
@@ -62,17 +62,17 @@ class UserServiceClient {
       return data as ServiceResponse;
     } catch (error) {
       logger.error('Failed to fetch user by ID from user service:', error);
-      return { 
-        success: false, 
-        error: 'Failed to communicate with user service' 
+      return {
+        success: false,
+        error: 'Failed to communicate with user service',
       };
     }
   }
 
   async updateUserStatus(
-    userId: string, 
-    action: string, 
-    reason?: string, 
+    userId: string,
+    action: string,
+    reason?: string,
     duration?: number
   ): Promise<ServiceResponse> {
     try {
@@ -88,9 +88,9 @@ class UserServiceClient {
       return data as ServiceResponse;
     } catch (error) {
       logger.error('Failed to update user status:', error);
-      return { 
-        success: false, 
-        error: 'Failed to communicate with user service' 
+      return {
+        success: false,
+        error: 'Failed to communicate with user service',
       };
     }
   }
@@ -109,9 +109,9 @@ class UserServiceClient {
       return data as ServiceResponse;
     } catch (error) {
       logger.error('Failed to promote user:', error);
-      return { 
-        success: false, 
-        error: 'Failed to communicate with user service' 
+      return {
+        success: false,
+        error: 'Failed to communicate with user service',
       };
     }
   }
@@ -140,34 +140,37 @@ class UserServiceClient {
       return data as ServiceResponse;
     } catch (error) {
       logger.error('Failed to fetch instructor applications:', error);
-      return { 
-        success: false, 
-        error: 'Failed to communicate with user service' 
+      return {
+        success: false,
+        error: 'Failed to communicate with user service',
       };
     }
   }
 
   async reviewInstructorApplication(
-    applicationId: string, 
-    action: 'approve' | 'reject', 
+    applicationId: string,
+    action: 'approve' | 'reject',
     notes?: string
   ): Promise<ServiceResponse> {
     try {
-      const response = await fetch(`${this.baseUrl}/admin/instructor-applications/${applicationId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ action, notes }),
-      });
+      const response = await fetch(
+        `${this.baseUrl}/admin/instructor-applications/${applicationId}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ action, notes }),
+        }
+      );
 
       const data = await response.json();
       return data as ServiceResponse;
     } catch (error) {
       logger.error('Failed to review instructor application:', error);
-      return { 
-        success: false, 
-        error: 'Failed to communicate with user service' 
+      return {
+        success: false,
+        error: 'Failed to communicate with user service',
       };
     }
   }
@@ -185,9 +188,9 @@ class UserServiceClient {
       return data as ServiceResponse;
     } catch (error) {
       logger.error('Failed to fetch user analytics:', error);
-      return { 
-        success: false, 
-        error: 'Failed to communicate with user service' 
+      return {
+        success: false,
+        error: 'Failed to communicate with user service',
       };
     }
   }

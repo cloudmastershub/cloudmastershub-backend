@@ -17,40 +17,46 @@ class AnalyticsServiceClient {
 
   async getRevenueAnalytics(timeframe: string): Promise<ServiceResponse> {
     try {
-      const response = await fetch(`${this.paymentServiceUrl}/admin/analytics/revenue?timeframe=${timeframe}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await fetch(
+        `${this.paymentServiceUrl}/admin/analytics/revenue?timeframe=${timeframe}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
       const data = await response.json();
       return data as ServiceResponse;
     } catch (error) {
       logger.error('Failed to fetch revenue analytics:', error);
-      return { 
-        success: false, 
-        error: 'Failed to communicate with payment service' 
+      return {
+        success: false,
+        error: 'Failed to communicate with payment service',
       };
     }
   }
 
   async getSubscriptionAnalytics(timeframe: string): Promise<ServiceResponse> {
     try {
-      const response = await fetch(`${this.paymentServiceUrl}/admin/analytics/subscriptions?timeframe=${timeframe}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await fetch(
+        `${this.paymentServiceUrl}/admin/analytics/subscriptions?timeframe=${timeframe}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
       const data = await response.json();
       return data as ServiceResponse;
     } catch (error) {
       logger.error('Failed to fetch subscription analytics:', error);
-      return { 
-        success: false, 
-        error: 'Failed to communicate with payment service' 
+      return {
+        success: false,
+        error: 'Failed to communicate with payment service',
       };
     }
   }
@@ -61,7 +67,7 @@ class AnalyticsServiceClient {
       const [userMetrics, contentMetrics, revenueMetrics] = await Promise.all([
         userService.getUserAnalytics(timeframe),
         contentService.getContentAnalytics(timeframe),
-        this.getRevenueAnalytics(timeframe)
+        this.getRevenueAnalytics(timeframe),
       ]);
 
       if (!userMetrics.success || !contentMetrics.success || !revenueMetrics.success) {
@@ -81,15 +87,15 @@ class AnalyticsServiceClient {
           totalLearningPaths: contentMetrics.data?.totalLearningPaths || 0,
           totalRevenue: revenueMetrics.data?.totalRevenue || 0,
           averageRating: contentMetrics.data?.averageRating || 0,
-        }
+        },
       };
 
       return { success: true, data: overview };
     } catch (error) {
       logger.error('Failed to generate platform overview:', error);
-      return { 
-        success: false, 
-        error: 'Failed to aggregate platform data' 
+      return {
+        success: false,
+        error: 'Failed to aggregate platform data',
       };
     }
   }
@@ -115,7 +121,7 @@ class AnalyticsServiceClient {
           { date: '2024-12-22', value: 74.5 },
           { date: '2024-12-23', value: 73.2 },
           { date: '2024-12-24', value: 76.1 },
-          { date: '2024-12-25', value: 75.8 }
+          { date: '2024-12-25', value: 75.8 },
         ],
         topEngagingContent: [
           {
@@ -123,24 +129,24 @@ class AnalyticsServiceClient {
             title: 'AWS Solutions Architect Fundamentals',
             type: 'course',
             engagementScore: 94.5,
-            completionRate: 87.2
+            completionRate: 87.2,
           },
           {
             id: 'path-1',
             title: 'Full Stack Cloud Developer',
             type: 'learning_path',
             engagementScore: 91.8,
-            completionRate: 83.4
-          }
-        ]
+            completionRate: 83.4,
+          },
+        ],
       };
 
       return { success: true, data: mockEngagementData };
     } catch (error) {
       logger.error('Failed to fetch engagement metrics:', error);
-      return { 
-        success: false, 
-        error: 'Failed to calculate engagement metrics' 
+      return {
+        success: false,
+        error: 'Failed to calculate engagement metrics',
       };
     }
   }
@@ -185,15 +191,15 @@ class AnalyticsServiceClient {
         filters,
         data: reportData.data,
         generatedAt: new Date().toISOString(),
-        downloadUrl: `${process.env.ADMIN_SERVICE_URL || 'http://localhost:3005'}/admin/reports/download/${type}-${Date.now()}.${format}`
+        downloadUrl: `${process.env.ADMIN_SERVICE_URL || 'http://localhost:3005'}/admin/reports/download/${type}-${Date.now()}.${format}`,
       };
 
       return { success: true, data: report };
     } catch (error) {
       logger.error('Failed to generate report:', error);
-      return { 
-        success: false, 
-        error: 'Failed to generate report' 
+      return {
+        success: false,
+        error: 'Failed to generate report',
       };
     }
   }
@@ -203,9 +209,12 @@ class AnalyticsServiceClient {
       // Check health of all microservices
       const services = [
         { name: 'user-service', url: process.env.USER_SERVICE_URL || 'http://user-service:3001' },
-        { name: 'course-service', url: process.env.COURSE_SERVICE_URL || 'http://course-service:3002' },
+        {
+          name: 'course-service',
+          url: process.env.COURSE_SERVICE_URL || 'http://course-service:3002',
+        },
         { name: 'lab-service', url: process.env.LAB_SERVICE_URL || 'http://lab-service:3003' },
-        { name: 'payment-service', url: this.paymentServiceUrl }
+        { name: 'payment-service', url: this.paymentServiceUrl },
       ];
 
       const healthChecks = await Promise.allSettled(
@@ -215,19 +224,19 @@ class AnalyticsServiceClient {
             const timeoutId = setTimeout(() => controller.abort(), 5000);
             const response = await fetch(`${service.url}/health`, {
               method: 'GET',
-              signal: controller.signal
+              signal: controller.signal,
             });
             clearTimeout(timeoutId);
             return {
               service: service.name,
               status: response.ok ? 'healthy' : 'unhealthy',
-              responseTime: response.ok ? 'fast' : 'slow'
+              responseTime: response.ok ? 'fast' : 'slow',
             };
           } catch (error) {
             return {
               service: service.name,
               status: 'unhealthy',
-              error: 'Connection failed'
+              error: 'Connection failed',
             };
           }
         })
@@ -235,18 +244,20 @@ class AnalyticsServiceClient {
 
       const healthData = {
         overallStatus: 'healthy',
-        services: healthChecks.map(result => 
-          result.status === 'fulfilled' ? result.value : {
-            service: 'unknown',
-            status: 'error',
-            error: 'Health check failed'
-          }
+        services: healthChecks.map((result) =>
+          result.status === 'fulfilled'
+            ? result.value
+            : {
+                service: 'unknown',
+                status: 'error',
+                error: 'Health check failed',
+              }
         ),
-        checkedAt: new Date().toISOString()
+        checkedAt: new Date().toISOString(),
       };
 
       // Determine overall status
-      const unhealthyServices = healthData.services.filter(s => s.status !== 'healthy');
+      const unhealthyServices = healthData.services.filter((s) => s.status !== 'healthy');
       if (unhealthyServices.length > 0) {
         healthData.overallStatus = unhealthyServices.length > 2 ? 'critical' : 'degraded';
       }
@@ -254,9 +265,9 @@ class AnalyticsServiceClient {
       return { success: true, data: healthData };
     } catch (error) {
       logger.error('Failed to check system health:', error);
-      return { 
-        success: false, 
-        error: 'Failed to check system health' 
+      return {
+        success: false,
+        error: 'Failed to check system health',
       };
     }
   }

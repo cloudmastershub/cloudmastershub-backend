@@ -1,6 +1,6 @@
 import { Response, NextFunction } from 'express';
 import { AdminRequest } from '../middleware/adminAuth';
-import { PlatformSettings, FeatureFlags } from '@cloudmastershub/types';
+import { PlatformSettings } from '@cloudmastershub/types';
 import logger from '../utils/logger';
 
 // Mock settings data - in real implementation, this would come from a database
@@ -12,7 +12,7 @@ let mockSettings: PlatformSettings = {
     maintenanceMode: false,
     maintenanceMessage: '',
     defaultLanguage: 'en',
-    timezone: 'UTC'
+    timezone: 'UTC',
   },
   security: {
     passwordMinLength: 8,
@@ -20,7 +20,7 @@ let mockSettings: PlatformSettings = {
     sessionTimeout: 480, // 8 hours
     maxLoginAttempts: 5,
     lockoutDuration: 30, // 30 minutes
-    twoFactorRequired: false
+    twoFactorRequired: false,
   },
   payment: {
     currency: 'USD',
@@ -28,7 +28,7 @@ let mockSettings: PlatformSettings = {
     refundWindow: 30, // 30 days
     stripeEnabled: true,
     paypalEnabled: false,
-    trialPeriod: 14 // 14 days
+    trialPeriod: 14, // 14 days
   },
   content: {
     autoApproveContent: false,
@@ -36,7 +36,7 @@ let mockSettings: PlatformSettings = {
     allowedVideoFormats: ['mp4', 'mov', 'avi'],
     maxVideoDuration: 180, // 3 hours
     requireCoursePreview: true,
-    contentModerationEnabled: true
+    contentModerationEnabled: true,
   },
   email: {
     fromName: 'CloudMastersHub',
@@ -46,40 +46,40 @@ let mockSettings: PlatformSettings = {
     smtpSecure: true,
     welcomeEmailEnabled: true,
     courseUpdateNotifications: true,
-    paymentNotifications: true
+    paymentNotifications: true,
   },
   features: {
     labEnvironments: {
       enabled: true,
       description: 'Interactive cloud lab environments',
       lastModified: new Date('2024-12-01'),
-      modifiedBy: 'admin@cloudmastershub.com'
+      modifiedBy: 'admin@cloudmastershub.com',
     },
     learningPaths: {
       enabled: true,
       description: 'Curated learning pathways',
       lastModified: new Date('2024-12-01'),
-      modifiedBy: 'admin@cloudmastershub.com'
+      modifiedBy: 'admin@cloudmastershub.com',
     },
     aiRecommendations: {
       enabled: false,
       description: 'AI-powered course recommendations',
       lastModified: new Date('2024-11-15'),
-      modifiedBy: 'admin@cloudmastershub.com'
+      modifiedBy: 'admin@cloudmastershub.com',
     },
     socialLearning: {
       enabled: true,
       description: 'Community features and discussions',
       lastModified: new Date('2024-11-20'),
-      modifiedBy: 'admin@cloudmastershub.com'
+      modifiedBy: 'admin@cloudmastershub.com',
     },
     betaFeatures: {
       enabled: false,
       description: 'Access to beta features for testing',
       lastModified: new Date('2024-12-10'),
-      modifiedBy: 'admin@cloudmastershub.com'
-    }
-  }
+      modifiedBy: 'admin@cloudmastershub.com',
+    },
+  },
 };
 
 export const getSettings = async (
@@ -89,13 +89,13 @@ export const getSettings = async (
 ): Promise<void> => {
   try {
     logger.info('Admin fetching platform settings', {
-      adminId: req.adminId
+      adminId: req.adminId,
     });
 
     // In real implementation, fetch from database
     res.status(200).json({
       success: true,
-      data: mockSettings
+      data: mockSettings,
     });
   } catch (error) {
     logger.error('Error in getSettings controller:', error);
@@ -113,7 +113,7 @@ export const updateSettings = async (
 
     logger.info('Admin updating platform settings', {
       adminId: req.adminId,
-      sectionsUpdated: Object.keys(updates)
+      sectionsUpdated: Object.keys(updates),
     });
 
     // Validate and merge updates
@@ -143,13 +143,13 @@ export const updateSettings = async (
       adminId: req.adminId,
       adminEmail: req.adminEmail,
       updatedSections: Object.keys(updates),
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     res.status(200).json({
       success: true,
       message: 'Settings updated successfully',
-      data: mockSettings
+      data: mockSettings,
     });
   } catch (error) {
     logger.error('Error in updateSettings controller:', error);
@@ -164,12 +164,12 @@ export const getFeatureFlags = async (
 ): Promise<void> => {
   try {
     logger.info('Admin fetching feature flags', {
-      adminId: req.adminId
+      adminId: req.adminId,
     });
 
     res.status(200).json({
       success: true,
-      data: mockSettings.features
+      data: mockSettings.features,
     });
   } catch (error) {
     logger.error('Error in getFeatureFlags controller:', error);
@@ -189,15 +189,15 @@ export const updateFeatureFlag = async (
     logger.info('Admin updating feature flag', {
       adminId: req.adminId,
       flagName,
-      enabled
+      enabled,
     });
 
     if (!mockSettings.features[flagName]) {
       res.status(404).json({
         success: false,
         error: {
-          message: 'Feature flag not found'
-        }
+          message: 'Feature flag not found',
+        },
       });
       return;
     }
@@ -208,7 +208,7 @@ export const updateFeatureFlag = async (
       enabled,
       ...(description && { description }),
       lastModified: new Date(),
-      modifiedBy: req.adminEmail || 'admin'
+      modifiedBy: req.adminEmail || 'admin',
     };
 
     // Log the feature flag update
@@ -217,13 +217,13 @@ export const updateFeatureFlag = async (
       adminEmail: req.adminEmail,
       flagName,
       enabled,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     res.status(200).json({
       success: true,
       message: `Feature flag '${flagName}' updated successfully`,
-      data: mockSettings.features[flagName]
+      data: mockSettings.features[flagName],
     });
   } catch (error) {
     logger.error('Error in updateFeatureFlag controller:', error);
@@ -243,8 +243,8 @@ export const createFeatureFlag = async (
       res.status(400).json({
         success: false,
         error: {
-          message: 'Valid flag name is required'
-        }
+          message: 'Valid flag name is required',
+        },
       });
       return;
     }
@@ -253,8 +253,8 @@ export const createFeatureFlag = async (
       res.status(409).json({
         success: false,
         error: {
-          message: 'Feature flag already exists'
-        }
+          message: 'Feature flag already exists',
+        },
       });
       return;
     }
@@ -263,7 +263,7 @@ export const createFeatureFlag = async (
       adminId: req.adminId,
       flagName,
       enabled,
-      description
+      description,
     });
 
     // Create the new feature flag
@@ -271,7 +271,7 @@ export const createFeatureFlag = async (
       enabled,
       description: description || `Feature flag: ${flagName}`,
       lastModified: new Date(),
-      modifiedBy: req.adminEmail || 'admin'
+      modifiedBy: req.adminEmail || 'admin',
     };
 
     // Log the feature flag creation
@@ -280,13 +280,13 @@ export const createFeatureFlag = async (
       adminEmail: req.adminEmail,
       flagName,
       enabled,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     res.status(201).json({
       success: true,
       message: `Feature flag '${flagName}' created successfully`,
-      data: mockSettings.features[flagName]
+      data: mockSettings.features[flagName],
     });
   } catch (error) {
     logger.error('Error in createFeatureFlag controller:', error);
@@ -304,15 +304,15 @@ export const deleteFeatureFlag = async (
 
     logger.info('Admin deleting feature flag', {
       adminId: req.adminId,
-      flagName
+      flagName,
     });
 
     if (!mockSettings.features[flagName]) {
       res.status(404).json({
         success: false,
         error: {
-          message: 'Feature flag not found'
-        }
+          message: 'Feature flag not found',
+        },
       });
       return;
     }
@@ -325,12 +325,12 @@ export const deleteFeatureFlag = async (
       adminId: req.adminId,
       adminEmail: req.adminEmail,
       flagName,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     res.status(200).json({
       success: true,
-      message: `Feature flag '${flagName}' deleted successfully`
+      message: `Feature flag '${flagName}' deleted successfully`,
     });
   } catch (error) {
     logger.error('Error in deleteFeatureFlag controller:', error);
@@ -345,7 +345,7 @@ export const getSystemConfiguration = async (
 ): Promise<void> => {
   try {
     logger.info('Admin fetching system configuration', {
-      adminId: req.adminId
+      adminId: req.adminId,
     });
 
     const systemConfig = {
@@ -354,37 +354,37 @@ export const getSystemConfiguration = async (
       deployment: {
         buildTime: process.env.BUILD_TIME || new Date().toISOString(),
         gitCommit: process.env.GIT_COMMIT || 'unknown',
-        imageTag: process.env.IMAGE_TAG || 'latest'
+        imageTag: process.env.IMAGE_TAG || 'latest',
       },
       services: {
         apiGateway: process.env.API_GATEWAY_URL || 'http://api-gateway:3000',
         userService: process.env.USER_SERVICE_URL || 'http://user-service:3001',
         courseService: process.env.COURSE_SERVICE_URL || 'http://course-service:3002',
         labService: process.env.LAB_SERVICE_URL || 'http://lab-service:3003',
-        paymentService: process.env.PAYMENT_SERVICE_URL || 'http://payment-service:3004'
+        paymentService: process.env.PAYMENT_SERVICE_URL || 'http://payment-service:3004',
       },
       database: {
         postgresql: {
           host: process.env.DB_HOST || 'postgres',
           port: process.env.DB_PORT || '5432',
-          database: process.env.DB_NAME || 'cloudmastershub'
+          database: process.env.DB_NAME || 'cloudmastershub',
         },
         mongodb: {
           host: process.env.MONGO_HOST || 'mongodb',
           port: process.env.MONGO_PORT || '27017',
-          database: process.env.MONGO_DB || 'cloudmastershub'
+          database: process.env.MONGO_DB || 'cloudmastershub',
         },
         redis: {
           host: process.env.REDIS_HOST || 'redis',
-          port: process.env.REDIS_PORT || '6379'
-        }
+          port: process.env.REDIS_PORT || '6379',
+        },
       },
-      features: mockSettings.features
+      features: mockSettings.features,
     };
 
     res.status(200).json({
       success: true,
-      data: systemConfig
+      data: systemConfig,
     });
   } catch (error) {
     logger.error('Error in getSystemConfiguration controller:', error);
@@ -403,7 +403,7 @@ export const maintenanceMode = async (
     logger.info('Admin updating maintenance mode', {
       adminId: req.adminId,
       enabled,
-      message: message ? 'provided' : 'none'
+      message: message ? 'provided' : 'none',
     });
 
     // Update maintenance mode settings
@@ -418,7 +418,7 @@ export const maintenanceMode = async (
       adminEmail: req.adminEmail,
       enabled,
       message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     res.status(200).json({
@@ -426,8 +426,8 @@ export const maintenanceMode = async (
       message: `Maintenance mode ${enabled ? 'enabled' : 'disabled'}`,
       data: {
         maintenanceMode: mockSettings.general.maintenanceMode,
-        maintenanceMessage: mockSettings.general.maintenanceMessage
-      }
+        maintenanceMessage: mockSettings.general.maintenanceMessage,
+      },
     });
   } catch (error) {
     logger.error('Error in maintenanceMode controller:', error);

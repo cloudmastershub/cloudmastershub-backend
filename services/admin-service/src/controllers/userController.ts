@@ -1,6 +1,6 @@
 import { Response, NextFunction } from 'express';
 import { AdminRequest } from '../middleware/adminAuth';
-import { UserListRequest, UserManagementAction, InstructorApplication } from '@cloudmastershub/types';
+import { UserManagementAction } from '@cloudmastershub/types';
 import userService from '../services/userService';
 import logger from '../utils/logger';
 
@@ -18,14 +18,14 @@ export const getUsers = async (
       subscription,
       search,
       sortBy = 'createdAt',
-      sortOrder = 'desc'
+      sortOrder = 'desc',
     } = req.query as any;
 
     logger.info('Admin fetching users list', {
       adminId: req.adminId,
       filters: { role, status, subscription, search },
       pagination: { page, limit },
-      sort: { sortBy, sortOrder }
+      sort: { sortBy, sortOrder },
     });
 
     const result = await userService.getUsers({
@@ -36,22 +36,22 @@ export const getUsers = async (
       subscription,
       search,
       sortBy,
-      sortOrder
+      sortOrder,
     });
 
     if (!result.success) {
       res.status(500).json({
         success: false,
         error: {
-          message: result.error || 'Failed to fetch users'
-        }
+          message: result.error || 'Failed to fetch users',
+        },
       });
       return;
     }
 
     res.status(200).json({
       success: true,
-      data: result.data
+      data: result.data,
     });
   } catch (error) {
     logger.error('Error in getUsers controller:', error);
@@ -69,7 +69,7 @@ export const getUserById = async (
 
     logger.info('Admin fetching user details', {
       adminId: req.adminId,
-      targetUserId: userId
+      targetUserId: userId,
     });
 
     const result = await userService.getUserById(userId);
@@ -78,15 +78,15 @@ export const getUserById = async (
       res.status(404).json({
         success: false,
         error: {
-          message: result.error || 'User not found'
-        }
+          message: result.error || 'User not found',
+        },
       });
       return;
     }
 
     res.status(200).json({
       success: true,
-      data: result.data
+      data: result.data,
     });
   } catch (error) {
     logger.error('Error in getUserById controller:', error);
@@ -107,7 +107,7 @@ export const manageUser = async (
       adminId: req.adminId,
       targetUserId: userId,
       action,
-      reason
+      reason,
     });
 
     let result;
@@ -123,8 +123,8 @@ export const manageUser = async (
       res.status(400).json({
         success: false,
         error: {
-          message: result.error || `Failed to ${action} user`
-        }
+          message: result.error || `Failed to ${action} user`,
+        },
       });
       return;
     }
@@ -136,13 +136,13 @@ export const manageUser = async (
       targetUserId: userId,
       action,
       reason,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     res.status(200).json({
       success: true,
       message: `User ${action} successful`,
-      data: result.data
+      data: result.data,
     });
   } catch (error) {
     logger.error('Error in manageUser controller:', error);
@@ -156,37 +156,33 @@ export const getInstructorApplications = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const {
-      page = 1,
-      limit = 20,
-      status = 'pending'
-    } = req.query as any;
+    const { page = 1, limit = 20, status = 'pending' } = req.query as any;
 
     logger.info('Admin fetching instructor applications', {
       adminId: req.adminId,
       filters: { status },
-      pagination: { page, limit }
+      pagination: { page, limit },
     });
 
     const result = await userService.getInstructorApplications({
       page: Number(page),
       limit: Number(limit),
-      status
+      status,
     });
 
     if (!result.success) {
       res.status(500).json({
         success: false,
         error: {
-          message: result.error || 'Failed to fetch instructor applications'
-        }
+          message: result.error || 'Failed to fetch instructor applications',
+        },
       });
       return;
     }
 
     res.status(200).json({
       success: true,
-      data: result.data
+      data: result.data,
     });
   } catch (error) {
     logger.error('Error in getInstructorApplications controller:', error);
@@ -207,21 +203,17 @@ export const reviewInstructorApplication = async (
       adminId: req.adminId,
       applicationId,
       action,
-      notes: notes ? 'provided' : 'none'
+      notes: notes ? 'provided' : 'none',
     });
 
-    const result = await userService.reviewInstructorApplication(
-      applicationId,
-      action,
-      notes
-    );
+    const result = await userService.reviewInstructorApplication(applicationId, action, notes);
 
     if (!result.success) {
       res.status(400).json({
         success: false,
         error: {
-          message: result.error || `Failed to ${action} application`
-        }
+          message: result.error || `Failed to ${action} application`,
+        },
       });
       return;
     }
@@ -232,13 +224,13 @@ export const reviewInstructorApplication = async (
       adminEmail: req.adminEmail,
       applicationId,
       action,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     res.status(200).json({
       success: true,
       message: `Application ${action}d successfully`,
-      data: result.data
+      data: result.data,
     });
   } catch (error) {
     logger.error('Error in reviewInstructorApplication controller:', error);
@@ -256,7 +248,7 @@ export const getUserStats = async (
 
     logger.info('Admin fetching user statistics', {
       adminId: req.adminId,
-      timeframe
+      timeframe,
     });
 
     const result = await userService.getUserAnalytics(timeframe);
@@ -265,15 +257,15 @@ export const getUserStats = async (
       res.status(500).json({
         success: false,
         error: {
-          message: result.error || 'Failed to fetch user statistics'
-        }
+          message: result.error || 'Failed to fetch user statistics',
+        },
       });
       return;
     }
 
     res.status(200).json({
       success: true,
-      data: result.data
+      data: result.data,
     });
   } catch (error) {
     logger.error('Error in getUserStats controller:', error);
@@ -293,8 +285,8 @@ export const bulkUserAction = async (
       res.status(400).json({
         success: false,
         error: {
-          message: 'User IDs array is required'
-        }
+          message: 'User IDs array is required',
+        },
       });
       return;
     }
@@ -303,8 +295,8 @@ export const bulkUserAction = async (
       res.status(400).json({
         success: false,
         error: {
-          message: 'Maximum 100 users can be processed at once'
-        }
+          message: 'Maximum 100 users can be processed at once',
+        },
       });
       return;
     }
@@ -313,7 +305,7 @@ export const bulkUserAction = async (
       adminId: req.adminId,
       userCount: userIds.length,
       action,
-      reason
+      reason,
     });
 
     const results = [];
@@ -324,7 +316,7 @@ export const bulkUserAction = async (
     for (const userId of userIds) {
       try {
         const result = await userService.updateUserStatus(userId, action, reason);
-        
+
         if (result.success) {
           successCount++;
           results.push({ userId, success: true });
@@ -345,7 +337,7 @@ export const bulkUserAction = async (
       totalUsers: userIds.length,
       successCount,
       failureCount,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     res.status(200).json({
@@ -355,8 +347,8 @@ export const bulkUserAction = async (
         totalProcessed: userIds.length,
         successCount,
         failureCount,
-        results
-      }
+        results,
+      },
     });
   } catch (error) {
     logger.error('Error in bulkUserAction controller:', error);

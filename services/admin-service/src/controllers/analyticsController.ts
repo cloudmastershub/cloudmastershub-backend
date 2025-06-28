@@ -1,6 +1,6 @@
 import { Response, NextFunction } from 'express';
 import { AdminRequest } from '../middleware/adminAuth';
-import { AnalyticsRequest, ReportsRequest } from '@cloudmastershub/types';
+import { ReportsRequest } from '@cloudmastershub/types';
 import analyticsService from '../services/analyticsService';
 import logger from '../utils/logger';
 
@@ -14,7 +14,7 @@ export const getDashboardOverview = async (
 
     logger.info('Admin fetching dashboard overview', {
       adminId: req.adminId,
-      timeframe
+      timeframe,
     });
 
     const result = await analyticsService.getPlatformOverview(timeframe);
@@ -23,15 +23,15 @@ export const getDashboardOverview = async (
       res.status(500).json({
         success: false,
         error: {
-          message: result.error || 'Failed to fetch dashboard overview'
-        }
+          message: result.error || 'Failed to fetch dashboard overview',
+        },
       });
       return;
     }
 
     res.status(200).json({
       success: true,
-      data: result.data
+      data: result.data,
     });
   } catch (error) {
     logger.error('Error in getDashboardOverview controller:', error);
@@ -49,7 +49,7 @@ export const getRevenueAnalytics = async (
 
     logger.info('Admin fetching revenue analytics', {
       adminId: req.adminId,
-      timeframe
+      timeframe,
     });
 
     const result = await analyticsService.getRevenueAnalytics(timeframe);
@@ -58,15 +58,15 @@ export const getRevenueAnalytics = async (
       res.status(500).json({
         success: false,
         error: {
-          message: result.error || 'Failed to fetch revenue analytics'
-        }
+          message: result.error || 'Failed to fetch revenue analytics',
+        },
       });
       return;
     }
 
     res.status(200).json({
       success: true,
-      data: result.data
+      data: result.data,
     });
   } catch (error) {
     logger.error('Error in getRevenueAnalytics controller:', error);
@@ -84,7 +84,7 @@ export const getSubscriptionAnalytics = async (
 
     logger.info('Admin fetching subscription analytics', {
       adminId: req.adminId,
-      timeframe
+      timeframe,
     });
 
     const result = await analyticsService.getSubscriptionAnalytics(timeframe);
@@ -93,15 +93,15 @@ export const getSubscriptionAnalytics = async (
       res.status(500).json({
         success: false,
         error: {
-          message: result.error || 'Failed to fetch subscription analytics'
-        }
+          message: result.error || 'Failed to fetch subscription analytics',
+        },
       });
       return;
     }
 
     res.status(200).json({
       success: true,
-      data: result.data
+      data: result.data,
     });
   } catch (error) {
     logger.error('Error in getSubscriptionAnalytics controller:', error);
@@ -119,7 +119,7 @@ export const getEngagementMetrics = async (
 
     logger.info('Admin fetching engagement metrics', {
       adminId: req.adminId,
-      timeframe
+      timeframe,
     });
 
     const result = await analyticsService.getEngagementMetrics(timeframe);
@@ -128,15 +128,15 @@ export const getEngagementMetrics = async (
       res.status(500).json({
         success: false,
         error: {
-          message: result.error || 'Failed to fetch engagement metrics'
-        }
+          message: result.error || 'Failed to fetch engagement metrics',
+        },
       });
       return;
     }
 
     res.status(200).json({
       success: true,
-      data: result.data
+      data: result.data,
     });
   } catch (error) {
     logger.error('Error in getEngagementMetrics controller:', error);
@@ -156,7 +156,7 @@ export const generateReport = async (
       adminId: req.adminId,
       type,
       timeframe,
-      format
+      format,
     });
 
     const result = await analyticsService.generateReport(type, timeframe, format, filters);
@@ -165,8 +165,8 @@ export const generateReport = async (
       res.status(500).json({
         success: false,
         error: {
-          message: result.error || 'Failed to generate report'
-        }
+          message: result.error || 'Failed to generate report',
+        },
       });
       return;
     }
@@ -178,13 +178,13 @@ export const generateReport = async (
       reportType: type,
       timeframe,
       format,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     res.status(200).json({
       success: true,
       message: 'Report generated successfully',
-      data: result.data
+      data: result.data,
     });
   } catch (error) {
     logger.error('Error in generateReport controller:', error);
@@ -199,7 +199,7 @@ export const getSystemHealth = async (
 ): Promise<void> => {
   try {
     logger.info('Admin checking system health', {
-      adminId: req.adminId
+      adminId: req.adminId,
     });
 
     const result = await analyticsService.getSystemHealth();
@@ -208,19 +208,23 @@ export const getSystemHealth = async (
       res.status(500).json({
         success: false,
         error: {
-          message: result.error || 'Failed to check system health'
-        }
+          message: result.error || 'Failed to check system health',
+        },
       });
       return;
     }
 
     // Return appropriate status code based on system health
-    const statusCode = result.data.overallStatus === 'healthy' ? 200 : 
-                      result.data.overallStatus === 'degraded' ? 206 : 503;
+    const statusCode =
+      result.data.overallStatus === 'healthy'
+        ? 200
+        : result.data.overallStatus === 'degraded'
+          ? 206
+          : 503;
 
     res.status(statusCode).json({
       success: true,
-      data: result.data
+      data: result.data,
     });
   } catch (error) {
     logger.error('Error in getSystemHealth controller:', error);
@@ -238,30 +242,41 @@ export const getAnalyticsSummary = async (
 
     logger.info('Admin fetching analytics summary', {
       adminId: req.adminId,
-      timeframe
+      timeframe,
     });
 
     // Get a quick summary of key metrics
     const [overview, engagement, health] = await Promise.allSettled([
       analyticsService.getPlatformOverview(timeframe),
       analyticsService.getEngagementMetrics(timeframe),
-      analyticsService.getSystemHealth()
+      analyticsService.getSystemHealth(),
     ]);
 
     const summary = {
       timeframe,
       generatedAt: new Date().toISOString(),
-      overview: overview.status === 'fulfilled' && overview.value.success ? overview.value.data : null,
-      engagement: engagement.status === 'fulfilled' && engagement.value.success ? engagement.value.data : null,
-      systemHealth: health.status === 'fulfilled' && health.value.success ? health.value.data : null,
-      errors: [] as string[]
+      overview:
+        overview.status === 'fulfilled' && overview.value.success ? overview.value.data : null,
+      engagement:
+        engagement.status === 'fulfilled' && engagement.value.success
+          ? engagement.value.data
+          : null,
+      systemHealth:
+        health.status === 'fulfilled' && health.value.success ? health.value.data : null,
+      errors: [] as string[],
     };
 
     // Collect any errors
-    if (overview.status === 'rejected' || (overview.status === 'fulfilled' && !overview.value.success)) {
+    if (
+      overview.status === 'rejected' ||
+      (overview.status === 'fulfilled' && !overview.value.success)
+    ) {
       summary.errors.push('Failed to fetch platform overview');
     }
-    if (engagement.status === 'rejected' || (engagement.status === 'fulfilled' && !engagement.value.success)) {
+    if (
+      engagement.status === 'rejected' ||
+      (engagement.status === 'fulfilled' && !engagement.value.success)
+    ) {
       summary.errors.push('Failed to fetch engagement metrics');
     }
     if (health.status === 'rejected' || (health.status === 'fulfilled' && !health.value.success)) {
@@ -274,9 +289,9 @@ export const getAnalyticsSummary = async (
     res.status(statusCode).json({
       success: hasData,
       data: summary,
-      ...(summary.errors.length > 0 && { 
-        warnings: summary.errors 
-      })
+      ...(summary.errors.length > 0 && {
+        warnings: summary.errors,
+      }),
     });
   } catch (error) {
     logger.error('Error in getAnalyticsSummary controller:', error);
@@ -291,7 +306,7 @@ export const getRealTimeMetrics = async (
 ): Promise<void> => {
   try {
     logger.info('Admin fetching real-time metrics', {
-      adminId: req.adminId
+      adminId: req.adminId,
     });
 
     // In a real implementation, this would fetch real-time data
@@ -301,33 +316,33 @@ export const getRealTimeMetrics = async (
       activeUsers: {
         current: 1247,
         peakToday: 1894,
-        averageToday: 1156
+        averageToday: 1156,
       },
       systemLoad: {
         cpu: 45.2,
         memory: 67.8,
-        storage: 34.1
+        storage: 34.1,
       },
       activeTransactions: {
         payments: 23,
         enrollments: 156,
-        labSessions: 89
+        labSessions: 89,
       },
       errorRates: {
         api: 0.8,
         payments: 0.2,
-        labs: 1.1
+        labs: 1.1,
       },
       responseTime: {
         averageMs: 245,
         p95Ms: 680,
-        p99Ms: 1200
-      }
+        p99Ms: 1200,
+      },
     };
 
     res.status(200).json({
       success: true,
-      data: realTimeData
+      data: realTimeData,
     });
   } catch (error) {
     logger.error('Error in getRealTimeMetrics controller:', error);

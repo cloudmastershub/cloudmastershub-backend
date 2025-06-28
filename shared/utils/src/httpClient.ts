@@ -27,7 +27,7 @@ export class HttpClient {
       timeout: 30000,
       retries: 3,
       retryDelay: 1000,
-      ...config
+      ...config,
     };
 
     this.axios = axios.create({
@@ -35,8 +35,8 @@ export class HttpClient {
       headers: {
         'Content-Type': 'application/json',
         'User-Agent': 'CloudMastersHub-Internal',
-        ...this.config.defaultHeaders
-      }
+        ...this.config.defaultHeaders,
+      },
     });
 
     this.setupInterceptors();
@@ -50,7 +50,7 @@ export class HttpClient {
           method: config.method?.toUpperCase(),
           url: config.url,
           headers: config.headers,
-          data: config.data ? 'present' : 'none'
+          data: config.data ? 'present' : 'none',
         });
         return config;
       },
@@ -66,18 +66,18 @@ export class HttpClient {
         logger.debug('Incoming response', {
           status: response.status,
           url: response.config.url,
-          data: response.data ? 'present' : 'none'
+          data: response.data ? 'present' : 'none',
         });
         return response;
       },
       async (error) => {
         const config = error.config;
-        
+
         logger.error('Response error', {
           status: error.response?.status,
           url: config?.url,
           message: error.message,
-          data: error.response?.data
+          data: error.response?.data,
         });
 
         // Retry logic for network errors and 5xx errors
@@ -87,10 +87,10 @@ export class HttpClient {
 
         if (config && config._retryCount < (this.config.retries || 3)) {
           config._retryCount += 1;
-          
+
           logger.info(`Retrying request (${config._retryCount}/${this.config.retries})`, {
             url: config.url,
-            method: config.method
+            method: config.method,
           });
 
           await this.delay(this.config.retryDelay || 1000);
@@ -122,7 +122,7 @@ export class HttpClient {
   }
 
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   // Generic HTTP methods
@@ -130,15 +130,27 @@ export class HttpClient {
     return this.axios.get<T>(url, config);
   }
 
-  async post<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+  async post<T = any>(
+    url: string,
+    data?: any,
+    config?: AxiosRequestConfig
+  ): Promise<AxiosResponse<T>> {
     return this.axios.post<T>(url, data, config);
   }
 
-  async put<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+  async put<T = any>(
+    url: string,
+    data?: any,
+    config?: AxiosRequestConfig
+  ): Promise<AxiosResponse<T>> {
     return this.axios.put<T>(url, data, config);
   }
 
-  async patch<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+  async patch<T = any>(
+    url: string,
+    data?: any,
+    config?: AxiosRequestConfig
+  ): Promise<AxiosResponse<T>> {
     return this.axios.patch<T>(url, data, config);
   }
 
@@ -148,13 +160,13 @@ export class HttpClient {
 
   // Service-specific methods
   async callUserService<T = any>(
-    endpoint: string, 
+    endpoint: string,
     method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
     data?: any,
     config?: AxiosRequestConfig
   ): Promise<AxiosResponse<T>> {
     const url = `${this.endpoints.userService}${endpoint}`;
-    
+
     switch (method) {
       case 'GET':
         return this.get<T>(url, config);
@@ -170,13 +182,13 @@ export class HttpClient {
   }
 
   async callCourseService<T = any>(
-    endpoint: string, 
+    endpoint: string,
     method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
     data?: any,
     config?: AxiosRequestConfig
   ): Promise<AxiosResponse<T>> {
     const url = `${this.endpoints.courseService}${endpoint}`;
-    
+
     switch (method) {
       case 'GET':
         return this.get<T>(url, config);
@@ -192,13 +204,13 @@ export class HttpClient {
   }
 
   async callLabService<T = any>(
-    endpoint: string, 
+    endpoint: string,
     method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
     data?: any,
     config?: AxiosRequestConfig
   ): Promise<AxiosResponse<T>> {
     const url = `${this.endpoints.labService}${endpoint}`;
-    
+
     switch (method) {
       case 'GET':
         return this.get<T>(url, config);
@@ -214,13 +226,13 @@ export class HttpClient {
   }
 
   async callPaymentService<T = any>(
-    endpoint: string, 
+    endpoint: string,
     method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
     data?: any,
     config?: AxiosRequestConfig
   ): Promise<AxiosResponse<T>> {
     const url = `${this.endpoints.paymentService}${endpoint}`;
-    
+
     switch (method) {
       case 'GET':
         return this.get<T>(url, config);
@@ -236,13 +248,13 @@ export class HttpClient {
   }
 
   async callAdminService<T = any>(
-    endpoint: string, 
+    endpoint: string,
     method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
     data?: any,
     config?: AxiosRequestConfig
   ): Promise<AxiosResponse<T>> {
     const url = `${this.endpoints.adminService}${endpoint}`;
-    
+
     switch (method) {
       case 'GET':
         return this.get<T>(url, config);
@@ -265,7 +277,7 @@ export const createHttpClient = (config?: Partial<HttpClientConfig>): HttpClient
     courseService: process.env.COURSE_SERVICE_URL || 'http://course-service:3002',
     labService: process.env.LAB_SERVICE_URL || 'http://lab-service:3003',
     paymentService: process.env.PAYMENT_SERVICE_URL || 'http://payment-service:3004',
-    adminService: process.env.ADMIN_SERVICE_URL || 'http://admin-service:3005'
+    adminService: process.env.ADMIN_SERVICE_URL || 'http://admin-service:3005',
   };
 
   return new HttpClient(endpoints, config);
@@ -294,7 +306,7 @@ export const createPaymentServiceClient = () => {
       return client.callPaymentService('/api/access/verify', 'POST', {
         userId,
         resourceType,
-        resourceId
+        resourceId,
       });
     },
 
@@ -303,9 +315,9 @@ export const createPaymentServiceClient = () => {
       return client.callPaymentService('/api/usage/check', 'POST', {
         userId,
         resourceType,
-        action
+        action,
       });
-    }
+    },
   };
 };
 
@@ -319,7 +331,7 @@ export const createUserServiceClient = () => {
     async updateUserSubscription(userId: string, subscriptionData: any) {
       const client = getHttpClient();
       return client.callUserService(`/users/${userId}/subscription`, 'PUT', subscriptionData);
-    }
+    },
   };
 };
 
@@ -334,9 +346,9 @@ export const createCourseServiceClient = () => {
       const client = getHttpClient();
       return client.callCourseService(`/courses/${courseId}/access`, 'PUT', {
         userId,
-        hasAccess
+        hasAccess,
       });
-    }
+    },
   };
 };
 
@@ -351,8 +363,8 @@ export const createLabServiceClient = () => {
       const client = getHttpClient();
       return client.callLabService(`/labs/${labId}/access`, 'PUT', {
         userId,
-        hasAccess
+        hasAccess,
       });
-    }
+    },
   };
 };

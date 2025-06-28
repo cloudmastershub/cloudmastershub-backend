@@ -1,10 +1,4 @@
-import { 
-  CourseCategory, 
-  DifficultyLevel, 
-  CourseStatus, 
-  Instructor, 
-  Certificate 
-} from './course';
+import { CourseCategory, DifficultyLevel, CourseStatus, Instructor, Certificate } from './course';
 
 export interface LearningPath {
   id: string;
@@ -16,45 +10,45 @@ export interface LearningPath {
   thumbnail: string;
   instructorId: string;
   instructor?: Instructor; // Populated when needed
-  
+
   // Pricing and business
   price: number;
   originalPrice?: number; // For showing discounts
   currency: string;
   isFree: boolean;
-  
+
   // Content structure
   pathway: PathwayStep[];
   totalSteps: number;
   totalCourses: number;
   totalLabs: number;
   estimatedDurationHours: number;
-  
+
   // Learning outcomes
   objectives: string[];
   skills: string[];
   prerequisites: string[];
   outcomes: string[];
-  
+
   // Engagement and quality
   rating: number;
   reviewCount: number;
   enrollmentCount: number;
   completionRate: number;
   tags: string[];
-  
+
   // Publishing and status
   status: CourseStatus;
   isPublished: boolean;
   publishedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
-  
+
   // SEO and metadata
   slug: string;
   metaDescription?: string;
   keywords?: string[];
-  
+
   // Features
   includesCertificate: boolean;
   hasHandsOnLabs: boolean;
@@ -68,70 +62,70 @@ export interface PathwayStep {
   type: PathwayStepType;
   title: string;
   description?: string;
-  
+
   // Content references
   courseId?: string;
   labId?: string;
-  
+
   // Step configuration
   isRequired: boolean;
   isLocked: boolean; // If depends on previous steps
   estimatedTimeMinutes: number;
-  
+
   // Dependencies and flow
   prerequisites: string[]; // Step IDs that must be completed first
   unlocks: string[]; // Step IDs that this step unlocks
-  
+
   // Content metadata
   difficulty?: DifficultyLevel;
   skills?: string[];
-  
+
   // Tracking
   createdAt: Date;
   updatedAt: Date;
 }
 
-export type PathwayStepType = 
-  | 'course'           // Reference to a course
-  | 'lab'              // Reference to a lab
-  | 'milestone'        // Progress checkpoint
-  | 'assessment'       // Quiz or test
-  | 'project'          // Hands-on project
-  | 'reading'          // External reading material
-  | 'video'            // Standalone video content
-  | 'discussion';      // Community discussion
+export type PathwayStepType =
+  | 'course' // Reference to a course
+  | 'lab' // Reference to a lab
+  | 'milestone' // Progress checkpoint
+  | 'assessment' // Quiz or test
+  | 'project' // Hands-on project
+  | 'reading' // External reading material
+  | 'video' // Standalone video content
+  | 'discussion'; // Community discussion
 
 export interface LearningPathProgress {
   id: string;
   userId: string;
   pathId: string;
-  
+
   // Enrollment details
   enrolledAt: Date;
   enrollmentType: 'free' | 'purchased' | 'subscription';
-  
+
   // Progress tracking
   progress: number; // 0-100 percentage
   currentStepId?: string;
   completedSteps: string[];
   skippedSteps: string[]; // For optional steps
-  
+
   // Time tracking
   totalTimeSpentMinutes: number;
   lastAccessedAt: Date;
   estimatedCompletionDate?: Date;
-  
+
   // Completion
   isCompleted: boolean;
   completedAt?: Date;
   finalScore?: number;
   certificate?: Certificate;
-  
+
   // Learning analytics
   strengths: string[]; // Skills user excels at
   weaknesses: string[]; // Skills needing improvement
   recommendedNextPaths: string[]; // Path IDs
-  
+
   // Metadata
   createdAt: Date;
   updatedAt: Date;

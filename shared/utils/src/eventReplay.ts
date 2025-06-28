@@ -79,7 +79,7 @@ export class RedisEventStore implements EventStore {
     const storedEvent: StoredEvent = {
       event,
       storedAt: new Date(),
-      replayCount: 0
+      replayCount: 0,
     };
 
     const eventKey = `${this.keyPrefix}:${event.id}`;
@@ -88,12 +88,12 @@ export class RedisEventStore implements EventStore {
     const sourceKey = `${this.keyPrefix}:by_source:${event.source}`;
 
     const pipeline = this.redis.pipeline();
-    
+
     // Store the event
     pipeline.hset(eventKey, {
       event: JSON.stringify(event),
       storedAt: storedEvent.storedAt.toISOString(),
-      replayCount: 0
+      replayCount: 0,
     });
 
     // Add to time-based sorted set
@@ -184,7 +184,7 @@ export class RedisEventStore implements EventStore {
     if (eventIds.length === 0) return [];
 
     const pipeline = this.redis.pipeline();
-    eventIds.forEach(id => {
+    eventIds.forEach((id) => {
       const eventKey = `${this.keyPrefix}:${id}`;
       pipeline.hgetall(eventKey);
     });
@@ -199,12 +199,12 @@ export class RedisEventStore implements EventStore {
           try {
             const event = JSON.parse(eventData.event) as CloudMastersEvent;
             event.timestamp = new Date(event.timestamp);
-            
+
             storedEvents.push({
               event,
               storedAt: new Date(eventData.storedAt),
               replayCount: parseInt(eventData.replayCount || '0'),
-              lastReplayAt: eventData.lastReplayAt ? new Date(eventData.lastReplayAt) : undefined
+              lastReplayAt: eventData.lastReplayAt ? new Date(eventData.lastReplayAt) : undefined,
             });
           } catch (error) {
             logger.error(`Failed to parse stored event ${eventIds[index]}:`, error);
@@ -236,12 +236,7 @@ export class EventReplayManager {
    * Replay events based on filters and options
    */
   async replayEvents(filters: EventFilters, options: ReplayOptions = {}): Promise<ReplayResult> {
-    const {
-      batchSize = 50,
-      delayBetweenBatches = 1000,
-      maxRetries = 3,
-      dryRun = false
-    } = options;
+    const { batchSize = 50, delayBetweenBatches = 1000, maxRetries = 3, dryRun = false } = options;
 
     logger.info('Starting event replay', { filters, options });
 
@@ -251,27 +246,29 @@ export class EventReplayManager {
       successfulReplays: 0,
       failedReplays: 0,
       skippedEvents: 0,
-      errors: []
+      errors: [],
     };
 
     // Filter events by type if specified
     let filteredEvents = events;
     if (options.eventTypes && options.eventTypes.length > 0) {
-      filteredEvents = events.filter(storedEvent => 
+      filteredEvents = events.filter((storedEvent) =>
         options.eventTypes!.includes(storedEvent.event.type)
       );
     }
 
     // Filter by correlation IDs if specified
     if (options.correlationIds && options.correlationIds.length > 0) {
-      filteredEvents = filteredEvents.filter(storedEvent => 
-        storedEvent.event.correlationId && options.correlationIds!.includes(storedEvent.event.correlationId)
+      filteredEvents = filteredEvents.filter(
+        (storedEvent) =>
+          storedEvent.event.correlationId &&
+          options.correlationIds!.includes(storedEvent.event.correlationId)
       );
     }
 
     // Filter by time range
     if (options.fromTime || options.toTime) {
-      filteredEvents = filteredEvents.filter(storedEvent => {
+      filteredEvents = filteredEvents.filter((storedEvent) => {
         const eventTime = storedEvent.event.timestamp;
         if (options.fromTime && eventTime < options.fromTime) return false;
         if (options.toTime && eventTime > options.toTime) return false;
@@ -289,7 +286,7 @@ export class EventReplayManager {
     // Process events in batches
     for (let i = 0; i < filteredEvents.length; i += batchSize) {
       const batch = filteredEvents.slice(i, i + batchSize);
-      
+
       for (const storedEvent of batch) {
         let retries = 0;
         let success = false;
@@ -304,12 +301,12 @@ export class EventReplayManager {
                 isReplay: true,
                 originalTimestamp: storedEvent.event.timestamp.toISOString(),
                 replayTimestamp: new Date().toISOString(),
-                replayCount: storedEvent.replayCount + 1
-              }
+                replayCount: storedEvent.replayCount + 1,
+              },
             };
 
             await this.eventBus.publish(replayEvent);
-            
+
             // Update replay count in store
             if (this.eventStore instanceof RedisEventStore) {
               await this.eventStore.updateReplayCount(storedEvent.event.id);
@@ -317,27 +314,32 @@ export class EventReplayManager {
 
             result.successfulReplays++;
             success = true;
-            
+
             logger.debug(`Successfully replayed event ${storedEvent.event.id}`, {
               eventType: storedEvent.event.type,
-              attempt: retries + 1
+              attempt: retries + 1,
             });
-
           } catch (error) {
             retries++;
-            
+
             if (retries >= maxRetries) {
               result.failedReplays++;
               result.errors.push({
                 eventId: storedEvent.event.id,
                 eventType: storedEvent.event.type,
                 error: error instanceof Error ? error.message : String(error),
-                timestamp: new Date()
+                timestamp: new Date(),
               });
-              
-              logger.error(`Failed to replay event ${storedEvent.event.id} after ${maxRetries} attempts:`, error);
+
+              logger.error(
+                `Failed to replay event ${storedEvent.event.id} after ${maxRetries} attempts:`,
+                error
+              );
             } else {
-              logger.warn(`Retry ${retries}/${maxRetries} for event ${storedEvent.event.id}:`, error);
+              logger.warn(
+                `Retry ${retries}/${maxRetries} for event ${storedEvent.event.id}:`,
+                error
+              );
               await this.delay(1000 * retries); // Exponential backoff
             }
           }
@@ -357,7 +359,10 @@ export class EventReplayManager {
   /**
    * Replay events for a specific correlation ID (useful for recovering failed workflows)
    */
-  async replayCorrelatedEvents(correlationId: string, options: ReplayOptions = {}): Promise<ReplayResult> {
+  async replayCorrelatedEvents(
+    correlationId: string,
+    options: ReplayOptions = {}
+  ): Promise<ReplayResult> {
     return this.replayEvents({ correlationId }, options);
   }
 
@@ -371,14 +376,18 @@ export class EventReplayManager {
   /**
    * Create a recovery checkpoint
    */
-  async createCheckpoint(name: string, lastProcessedEventId: string, metadata: Record<string, any> = {}): Promise<RecoveryCheckpoint> {
+  async createCheckpoint(
+    name: string,
+    lastProcessedEventId: string,
+    metadata: Record<string, any> = {}
+  ): Promise<RecoveryCheckpoint> {
     const checkpoint: RecoveryCheckpoint = {
       id: `checkpoint-${Date.now()}`,
       name,
       timestamp: new Date(),
       lastProcessedEventId,
       eventCount: 0, // TODO: Calculate actual count
-      metadata
+      metadata,
     };
 
     // Store checkpoint in Redis (if using RedisEventStore)
@@ -390,7 +399,7 @@ export class EventReplayManager {
         timestamp: checkpoint.timestamp.toISOString(),
         lastProcessedEventId: checkpoint.lastProcessedEventId,
         eventCount: checkpoint.eventCount,
-        metadata: JSON.stringify(checkpoint.metadata)
+        metadata: JSON.stringify(checkpoint.metadata),
       });
     }
 
@@ -401,17 +410,20 @@ export class EventReplayManager {
   /**
    * Recover from a checkpoint
    */
-  async recoverFromCheckpoint(checkpointId: string, options: ReplayOptions = {}): Promise<ReplayResult> {
+  async recoverFromCheckpoint(
+    checkpointId: string,
+    options: ReplayOptions = {}
+  ): Promise<ReplayResult> {
     // TODO: Implement checkpoint recovery logic
     logger.info(`Recovering from checkpoint: ${checkpointId}`);
-    
+
     // For now, replay all events after checkpoint timestamp
     const fromTime = new Date(); // TODO: Get from checkpoint
     return this.replayEvents({ startTime: fromTime }, options);
   }
 
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
 
@@ -427,14 +439,12 @@ let eventReplayManager: EventReplayManager | null = null;
 export const getEventReplayManager = (): EventReplayManager => {
   if (!eventReplayManager) {
     // Use the same Redis instance as the event bus
-    const Redis = require('ioredis');
     const redis = new Redis({
       host: process.env.REDIS_HOST || 'localhost',
       port: parseInt(process.env.REDIS_PORT || '6379'),
-      retryDelayOnFailover: 100,
       maxRetriesPerRequest: 3,
     });
-    
+
     eventReplayManager = createEventReplayManager(redis);
   }
   return eventReplayManager;

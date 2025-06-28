@@ -1,6 +1,6 @@
 import { Response, NextFunction } from 'express';
 import { AdminRequest } from '../middleware/adminAuth';
-import { ContentModerationRequest, ContentModerationAction } from '@cloudmastershub/types';
+import { ContentModerationAction } from '@cloudmastershub/types';
 import contentService from '../services/contentService';
 import logger from '../utils/logger';
 
@@ -16,14 +16,14 @@ export const getContentForModeration = async (
       status = 'pending',
       type,
       sortBy = 'submittedAt',
-      sortOrder = 'desc'
+      sortOrder = 'desc',
     } = req.query as any;
 
     logger.info('Admin fetching content for moderation', {
       adminId: req.adminId,
       filters: { status, type },
       pagination: { page, limit },
-      sort: { sortBy, sortOrder }
+      sort: { sortBy, sortOrder },
     });
 
     const result = await contentService.getContentForModeration({
@@ -32,22 +32,22 @@ export const getContentForModeration = async (
       status,
       type,
       sortBy,
-      sortOrder
+      sortOrder,
     });
 
     if (!result.success) {
       res.status(500).json({
         success: false,
         error: {
-          message: result.error || 'Failed to fetch content for moderation'
-        }
+          message: result.error || 'Failed to fetch content for moderation',
+        },
       });
       return;
     }
 
     res.status(200).json({
       success: true,
-      data: result.data
+      data: result.data,
     });
   } catch (error) {
     logger.error('Error in getContentForModeration controller:', error);
@@ -68,8 +68,8 @@ export const getContentDetails = async (
       res.status(400).json({
         success: false,
         error: {
-          message: 'Valid content type (course or learning_path) is required'
-        }
+          message: 'Valid content type (course or learning_path) is required',
+        },
       });
       return;
     }
@@ -77,7 +77,7 @@ export const getContentDetails = async (
     logger.info('Admin fetching content details', {
       adminId: req.adminId,
       contentId,
-      contentType
+      contentType,
     });
 
     const result = await contentService.getContentById(contentId, contentType);
@@ -86,15 +86,15 @@ export const getContentDetails = async (
       res.status(404).json({
         success: false,
         error: {
-          message: result.error || 'Content not found'
-        }
+          message: result.error || 'Content not found',
+        },
       });
       return;
     }
 
     res.status(200).json({
       success: true,
-      data: result.data
+      data: result.data,
     });
   } catch (error) {
     logger.error('Error in getContentDetails controller:', error);
@@ -116,7 +116,7 @@ export const moderateContent = async (
       contentId,
       contentType,
       action,
-      reason: reason ? 'provided' : 'none'
+      reason: reason ? 'provided' : 'none',
     });
 
     const result = await contentService.moderateContent(
@@ -131,8 +131,8 @@ export const moderateContent = async (
       res.status(400).json({
         success: false,
         error: {
-          message: result.error || `Failed to ${action} content`
-        }
+          message: result.error || `Failed to ${action} content`,
+        },
       });
       return;
     }
@@ -145,13 +145,13 @@ export const moderateContent = async (
       contentType,
       action,
       reason,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     res.status(200).json({
       success: true,
       message: `Content ${action}d successfully`,
-      data: result.data
+      data: result.data,
     });
   } catch (error) {
     logger.error('Error in moderateContent controller:', error);
@@ -165,37 +165,33 @@ export const getFlaggedContent = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const {
-      page = 1,
-      limit = 20,
-      type
-    } = req.query as any;
+    const { page = 1, limit = 20, type } = req.query as any;
 
     logger.info('Admin fetching flagged content', {
       adminId: req.adminId,
       filters: { type },
-      pagination: { page, limit }
+      pagination: { page, limit },
     });
 
     const result = await contentService.getFlaggedContent({
       page: Number(page),
       limit: Number(limit),
-      type
+      type,
     });
 
     if (!result.success) {
       res.status(500).json({
         success: false,
         error: {
-          message: result.error || 'Failed to fetch flagged content'
-        }
+          message: result.error || 'Failed to fetch flagged content',
+        },
       });
       return;
     }
 
     res.status(200).json({
       success: true,
-      data: result.data
+      data: result.data,
     });
   } catch (error) {
     logger.error('Error in getFlaggedContent controller:', error);
@@ -213,7 +209,7 @@ export const getContentStats = async (
 
     logger.info('Admin fetching content statistics', {
       adminId: req.adminId,
-      timeframe
+      timeframe,
     });
 
     const result = await contentService.getContentAnalytics(timeframe);
@@ -222,15 +218,15 @@ export const getContentStats = async (
       res.status(500).json({
         success: false,
         error: {
-          message: result.error || 'Failed to fetch content statistics'
-        }
+          message: result.error || 'Failed to fetch content statistics',
+        },
       });
       return;
     }
 
     res.status(200).json({
       success: true,
-      data: result.data
+      data: result.data,
     });
   } catch (error) {
     logger.error('Error in getContentStats controller:', error);
@@ -244,38 +240,34 @@ export const getPopularContent = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const {
-      type,
-      timeframe = '30d',
-      limit = 10
-    } = req.query as any;
+    const { type, timeframe = '30d', limit = 10 } = req.query as any;
 
     logger.info('Admin fetching popular content', {
       adminId: req.adminId,
       type,
       timeframe,
-      limit
+      limit,
     });
 
     const result = await contentService.getPopularContent({
       type,
       timeframe,
-      limit: Number(limit)
+      limit: Number(limit),
     });
 
     if (!result.success) {
       res.status(500).json({
         success: false,
         error: {
-          message: result.error || 'Failed to fetch popular content'
-        }
+          message: result.error || 'Failed to fetch popular content',
+        },
       });
       return;
     }
 
     res.status(200).json({
       success: true,
-      data: result.data
+      data: result.data,
     });
   } catch (error) {
     logger.error('Error in getPopularContent controller:', error);
@@ -295,8 +287,8 @@ export const bulkModerateContent = async (
       res.status(400).json({
         success: false,
         error: {
-          message: 'Content items array is required'
-        }
+          message: 'Content items array is required',
+        },
       });
       return;
     }
@@ -305,8 +297,8 @@ export const bulkModerateContent = async (
       res.status(400).json({
         success: false,
         error: {
-          message: 'Maximum 50 content items can be processed at once'
-        }
+          message: 'Maximum 50 content items can be processed at once',
+        },
       });
       return;
     }
@@ -315,8 +307,8 @@ export const bulkModerateContent = async (
       res.status(400).json({
         success: false,
         error: {
-          message: 'Action must be approve or reject'
-        }
+          message: 'Action must be approve or reject',
+        },
       });
       return;
     }
@@ -325,7 +317,7 @@ export const bulkModerateContent = async (
       adminId: req.adminId,
       contentCount: contentItems.length,
       action,
-      reason
+      reason,
     });
 
     const result = await contentService.bulkModerateContent(contentItems, action, reason);
@@ -334,8 +326,8 @@ export const bulkModerateContent = async (
       res.status(500).json({
         success: false,
         error: {
-          message: result.error || 'Failed to perform bulk moderation'
-        }
+          message: result.error || 'Failed to perform bulk moderation',
+        },
       });
       return;
     }
@@ -347,13 +339,13 @@ export const bulkModerateContent = async (
       action,
       contentCount: contentItems.length,
       reason,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     res.status(200).json({
       success: true,
       message: `Bulk ${action} completed successfully`,
-      data: result.data
+      data: result.data,
     });
   } catch (error) {
     logger.error('Error in bulkModerateContent controller:', error);
@@ -368,7 +360,7 @@ export const getContentModerationQueue = async (
 ): Promise<void> => {
   try {
     logger.info('Admin fetching content moderation queue summary', {
-      adminId: req.adminId
+      adminId: req.adminId,
     });
 
     // Fetch pending content counts
@@ -376,29 +368,29 @@ export const getContentModerationQueue = async (
       contentService.getContentForModeration({
         limit: 0, // Just get count
         status: 'pending',
-        type: 'course'
+        type: 'course',
       }),
       contentService.getContentForModeration({
         limit: 0, // Just get count
         status: 'pending',
-        type: 'learning_path'
-      })
+        type: 'learning_path',
+      }),
     ]);
 
     const queueSummary = {
       pending: {
         courses: coursesResult.success ? coursesResult.data?.total || 0 : 0,
         learningPaths: pathsResult.success ? pathsResult.data?.total || 0 : 0,
-        total: 0
+        total: 0,
       },
-      lastUpdated: new Date().toISOString()
+      lastUpdated: new Date().toISOString(),
     };
 
     queueSummary.pending.total = queueSummary.pending.courses + queueSummary.pending.learningPaths;
 
     res.status(200).json({
       success: true,
-      data: queueSummary
+      data: queueSummary,
     });
   } catch (error) {
     logger.error('Error in getContentModerationQueue controller:', error);

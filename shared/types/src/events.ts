@@ -16,7 +16,7 @@ export enum EventStatus {
   PROCESSING = 'processing',
   COMPLETED = 'completed',
   FAILED = 'failed',
-  RETRYING = 'retrying'
+  RETRYING = 'retrying',
 }
 
 // Event priority levels
@@ -24,16 +24,27 @@ export enum EventPriority {
   LOW = 'low',
   MEDIUM = 'medium',
   HIGH = 'high',
-  CRITICAL = 'critical'
+  CRITICAL = 'critical',
 }
 
 // Payment Events (Enhanced)
 export interface PaymentEvent extends BaseEvent {
-  type: 'payment.subscription.created' | 'payment.subscription.updated' | 'payment.subscription.cancelled' |
-        'payment.purchase.completed' | 'payment.payment.succeeded' | 'payment.payment.failed' |
-        'payment.access.granted' | 'payment.access.revoked' | 'payment.refund.processed' |
-        'payment.invoice.created' | 'payment.invoice.paid' | 'payment.trial.started' |
-        'payment.trial.ended' | 'payment.dunning.started' | 'payment.plan.changed';
+  type:
+    | 'payment.subscription.created'
+    | 'payment.subscription.updated'
+    | 'payment.subscription.cancelled'
+    | 'payment.purchase.completed'
+    | 'payment.payment.succeeded'
+    | 'payment.payment.failed'
+    | 'payment.access.granted'
+    | 'payment.access.revoked'
+    | 'payment.refund.processed'
+    | 'payment.invoice.created'
+    | 'payment.invoice.paid'
+    | 'payment.trial.started'
+    | 'payment.trial.ended'
+    | 'payment.dunning.started'
+    | 'payment.plan.changed';
   userId: string;
   subscriptionId?: string;
   purchaseId?: string;
@@ -58,9 +69,18 @@ export interface PaymentEvent extends BaseEvent {
 
 // User Events
 export interface UserEvent extends BaseEvent {
-  type: 'user.created' | 'user.updated' | 'user.deleted' | 'user.profile.updated' |
-        'user.email.changed' | 'user.password.changed' | 'user.role.changed' |
-        'user.login' | 'user.logout' | 'user.suspended' | 'user.activated';
+  type:
+    | 'user.created'
+    | 'user.updated'
+    | 'user.deleted'
+    | 'user.profile.updated'
+    | 'user.email.changed'
+    | 'user.password.changed'
+    | 'user.role.changed'
+    | 'user.login'
+    | 'user.logout'
+    | 'user.suspended'
+    | 'user.activated';
   userId: string;
   data: {
     email?: string;
@@ -81,10 +101,19 @@ export interface UserEvent extends BaseEvent {
 
 // Course Events
 export interface CourseEvent extends BaseEvent {
-  type: 'course.created' | 'course.updated' | 'course.deleted' | 'course.published' |
-        'course.unpublished' | 'course.enrolled' | 'course.unenrolled' |
-        'course.progress.updated' | 'course.completed' | 'course.certificate.issued' |
-        'course.reviewed' | 'course.rating.added';
+  type:
+    | 'course.created'
+    | 'course.updated'
+    | 'course.deleted'
+    | 'course.published'
+    | 'course.unpublished'
+    | 'course.enrolled'
+    | 'course.unenrolled'
+    | 'course.progress.updated'
+    | 'course.completed'
+    | 'course.certificate.issued'
+    | 'course.reviewed'
+    | 'course.rating.added';
   courseId: string;
   userId?: string;
   instructorId?: string;
@@ -108,9 +137,17 @@ export interface CourseEvent extends BaseEvent {
 
 // Learning Path Events
 export interface LearningPathEvent extends BaseEvent {
-  type: 'path.created' | 'path.updated' | 'path.deleted' | 'path.published' |
-        'path.enrolled' | 'path.unenrolled' | 'path.progress.updated' |
-        'path.completed' | 'path.certificate.issued' | 'path.step.completed';
+  type:
+    | 'path.created'
+    | 'path.updated'
+    | 'path.deleted'
+    | 'path.published'
+    | 'path.enrolled'
+    | 'path.unenrolled'
+    | 'path.progress.updated'
+    | 'path.completed'
+    | 'path.certificate.issued'
+    | 'path.step.completed';
   pathId: string;
   userId?: string;
   instructorId?: string;
@@ -132,10 +169,19 @@ export interface LearningPathEvent extends BaseEvent {
 
 // Lab Events
 export interface LabEvent extends BaseEvent {
-  type: 'lab.created' | 'lab.updated' | 'lab.deleted' | 'lab.published' |
-        'lab.session.started' | 'lab.session.stopped' | 'lab.session.completed' |
-        'lab.session.failed' | 'lab.solution.submitted' | 'lab.solution.graded' |
-        'lab.environment.provisioned' | 'lab.environment.destroyed';
+  type:
+    | 'lab.created'
+    | 'lab.updated'
+    | 'lab.deleted'
+    | 'lab.published'
+    | 'lab.session.started'
+    | 'lab.session.stopped'
+    | 'lab.session.completed'
+    | 'lab.session.failed'
+    | 'lab.solution.submitted'
+    | 'lab.solution.graded'
+    | 'lab.environment.provisioned'
+    | 'lab.environment.destroyed';
   labId: string;
   userId?: string;
   sessionId?: string;
@@ -161,9 +207,16 @@ export interface LabEvent extends BaseEvent {
 
 // Admin Events
 export interface AdminEvent extends BaseEvent {
-  type: 'admin.user.managed' | 'admin.content.moderated' | 'admin.settings.updated' |
-        'admin.instructor.approved' | 'admin.instructor.rejected' | 'admin.system.maintenance' |
-        'admin.feature.toggled' | 'admin.analytics.generated' | 'admin.audit.logged';
+  type:
+    | 'admin.user.managed'
+    | 'admin.content.moderated'
+    | 'admin.settings.updated'
+    | 'admin.instructor.approved'
+    | 'admin.instructor.rejected'
+    | 'admin.system.maintenance'
+    | 'admin.feature.toggled'
+    | 'admin.analytics.generated'
+    | 'admin.audit.logged';
   adminId: string;
   targetUserId?: string;
   targetResourceType?: string;
@@ -184,9 +237,16 @@ export interface AdminEvent extends BaseEvent {
 
 // System Events
 export interface SystemEvent extends BaseEvent {
-  type: 'system.service.started' | 'system.service.stopped' | 'system.health.check' |
-        'system.error' | 'system.warning' | 'system.backup.started' |
-        'system.backup.completed' | 'system.deployment.started' | 'system.deployment.completed';
+  type:
+    | 'system.service.started'
+    | 'system.service.stopped'
+    | 'system.health.check'
+    | 'system.error'
+    | 'system.warning'
+    | 'system.backup.started'
+    | 'system.backup.completed'
+    | 'system.deployment.started'
+    | 'system.deployment.completed';
   serviceId: string;
   data: {
     version?: string;
@@ -203,8 +263,14 @@ export interface SystemEvent extends BaseEvent {
 }
 
 // Union type for all events
-export type CloudMastersEvent = PaymentEvent | UserEvent | CourseEvent | 
-                               LearningPathEvent | LabEvent | AdminEvent | SystemEvent;
+export type CloudMastersEvent =
+  | PaymentEvent
+  | UserEvent
+  | CourseEvent
+  | LearningPathEvent
+  | LabEvent
+  | AdminEvent
+  | SystemEvent;
 
 // Event envelope for transport
 export interface EventEnvelope {
@@ -227,12 +293,15 @@ export interface EventHandler<T extends CloudMastersEvent = CloudMastersEvent> {
 
 // Event publisher interface
 export interface EventPublisher {
-  publish(event: CloudMastersEvent, options?: {
-    priority?: EventPriority;
-    delay?: number;
-    retries?: number;
-    expiration?: Date;
-  }): Promise<void>;
+  publish(
+    event: CloudMastersEvent,
+    options?: {
+      priority?: EventPriority;
+      delay?: number;
+      retries?: number;
+      expiration?: Date;
+    }
+  ): Promise<void>;
 }
 
 // Event subscriber interface
@@ -245,7 +314,9 @@ export interface EventSubscriber {
 export interface EventStore {
   save(event: CloudMastersEvent, envelope: EventEnvelope): Promise<void>;
   get(eventId: string): Promise<{ event: CloudMastersEvent; envelope: EventEnvelope } | null>;
-  getByCorrelationId(correlationId: string): Promise<Array<{ event: CloudMastersEvent; envelope: EventEnvelope }>>;
+  getByCorrelationId(
+    correlationId: string
+  ): Promise<Array<{ event: CloudMastersEvent; envelope: EventEnvelope }>>;
   getEventStream(aggregateId: string, fromVersion?: number): Promise<CloudMastersEvent[]>;
 }
 

@@ -7,13 +7,10 @@ import {
   getContentStats,
   getPopularContent,
   bulkModerateContent,
-  getContentModerationQueue
+  getContentModerationQueue,
 } from '../controllers/contentController';
 import { requireAdmin, requirePermission, logAdminAction } from '../middleware/adminAuth';
-import {
-  validateContentList,
-  validateContentAction
-} from '../middleware/validation';
+import { validateContentList, validateContentAction } from '../middleware/validation';
 import { AdminPermission } from '@cloudmastershub/types';
 
 const router = Router();
@@ -22,60 +19,69 @@ const router = Router();
 router.use(requireAdmin);
 
 // Content moderation queue overview
-router.get('/queue',
+router.get(
+  '/queue',
   requirePermission(AdminPermission.MODERATE_CONTENT),
   logAdminAction('VIEW_MODERATION_QUEUE'),
   getContentModerationQueue
 );
 
 // Content list and details
-router.get('/',
+router.get(
+  '/',
   requirePermission(AdminPermission.MODERATE_CONTENT),
   validateContentList,
   logAdminAction('VIEW_CONTENT_MODERATION'),
   getContentForModeration
 );
 
-router.get('/stats',
+router.get(
+  '/stats',
   requirePermission(AdminPermission.VIEW_ANALYTICS),
   logAdminAction('VIEW_CONTENT_STATS'),
   getContentStats
 );
 
-router.get('/popular',
+router.get(
+  '/popular',
   requirePermission(AdminPermission.VIEW_ANALYTICS),
   logAdminAction('VIEW_POPULAR_CONTENT'),
   getPopularContent
 );
 
-router.get('/flagged',
+router.get(
+  '/flagged',
   requirePermission(AdminPermission.MODERATE_CONTENT),
   logAdminAction('VIEW_FLAGGED_CONTENT'),
   getFlaggedContent
 );
 
-router.get('/:contentId',
+router.get(
+  '/:contentId',
   requirePermission(AdminPermission.MODERATE_CONTENT),
   logAdminAction('VIEW_CONTENT_DETAILS'),
   getContentDetails
 );
 
 // Content moderation actions
-router.put('/:contentId/moderate',
+router.put(
+  '/:contentId/moderate',
   requirePermission(AdminPermission.MODERATE_CONTENT),
   validateContentAction,
   logAdminAction('MODERATE_CONTENT'),
   moderateContent
 );
 
-router.post('/bulk-moderate',
+router.post(
+  '/bulk-moderate',
   requirePermission(AdminPermission.MODERATE_CONTENT),
   logAdminAction('BULK_MODERATE_CONTENT'),
   bulkModerateContent
 );
 
 // Course-specific approval endpoints
-router.get('/courses/pending',
+router.get(
+  '/courses/pending',
   requirePermission(AdminPermission.MODERATE_CONTENT),
   logAdminAction('VIEW_PENDING_COURSES'),
   async (req, res, next) => {
@@ -85,7 +91,8 @@ router.get('/courses/pending',
   }
 );
 
-router.get('/courses/:courseId/approval',
+router.get(
+  '/courses/:courseId/approval',
   requirePermission(AdminPermission.MODERATE_CONTENT),
   logAdminAction('VIEW_COURSE_APPROVAL'),
   async (req, res, next) => {
@@ -94,7 +101,8 @@ router.get('/courses/:courseId/approval',
   }
 );
 
-router.post('/courses/:courseId/approve',
+router.post(
+  '/courses/:courseId/approve',
   requirePermission(AdminPermission.MODERATE_CONTENT),
   logAdminAction('APPROVE_COURSE'),
   async (req, res, next) => {
@@ -105,7 +113,8 @@ router.post('/courses/:courseId/approve',
   }
 );
 
-router.post('/courses/:courseId/reject',
+router.post(
+  '/courses/:courseId/reject',
   requirePermission(AdminPermission.MODERATE_CONTENT),
   logAdminAction('REJECT_COURSE'),
   async (req, res, next) => {

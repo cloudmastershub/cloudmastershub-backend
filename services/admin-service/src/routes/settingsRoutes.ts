@@ -7,13 +7,10 @@ import {
   createFeatureFlag,
   deleteFeatureFlag,
   getSystemConfiguration,
-  maintenanceMode
+  maintenanceMode,
 } from '../controllers/settingsController';
 import { requireAdmin, requirePermission, logAdminAction } from '../middleware/adminAuth';
-import {
-  validateSettingsUpdate,
-  validateFeatureFlagUpdate
-} from '../middleware/validation';
+import { validateSettingsUpdate, validateFeatureFlagUpdate } from '../middleware/validation';
 import { AdminPermission } from '@cloudmastershub/types';
 
 const router = Router();
@@ -22,13 +19,15 @@ const router = Router();
 router.use(requireAdmin);
 
 // Platform settings
-router.get('/',
+router.get(
+  '/',
   requirePermission(AdminPermission.MANAGE_SETTINGS),
   logAdminAction('VIEW_PLATFORM_SETTINGS'),
   getSettings
 );
 
-router.put('/',
+router.put(
+  '/',
   requirePermission(AdminPermission.MANAGE_SETTINGS),
   validateSettingsUpdate,
   logAdminAction('UPDATE_PLATFORM_SETTINGS'),
@@ -36,39 +35,45 @@ router.put('/',
 );
 
 // Feature flags management
-router.get('/feature-flags',
+router.get(
+  '/feature-flags',
   requirePermission(AdminPermission.MANAGE_SETTINGS),
   logAdminAction('VIEW_FEATURE_FLAGS'),
   getFeatureFlags
 );
 
-router.post('/feature-flags',
+router.post(
+  '/feature-flags',
   requirePermission(AdminPermission.MANAGE_SETTINGS),
   logAdminAction('CREATE_FEATURE_FLAG'),
   createFeatureFlag
 );
 
-router.put('/feature-flags/:flagName',
+router.put(
+  '/feature-flags/:flagName',
   requirePermission(AdminPermission.MANAGE_SETTINGS),
   validateFeatureFlagUpdate,
   logAdminAction('UPDATE_FEATURE_FLAG'),
   updateFeatureFlag
 );
 
-router.delete('/feature-flags/:flagName',
+router.delete(
+  '/feature-flags/:flagName',
   requirePermission(AdminPermission.MANAGE_SETTINGS),
   logAdminAction('DELETE_FEATURE_FLAG'),
   deleteFeatureFlag
 );
 
 // System configuration and maintenance
-router.get('/system',
+router.get(
+  '/system',
   requirePermission(AdminPermission.SYSTEM_ADMIN),
   logAdminAction('VIEW_SYSTEM_CONFIG'),
   getSystemConfiguration
 );
 
-router.put('/maintenance',
+router.put(
+  '/maintenance',
   requirePermission(AdminPermission.SYSTEM_ADMIN),
   logAdminAction('UPDATE_MAINTENANCE_MODE'),
   maintenanceMode

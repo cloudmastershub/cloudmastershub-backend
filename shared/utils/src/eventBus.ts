@@ -1,15 +1,13 @@
 import { createClient, RedisClientType } from 'redis';
-import { v4 as uuidv4 } from 'uuid';
-import { 
-  CloudMastersEvent, 
-  EventEnvelope, 
-  EventHandler, 
-  EventPublisher, 
+import {
+  CloudMastersEvent,
+  EventEnvelope,
+  EventHandler,
+  EventPublisher,
   EventSubscriber,
   EventPriority,
-  EventStatus,
   EventConfig,
-  EventMetrics
+  EventMetrics,
 } from '@cloudmastershub/types';
 import logger from './logger';
 import { getEventValidator, ValidationResult } from './eventValidation';
@@ -44,15 +42,12 @@ export class EventBus implements EventPublisher, EventSubscriber {
       });
 
       // Connect clients
-      await Promise.all([
-        this.publishClient.connect(),
-        this.subscribeClient.connect()
-      ]);
+      await Promise.all([this.publishClient.connect(), this.subscribeClient.connect()]);
 
       this.isConnected = true;
       logger.info('Event bus connected to Redis', {
         serviceName: this.config.serviceName,
-        environment: this.config.environment
+        environment: this.config.environment,
       });
 
       // Setup metrics collection if enabled
@@ -64,19 +59,21 @@ export class EventBus implements EventPublisher, EventSubscriber {
       if (this.config.enableEventStore) {
         this.eventStore = new RedisEventStore(this.publishClient as any, 'cloudmasters:events');
       }
-
     } catch (error) {
       logger.error('Failed to initialize event bus:', error);
       throw error;
     }
   }
 
-  async publish(event: CloudMastersEvent, options?: {
-    priority?: EventPriority;
-    delay?: number;
-    retries?: number;
-    expiration?: Date;
-  }): Promise<void> {
+  async publish(
+    event: CloudMastersEvent,
+    options?: {
+      priority?: EventPriority;
+      delay?: number;
+      retries?: number;
+      expiration?: Date;
+    }
+  ): Promise<void> {
     if (!this.isConnected) {
       throw new Error('Event bus is not connected');
     }
@@ -101,17 +98,16 @@ export class EventBus implements EventPublisher, EventSubscriber {
         headers: {
           'x-service': this.config.serviceName,
           'x-environment': this.config.environment,
-          'x-published-at': new Date().toISOString()
-        }
+          'x-published-at': new Date().toISOString(),
+        },
       };
 
       // Determine channel based on event type
       const channel = this.getChannelForEvent(event);
-      const messageId = uuidv4();
 
       // Publish event
       const message = JSON.stringify(envelope);
-      
+
       if (options?.delay && options.delay > 0) {
         // Delayed publishing (could use Redis keyspace notifications or Bull queue)
         setTimeout(async () => {
@@ -134,14 +130,13 @@ export class EventBus implements EventPublisher, EventSubscriber {
         eventType: event.type,
         channel,
         priority: envelope.priority,
-        delay: options?.delay || 0
+        delay: options?.delay || 0,
       });
-
     } catch (error) {
       logger.error('Failed to publish event:', {
         eventId: event.id,
         eventType: event.type,
-        error: error instanceof Error ? error.message : error
+        error: error instanceof Error ? error.message : error,
       });
       throw error;
     }
@@ -171,14 +166,13 @@ export class EventBus implements EventPublisher, EventSubscriber {
         logger.info('Subscribed to event type', {
           eventType: type,
           channel,
-          handlerName: handler.constructor.name
+          handlerName: handler.constructor.name,
         });
       }
-
     } catch (error) {
       logger.error('Failed to subscribe to event:', {
         eventType: Array.isArray(eventType) ? eventType.join(', ') : eventType,
-        error: error instanceof Error ? error.message : error
+        error: error instanceof Error ? error.message : error,
       });
       throw error;
     }
@@ -201,25 +195,24 @@ export class EventBus implements EventPublisher, EventSubscriber {
 
       logger.info('Unsubscribed from event type', {
         eventType,
-        handlerName: handler.constructor.name
+        handlerName: handler.constructor.name,
       });
-
     } catch (error) {
       logger.error('Failed to unsubscribe from event:', {
         eventType,
-        error: error instanceof Error ? error.message : error
+        error: error instanceof Error ? error.message : error,
       });
       throw error;
     }
   }
 
   private async handleIncomingMessage(
-    message: string, 
-    eventType: string, 
+    message: string,
+    eventType: string,
     handler: EventHandler
   ): Promise<void> {
     let envelope: EventEnvelope;
-    
+
     try {
       envelope = JSON.parse(message);
       const event = envelope.event;
@@ -229,7 +222,7 @@ export class EventBus implements EventPublisher, EventSubscriber {
         logger.warn('Event expired, skipping processing', {
           eventId: event.id,
           eventType: event.type,
-          expiresAt: envelope.expiresAt
+          expiresAt: envelope.expiresAt,
         });
         return;
       }
@@ -242,9 +235,9 @@ export class EventBus implements EventPublisher, EventSubscriber {
       // Process event with timeout
       await Promise.race([
         handler.handle(event, envelope),
-        new Promise((_, reject) => 
+        new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Handler timeout')), this.config.defaultTimeout)
-        )
+        ),
       ]);
 
       const processingTime = Date.now() - startTime;
@@ -254,14 +247,13 @@ export class EventBus implements EventPublisher, EventSubscriber {
         eventId: event.id,
         eventType: event.type,
         processingTime,
-        retryCount: envelope.retryCount
+        retryCount: envelope.retryCount,
       });
-
     } catch (error) {
       logger.error('Failed to process event:', {
         eventType,
         error: error instanceof Error ? error.message : error,
-        message: message.substring(0, 500) // Truncate for logging
+        message: message.substring(0, 500), // Truncate for logging
       });
 
       try {
@@ -277,8 +269,8 @@ export class EventBus implements EventPublisher, EventSubscriber {
   }
 
   private async handleEventError(
-    error: Error, 
-    event: CloudMastersEvent, 
+    error: Error,
+    event: CloudMastersEvent,
     envelope: EventEnvelope,
     handler: EventHandler
   ): Promise<void> {
@@ -301,7 +293,7 @@ export class EventBus implements EventPublisher, EventSubscriber {
         eventType: event.type,
         retryCount: envelope.retryCount,
         maxRetries: envelope.maxRetries,
-        delayMs: envelope.delayMs
+        delayMs: envelope.delayMs,
       });
 
       // Republish with delay
@@ -312,7 +304,6 @@ export class EventBus implements EventPublisher, EventSubscriber {
       }, envelope.delayMs);
 
       this.updateMetrics(event.type, 'retried');
-
     } else if (this.config.enableDeadLetterQueue) {
       // Send to dead letter queue
       await this.sendToDeadLetterQueue(event, envelope, error);
@@ -320,8 +311,8 @@ export class EventBus implements EventPublisher, EventSubscriber {
   }
 
   private async sendToDeadLetterQueue(
-    event: CloudMastersEvent, 
-    envelope: EventEnvelope, 
+    event: CloudMastersEvent,
+    envelope: EventEnvelope,
     error: Error
   ): Promise<void> {
     try {
@@ -332,20 +323,19 @@ export class EventBus implements EventPublisher, EventSubscriber {
         error: {
           message: error.message,
           stack: error.stack,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         },
-        failedAt: new Date().toISOString()
+        failedAt: new Date().toISOString(),
       });
 
       await this.publishClient.publish(dlqChannel, dlqMessage);
-      
+
       logger.warn('Event sent to dead letter queue', {
         eventId: event.id,
         eventType: event.type,
         dlqChannel,
-        error: error.message
+        error: error.message,
       });
-
     } catch (dlqError) {
       logger.error('Failed to send event to dead letter queue:', dlqError);
     }
@@ -353,7 +343,7 @@ export class EventBus implements EventPublisher, EventSubscriber {
 
   private getChannelForEvent(event: CloudMastersEvent): string {
     const eventType = event.type;
-    
+
     if (eventType.startsWith('payment.')) return this.config.channels.payment;
     if (eventType.startsWith('user.')) return this.config.channels.user;
     if (eventType.startsWith('course.')) return this.config.channels.course;
@@ -361,18 +351,19 @@ export class EventBus implements EventPublisher, EventSubscriber {
     if (eventType.startsWith('lab.')) return this.config.channels.lab;
     if (eventType.startsWith('admin.')) return this.config.channels.admin;
     if (eventType.startsWith('system.')) return this.config.channels.system;
-    
+
     return 'events:general';
   }
 
   private getChannelForEventType(eventType: string): string {
     if (eventType.startsWith('payment.')) return this.config.channels.payment;
     if (eventType.startsWith('user.')) return this.config.channels.user;
-    if (eventType.startsWith('course.') || eventType.startsWith('path.')) return this.config.channels.course;
+    if (eventType.startsWith('course.') || eventType.startsWith('path.'))
+      return this.config.channels.course;
     if (eventType.startsWith('lab.')) return this.config.channels.lab;
     if (eventType.startsWith('admin.')) return this.config.channels.admin;
     if (eventType.startsWith('system.')) return this.config.channels.system;
-    
+
     return 'events:general';
   }
 
@@ -390,7 +381,11 @@ export class EventBus implements EventPublisher, EventSubscriber {
     return this.eventValidator.validate(event);
   }
 
-  private updateMetrics(eventType: string, operation: 'published' | 'received' | 'processed' | 'failed' | 'retried', processingTime?: number): void {
+  private updateMetrics(
+    eventType: string,
+    operation: 'published' | 'received' | 'processed' | 'failed' | 'retried',
+    processingTime?: number
+  ): void {
     if (!this.config.enableMetrics) return;
 
     let metrics = this.metrics.get(eventType);
@@ -402,7 +397,7 @@ export class EventBus implements EventPublisher, EventSubscriber {
         retryCount: 0,
         lastProcessed: new Date(),
         averageProcessingTime: 0,
-        successRate: 0
+        successRate: 0,
       };
       this.metrics.set(eventType, metrics);
     }
@@ -439,7 +434,7 @@ export class EventBus implements EventPublisher, EventSubscriber {
       if (this.metrics.size > 0) {
         logger.info('Event bus metrics', {
           serviceName: this.config.serviceName,
-          metrics: Object.fromEntries(this.metrics)
+          metrics: Object.fromEntries(this.metrics),
         });
       }
     }, 60000); // Log metrics every minute
@@ -451,10 +446,7 @@ export class EventBus implements EventPublisher, EventSubscriber {
 
   async disconnect(): Promise<void> {
     try {
-      await Promise.all([
-        this.publishClient.disconnect(),
-        this.subscribeClient.disconnect()
-      ]);
+      await Promise.all([this.publishClient.disconnect(), this.subscribeClient.disconnect()]);
       this.isConnected = false;
       logger.info('Event bus disconnected');
     } catch (error) {
@@ -485,8 +477,8 @@ export const createEventBus = (config: Partial<EventConfig>): EventBus => {
       course: 'events:course',
       lab: 'events:lab',
       admin: 'events:admin',
-      system: 'events:system'
-    }
+      system: 'events:system',
+    },
   };
 
   return new EventBus({ ...defaultConfig, ...config });

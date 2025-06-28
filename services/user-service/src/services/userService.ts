@@ -305,7 +305,7 @@ export const deleteUser = async (userId: string): Promise<boolean> => {
       
       // Publish user deleted event
       const eventPublisher = getUserEventPublisher();
-      await eventPublisher.publishUserDeleted(userId);
+      await eventPublisher.publishUserDeleted(userId, 'system');
     } else {
       logger.warn('User not found for deletion', { userId });
     }

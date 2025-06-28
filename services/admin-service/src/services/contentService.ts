@@ -40,14 +40,17 @@ class ContentServiceClient {
       return data as ServiceResponse;
     } catch (error) {
       logger.error('Failed to fetch content for moderation:', error);
-      return { 
-        success: false, 
-        error: 'Failed to communicate with course service' 
+      return {
+        success: false,
+        error: 'Failed to communicate with course service',
       };
     }
   }
 
-  async getContentById(contentId: string, contentType: 'course' | 'learning_path'): Promise<ServiceResponse> {
+  async getContentById(
+    contentId: string,
+    contentType: 'course' | 'learning_path'
+  ): Promise<ServiceResponse> {
     try {
       const endpoint = contentType === 'course' ? 'courses' : 'paths';
       const response = await fetch(`${this.baseUrl}/${endpoint}/${contentId}`, {
@@ -61,9 +64,9 @@ class ContentServiceClient {
       return data as ServiceResponse;
     } catch (error) {
       logger.error('Failed to fetch content by ID:', error);
-      return { 
-        success: false, 
-        error: 'Failed to communicate with course service' 
+      return {
+        success: false,
+        error: 'Failed to communicate with course service',
       };
     }
   }
@@ -89,9 +92,9 @@ class ContentServiceClient {
       return data as ServiceResponse;
     } catch (error) {
       logger.error('Failed to moderate content:', error);
-      return { 
-        success: false, 
-        error: 'Failed to communicate with course service' 
+      return {
+        success: false,
+        error: 'Failed to communicate with course service',
       };
     }
   }
@@ -120,29 +123,32 @@ class ContentServiceClient {
       return data as ServiceResponse;
     } catch (error) {
       logger.error('Failed to fetch flagged content:', error);
-      return { 
-        success: false, 
-        error: 'Failed to communicate with course service' 
+      return {
+        success: false,
+        error: 'Failed to communicate with course service',
       };
     }
   }
 
   async getContentAnalytics(timeframe: string): Promise<ServiceResponse> {
     try {
-      const response = await fetch(`${this.baseUrl}/admin/analytics/content?timeframe=${timeframe}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await fetch(
+        `${this.baseUrl}/admin/analytics/content?timeframe=${timeframe}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
       const data = await response.json();
       return data as ServiceResponse;
     } catch (error) {
       logger.error('Failed to fetch content analytics:', error);
-      return { 
-        success: false, 
-        error: 'Failed to communicate with course service' 
+      return {
+        success: false,
+        error: 'Failed to communicate with course service',
       };
     }
   }
@@ -171,9 +177,9 @@ class ContentServiceClient {
       return data as ServiceResponse;
     } catch (error) {
       logger.error('Failed to fetch popular content:', error);
-      return { 
-        success: false, 
-        error: 'Failed to communicate with course service' 
+      return {
+        success: false,
+        error: 'Failed to communicate with course service',
       };
     }
   }
@@ -199,9 +205,9 @@ class ContentServiceClient {
       return data as ServiceResponse;
     } catch (error) {
       logger.error('Failed to bulk moderate content:', error);
-      return { 
-        success: false, 
-        error: 'Failed to communicate with course service' 
+      return {
+        success: false,
+        error: 'Failed to communicate with course service',
       };
     }
   }

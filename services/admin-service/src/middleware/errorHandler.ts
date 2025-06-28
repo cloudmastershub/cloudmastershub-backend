@@ -10,7 +10,7 @@ export const errorHandler = (
   err: ErrorWithStatus,
   req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ): void => {
   logger.error('Admin Service Error:', {
     error: err.message,
