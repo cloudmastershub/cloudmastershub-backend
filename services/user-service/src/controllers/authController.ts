@@ -166,47 +166,30 @@ export const googleAuth = async (req: Request, res: Response, next: NextFunction
       return;
     }
 
-    // Check if user exists in database, create if not
-    let userRecord = await userService.getUserByEmail(email);
+    // TEMPORARY: Hardcode admin user until database is properly connected
+    // Check if this is the admin user
+    const isAdminUser = email === 'mbuaku@gmail.com';
     
-    if (!userRecord) {
-      // Create new user with Google data
-      userRecord = await userService.createUser({
-        email,
-        firstName: firstName || 'User',
-        lastName: lastName || '',
-        profilePicture: avatar,
-        emailVerified: true, // Google users are pre-verified
-        roles: ['student'], // Default role for new users
-        subscriptionType: 'free'
-      });
-      logger.info('New Google user created', { userId: userRecord.id, email });
-    } else {
-      // Update existing user with latest Google data
-      await userService.updateUser(userRecord.id, {
-        firstName: firstName || userRecord.firstName,
-        lastName: lastName || userRecord.lastName,
-        profilePicture: avatar || userRecord.profilePicture,
-        lastLoginAt: new Date()
-      });
-      logger.info('Existing Google user updated', { userId: userRecord.id, email });
-    }
-
-    // Convert database user to API format
     const user = {
-      id: userRecord.id,
-      email: userRecord.email,
-      firstName: userRecord.firstName,
-      lastName: userRecord.lastName,
-      avatar: userRecord.profilePicture,
-      roles: userRecord.roles || ['student'],
-      subscriptionTier: userRecord.subscriptionPlan || 'free',
-      subscriptionStatus: userRecord.subscriptionStatus || 'free',
+      id: `google_${email.replace(/[^a-zA-Z0-9]/g, '_')}`,
+      email,
+      firstName: firstName || (isAdminUser ? 'Admin' : 'User'),
+      lastName: lastName || (isAdminUser ? 'User' : ''),
+      avatar,
+      roles: isAdminUser ? ['admin', 'student'] : ['student'],
+      subscriptionTier: isAdminUser ? 'enterprise' : 'free',
+      subscriptionStatus: isAdminUser ? 'active' : 'free',
       authProvider: 'google',
-      emailVerified: userRecord.emailVerified,
-      createdAt: userRecord.createdAt,
-      updatedAt: userRecord.updatedAt,
+      emailVerified: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
+    
+    logger.info(`Google OAuth user ${isAdminUser ? '(ADMIN)' : '(STUDENT)'}`, { 
+      email, 
+      roles: user.roles, 
+      subscriptionTier: user.subscriptionTier 
+    });
 
     const accessToken = jwt.sign(
       { 
