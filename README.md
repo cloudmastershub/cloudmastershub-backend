@@ -219,6 +219,14 @@ BackEnd/
 - **[Architecture Docs](./Docs/)**: Detailed system design and technical specifications
 - **[API Documentation](./API.md)**: Comprehensive API reference (auto-generated)
 
+## 📁 File Organization (Updated July 2025)
+
+Recent improvements to project structure:
+
+- **Network Policies**: Moved to `k8s/network-policies/` for better organization
+- **Admin Scripts**: Organized in `scripts/dev/grant-role/` for development access management
+- **Kubernetes Resources**: All K8s manifests centralized in `k8s/` directory
+
 ## 🚀 Production Readiness
 
 This backend is production-ready with:
