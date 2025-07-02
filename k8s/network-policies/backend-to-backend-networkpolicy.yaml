@@ -1,0 +1,62 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-to-backend
+  namespace: cloudmastershub-dev
+  labels:
+    app: cloudmastershub
+    type: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      tier: backend
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          tier: backend
+    ports:
+    - protocol: TCP
+      port: 3000  # API Gateway
+    - protocol: TCP
+      port: 3001  # User Service
+    - protocol: TCP
+      port: 3002  # Course Service
+    - protocol: TCP
+      port: 3003  # Lab Service
+    - protocol: TCP
+      port: 3004  # Payment Service
+    - protocol: TCP
+      port: 3005  # Admin Service
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          tier: backend
+    ports:
+    - protocol: TCP
+      port: 3000  # API Gateway
+    - protocol: TCP
+      port: 3001  # User Service
+    - protocol: TCP
+      port: 3002  # Course Service
+    - protocol: TCP
+      port: 3003  # Lab Service
+    - protocol: TCP
+      port: 3004  # Payment Service
+    - protocol: TCP
+      port: 3005  # Admin Service
+  - to:
+    - podSelector:
+        matchLabels:
+          tier: database
+    ports:
+    - protocol: TCP
+      port: 5432  # PostgreSQL
+    - protocol: TCP
+      port: 6379  # Redis
+    - protocol: TCP
+      port: 27017  # MongoDB

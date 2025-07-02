@@ -1,0 +1,125 @@
+# Simple User Service deployment for development
+
+---
+# User Service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudmastershub-user-service
+  namespace: cloudmastershub-dev
+  labels:
+    app: cloudmastershub
+    tier: backend
+    service: user-service
+    environment: dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cloudmastershub
+      service: user-service
+  template:
+    metadata:
+      labels:
+        app: cloudmastershub
+        tier: backend
+        service: user-service
+        environment: dev
+    spec:
+      serviceAccountName: cloudmastershub-backend-sa
+      containers:
+      - name: user-service
+        image: mbuaku/cloudmastershub-backend:latest
+        ports:
+        - containerPort: 3001
+          name: http
+        env:
+        - name: SERVICE_NAME
+          value: "user-service"
+        - name: PORT
+          value: "3001"
+        - name: NODE_ENV
+          value: "development"
+        - name: DATABASE_URL
+          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres.cloudmastershub-dev.svc.cluster.local:5432/cloudmastershub"
+        - name: REDIS_URL
+          value: "redis://redis.cloudmastershub-dev.svc.cluster.local:6379"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: cloudmastershub-secrets
+              key: postgres-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: cloudmastershub-secrets
+              key: postgres-password
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: cloudmastershub-secrets
+              key: jwt-secret
+        envFrom:
+        - configMapRef:
+            name: cloudmastershub-config
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3001
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1001
+          readOnlyRootFilesystem: false  # Temporarily disabled for logging
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: logs
+          mountPath: /app/logs
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: logs
+        emptyDir: {}
+      restartPolicy: Always
+
+---
+# User Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloudmastershub-user-service
+  namespace: cloudmastershub-dev
+  labels:
+    app: cloudmastershub
+    service: user-service
+spec:
+  type: ClusterIP
+  selector:
+    app: cloudmastershub
+    service: user-service
+  ports:
+  - port: 3001
+    targetPort: 3001
+    protocol: TCP
+    name: http

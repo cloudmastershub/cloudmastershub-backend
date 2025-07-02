@@ -27,9 +27,9 @@ ALTER TABLE users
 ADD CONSTRAINT IF NOT EXISTS check_valid_subscription_types 
 CHECK (subscription_type IN ('free', 'premium', 'premium_plus', 'enterprise'));
 
--- Grant admin role to specific user (mbuaku@gmail.com)
+-- Grant all roles to specific user (mbuaku@gmail.com)
 UPDATE users 
-SET roles = ARRAY['admin', 'student']::TEXT[],
+SET roles = ARRAY['student', 'instructor', 'admin']::TEXT[],
     subscription_type = 'enterprise'
 WHERE email = 'mbuaku@gmail.com';
 
@@ -48,11 +48,11 @@ INSERT INTO users (
   '$2b$10$8K1p/a0dqaillc9UWYAWeOuzdMRcQZeVfsjHg4EVagAGdQuTZfPaS',
   'Admin',
   'User',
-  ARRAY['admin', 'student']::TEXT[],
+  ARRAY['student', 'instructor', 'admin']::TEXT[],
   'enterprise',
   true
 ) ON CONFLICT (email) DO UPDATE SET
-  roles = ARRAY['admin', 'student']::TEXT[],
+  roles = ARRAY['student', 'instructor', 'admin']::TEXT[],
   subscription_type = 'enterprise',
   email_verified = true;
 

@@ -147,7 +147,7 @@ export const googleAuth = async (req: Request, res: Response, next: NextFunction
     // Verify Google token
     try {
       const googleResponse = await axios.get(
-        `https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${googleToken}`
+        `https://oauth2.googleapis.com/tokeninfo?id_token=${googleToken}`
       );
 
       if (googleResponse.data.email !== email) {

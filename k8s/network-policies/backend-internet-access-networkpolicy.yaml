@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-internet-access
+  namespace: cloudmastershub-dev
+  labels:
+    app: cloudmastershub
+    type: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      tier: backend
+  policyTypes:
+  - Egress
+  egress:
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443  # HTTPS for Google APIs
+    - protocol: TCP
+      port: 80   # HTTP (for redirects or other services)

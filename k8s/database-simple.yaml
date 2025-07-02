@@ -1,0 +1,304 @@
+# Simple database configuration for development
+# Uses emptyDir volumes for simplicity
+
+---
+# PostgreSQL Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: cloudmastershub-dev
+  labels:
+    app: cloudmastershub
+    tier: database
+    component: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cloudmastershub
+      tier: database
+      component: postgres
+  template:
+    metadata:
+      labels:
+        app: cloudmastershub
+        tier: database
+        component: postgres
+    spec:
+      serviceAccountName: cloudmastershub-database-sa
+      containers:
+      - name: postgres
+        image: postgres:13-alpine
+        ports:
+        - containerPort: 5432
+          name: postgres
+        env:
+        - name: POSTGRES_DB
+          value: "cloudmastershub"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: cloudmastershub-secrets
+              key: postgres-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: cloudmastershub-secrets
+              key: postgres-password
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - postgres
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - postgres
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: false  # PostgreSQL needs to run as postgres user
+          readOnlyRootFilesystem: false
+      volumes:
+      - name: postgres-data
+        emptyDir: {}
+      restartPolicy: Always
+
+---
+# PostgreSQL Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: cloudmastershub-dev
+  labels:
+    app: cloudmastershub
+    tier: database
+    component: postgres
+spec:
+  type: ClusterIP
+  selector:
+    app: cloudmastershub
+    tier: database
+    component: postgres
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    name: postgres
+
+---
+# MongoDB Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb
+  namespace: cloudmastershub-dev
+  labels:
+    app: cloudmastershub
+    tier: database
+    component: mongodb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cloudmastershub
+      tier: database
+      component: mongodb
+  template:
+    metadata:
+      labels:
+        app: cloudmastershub
+        tier: database
+        component: mongodb
+    spec:
+      serviceAccountName: cloudmastershub-database-sa
+      containers:
+      - name: mongodb
+        image: mongo:4.4
+        ports:
+        - containerPort: 27017
+          name: mongodb
+        env:
+        - name: MONGO_INITDB_DATABASE
+          value: "cloudmastershub"
+        - name: MONGO_INITDB_ROOT_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: cloudmastershub-secrets
+              key: mongodb-username
+        - name: MONGO_INITDB_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: cloudmastershub-secrets
+              key: mongodb-password
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        volumeMounts:
+        - name: mongodb-data
+          mountPath: /data/db
+        livenessProbe:
+          exec:
+            command:
+            - mongo
+            - --eval
+            - "db.adminCommand('ping')"
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - mongo
+            - --eval
+            - "db.adminCommand('ping')"
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        securityContext:
+          runAsNonRoot: false  # MongoDB needs specific permissions
+          readOnlyRootFilesystem: false
+      volumes:
+      - name: mongodb-data
+        emptyDir: {}
+      restartPolicy: Always
+
+---
+# MongoDB Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb
+  namespace: cloudmastershub-dev
+  labels:
+    app: cloudmastershub
+    tier: database
+    component: mongodb
+spec:
+  type: ClusterIP
+  selector:
+    app: cloudmastershub
+    tier: database
+    component: mongodb
+  ports:
+  - port: 27017
+    targetPort: 27017
+    protocol: TCP
+    name: mongodb
+
+---
+# Redis Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: cloudmastershub-dev
+  labels:
+    app: cloudmastershub
+    tier: database
+    component: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cloudmastershub
+      tier: database
+      component: redis
+  template:
+    metadata:
+      labels:
+        app: cloudmastershub
+        tier: database
+        component: redis
+    spec:
+      serviceAccountName: cloudmastershub-database-sa
+      containers:
+      - name: redis
+        image: redis:7.0-alpine
+        ports:
+        - containerPort: 6379
+          name: redis
+        command:
+        - redis-server
+        - --appendonly
+        - "yes"
+        - --maxmemory
+        - "256mb"
+        - --maxmemory-policy
+        - "allkeys-lru"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "300m"
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+        livenessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 999
+          readOnlyRootFilesystem: false
+      volumes:
+      - name: redis-data
+        emptyDir: {}
+      restartPolicy: Always
+
+---
+# Redis Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: cloudmastershub-dev
+  labels:
+    app: cloudmastershub
+    tier: database
+    component: redis
+spec:
+  type: ClusterIP
+  selector:
+    app: cloudmastershub
+    tier: database
+    component: redis
+  ports:
+  - port: 6379
+    targetPort: 6379
+    protocol: TCP
+    name: redis

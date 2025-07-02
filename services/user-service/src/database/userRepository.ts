@@ -499,15 +499,13 @@ export class UserRepository {
   }
 
   /**
-   * Grant admin privileges to a user by email
+   * Grant all roles (student, instructor, admin) to a user by email
    */
   async grantAdminPrivileges(email: string): Promise<UserRecord | null> {
+    const allRoles = ['student', 'instructor', 'admin'];
     const query = `
       UPDATE users 
-      SET roles = CASE 
-        WHEN 'admin' = ANY(roles) THEN roles
-        ELSE array_append(roles, 'admin')
-      END,
+      SET roles = $2,
       subscription_type = 'enterprise',
       email_verified = true,
       updated_at = CURRENT_TIMESTAMP
@@ -516,22 +514,22 @@ export class UserRepository {
     `;
 
     try {
-      const result = await db.query<UserRecord>(query, [email]);
+      const result = await db.query<UserRecord>(query, [email, allRoles]);
       const user = result.rows[0] || null;
       
       if (user) {
-        logger.info('Admin privileges granted to user', { 
+        logger.info('All roles granted to user', { 
           userId: user.id, 
           email: user.email,
           roles: user.roles 
         });
       } else {
-        logger.warn('User not found for admin privileges grant', { email });
+        logger.warn('User not found for role grant', { email });
       }
       
       return user;
     } catch (error) {
-      logger.error('Failed to grant admin privileges', { error, email });
+      logger.error('Failed to grant all roles', { error, email });
       throw error;
     }
   }

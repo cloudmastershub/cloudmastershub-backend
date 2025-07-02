@@ -32,7 +32,7 @@ metadata:
     service: api-gateway
     environment: dev
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: cloudmastershub
@@ -150,7 +150,7 @@ metadata:
     service: user-service
     environment: dev
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: cloudmastershub
@@ -185,17 +185,22 @@ spec:
           valueFrom:
             secretKeyRef:
               name: cloudmastershub-secrets
-              key: mongodb-username
+              key: postgres-username
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
               name: cloudmastershub-secrets
-              key: mongodb-password
+              key: postgres-password
         - name: JWT_SECRET
           valueFrom:
             secretKeyRef:
               name: cloudmastershub-secrets
               key: jwt-secret
+        - name: REFRESH_TOKEN_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: cloudmastershub-secrets
+              key: refresh-token-secret
         envFrom:
         - configMapRef:
             name: cloudmastershub-config
@@ -277,7 +282,7 @@ metadata:
     service: course-service
     environment: dev
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: cloudmastershub
@@ -399,7 +404,7 @@ metadata:
     service: lab-service
     environment: dev
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: cloudmastershub
@@ -562,7 +567,7 @@ metadata:
     service: payment-service
     environment: dev
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: cloudmastershub
