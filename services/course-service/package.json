@@ -14,7 +14,8 @@
     "migrate:down": "migrate-mongo down",
     "migrate:status": "migrate-mongo status",
     "migrate:create": "migrate-mongo create",
-    "seed": "ts-node scripts/seed.ts"
+    "seed": "ts-node scripts/seed.ts",
+    "migrate:slugs": "ts-node scripts/add-slugs-migration.ts"
   },
   "dependencies": {
     "express": "^4.18.2",

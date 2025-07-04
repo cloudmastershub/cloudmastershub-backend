@@ -1,0 +1,28 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: course-slug-migration
+  namespace: cloudmastershub-dev
+spec:
+  template:
+    metadata:
+      name: course-slug-migration
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: migration
+        image: mbuaku/cloudmastershub-backend:latest  # Will be replaced by CI/CD
+        imagePullPolicy: Always
+        command: ["npm", "run", "migrate:slugs", "-w", "@cloudmastershub/course-service"]
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: MONGODB_URI
+          valueFrom:
+            secretKeyRef:
+              name: cloudmastershub-secrets
+              key: mongodb-uri
+        - name: SERVICE_NAME
+          value: "course-slug-migration"
+      nodeSelector:
+        kubernetes.io/os: linux

@@ -1,6 +1,7 @@
 export interface Course {
   id: string;
   title: string;
+  slug: string;
   description: string;
   category: CourseCategory;
   level: DifficultyLevel;

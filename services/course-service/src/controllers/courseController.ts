@@ -104,7 +104,15 @@ export const getCourseById = async (
   try {
     const { id } = req.params;
 
-    const course = await Course.findById(id).lean();
+    // Check if the id is a valid ObjectId or a slug
+    let course;
+    if (id.match(/^[0-9a-fA-F]{24}$/)) {
+      // It's a valid ObjectId
+      course = await Course.findById(id).lean();
+    } else {
+      // Try to find by slug
+      course = await Course.findOne({ slug: id }).lean();
+    }
 
     if (!course) {
       res.status(404).json({
@@ -112,13 +120,16 @@ export const getCourseById = async (
         message: 'Course not found',
         error: {
           code: 'COURSE_NOT_FOUND',
-          details: `No course found with ID: ${id}`
+          details: `No course found with ID or slug: ${id}`
         }
       });
       return;
     }
 
-    logger.info(`Retrieved course: ${course.title}`, { courseId: id });
+    logger.info(`Retrieved course: ${course.title}`, { 
+      courseId: course._id, 
+      slug: course.slug 
+    });
 
     res.json({
       success: true,
@@ -126,21 +137,6 @@ export const getCourseById = async (
     });
   } catch (error) {
     logger.error('Error fetching course:', error);
-    
-    // Handle invalid ObjectId
-    const err = error as any;
-    if (err?.name === 'CastError') {
-      res.status(400).json({
-        success: false,
-        message: 'Invalid course ID format',
-        error: {
-          code: 'INVALID_ID_FORMAT',
-          details: 'Course ID must be a valid MongoDB ObjectId'
-        }
-      });
-      return;
-    }
-    
     next(error);
   }
 };

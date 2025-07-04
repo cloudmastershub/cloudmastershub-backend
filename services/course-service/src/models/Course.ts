@@ -1,9 +1,11 @@
 import mongoose, { Schema, Document } from 'mongoose';
 import { Course, CourseCategory, DifficultyLevel, CourseStatus } from '@cloudmastershub/types';
+import { generateSlug, generateUniqueSlug } from '@cloudmastershub/utils';
 
 // Extend the Course interface to include Mongoose Document methods
 export interface ICourse extends Omit<Course, 'id'>, Document {
   _id: string;
+  slug: string;
 }
 
 const InstructorSchema = new Schema({
@@ -68,6 +70,14 @@ const CourseSchema = new Schema<ICourse>({
     required: true, 
     trim: true,
     maxlength: 200
+  },
+  slug: {
+    type: String,
+    required: true,
+    unique: true,
+    trim: true,
+    lowercase: true,
+    index: true
   },
   description: { 
     type: String, 
@@ -166,6 +176,7 @@ CourseSchema.index({ title: 'text', description: 'text' });
 CourseSchema.index({ createdAt: -1 });
 CourseSchema.index({ rating: -1 });
 CourseSchema.index({ enrollmentCount: -1 });
+CourseSchema.index({ slug: 1 }, { unique: true });
 
 // Instance methods
 CourseSchema.methods.publish = function() {
@@ -201,6 +212,10 @@ CourseSchema.statics.findPublished = function() {
   return this.find({ status: CourseStatus.PUBLISHED });
 };
 
+CourseSchema.statics.findBySlug = function(slug: string) {
+  return this.findOne({ slug });
+};
+
 CourseSchema.statics.findByInstructor = function(instructorId: string) {
   return this.find({ 'instructor.id': instructorId });
 };
@@ -217,7 +232,23 @@ CourseSchema.statics.searchCourses = function(searchTerm: string) {
 };
 
 // Pre-save middleware
-CourseSchema.pre('save', function(next) {
+CourseSchema.pre('save', async function(next) {
+  // Generate slug from title if not provided
+  if (this.isNew || this.isModified('title')) {
+    const baseSlug = generateSlug(this.title);
+    
+    // Check for existing slugs to ensure uniqueness
+    const existingCourses = await CourseModel.find({ 
+      slug: { $regex: `^${baseSlug}(-\d+)?$` } 
+    }).select('slug');
+    
+    const existingSlugs = existingCourses
+      .filter(course => course._id.toString() !== this._id.toString())
+      .map(course => course.slug);
+    
+    this.slug = generateUniqueSlug(baseSlug, existingSlugs);
+  }
+  
   // Auto-publish if status changes to published and no publishedAt date
   if (this.status === CourseStatus.PUBLISHED && !this.publishedAt) {
     this.publishedAt = new Date();
