@@ -310,14 +310,14 @@ pipeline {
                     // Try to deploy with kubeconfig if available
                     try {
                         sh '''
-                            echo "✅ Deploying backend to Kubernetes via secondary host..."
+                            echo "✅ Deploying backend to Kubernetes via primary host..."
                             
                             # Check if namespace exists
-                            if ssh -i ~/.ssh/terraform_key -o StrictHostKeyChecking=no terraform@192.168.254.10 "kubectl get namespace cloudmastershub-dev" > /dev/null 2>&1; then
+                            if ssh -i /var/lib/jenkins/.ssh/terraform_key -o StrictHostKeyChecking=no terraform@192.168.101.10 "kubectl get namespace cloudmastershub-dev" > /dev/null 2>&1; then
                                 echo "✅ Namespace cloudmastershub-dev exists"
                             else
                                 echo "⚠️  Creating namespace cloudmastershub-dev"
-                                ssh -i ~/.ssh/terraform_key -o StrictHostKeyChecking=no terraform@192.168.254.10 "kubectl create namespace cloudmastershub-dev || true"
+                                ssh -i /var/lib/jenkins/.ssh/terraform_key -o StrictHostKeyChecking=no terraform@192.168.101.10 "kubectl create namespace cloudmastershub-dev || true"
                             fi
                             
                             # Note: Using Docker registry images (no need to load locally)
@@ -331,9 +331,9 @@ pipeline {
                             if [ -d "k8s" ]; then
                                 # Delete existing deployments if they exist to avoid selector conflicts
                                 for service in api-gateway user-service course-service lab-service; do
-                                    if ssh -i ~/.ssh/terraform_key -o StrictHostKeyChecking=no terraform@192.168.254.10 "kubectl get deployment cloudmastershub-$service -n cloudmastershub-dev" > /dev/null 2>&1; then
+                                    if ssh -i /var/lib/jenkins/.ssh/terraform_key -o StrictHostKeyChecking=no terraform@192.168.101.10 "kubectl get deployment cloudmastershub-$service -n cloudmastershub-dev" > /dev/null 2>&1; then
                                         echo "🗑️  Deleting existing $service deployment to avoid selector conflicts..."
-                                        ssh -i ~/.ssh/terraform_key -o StrictHostKeyChecking=no terraform@192.168.254.10 "kubectl delete deployment cloudmastershub-$service -n cloudmastershub-dev || true"
+                                        ssh -i /var/lib/jenkins/.ssh/terraform_key -o StrictHostKeyChecking=no terraform@192.168.101.10 "kubectl delete deployment cloudmastershub-$service -n cloudmastershub-dev || true"
                                     fi
                                 done
                                 
@@ -341,7 +341,7 @@ pipeline {
                                 for yaml_file in k8s/*.yaml k8s/*.yml; do
                                     if [ -f "$yaml_file" ]; then
                                         echo "📝 Applying $yaml_file..."
-                                        ssh -i ~/.ssh/terraform_key -o StrictHostKeyChecking=no terraform@192.168.254.10 "kubectl apply -f - <<EOF
+                                        ssh -i /var/lib/jenkins/.ssh/terraform_key -o StrictHostKeyChecking=no terraform@192.168.101.10 "kubectl apply -f - <<EOF
 $(cat "$yaml_file")
 EOF" -n cloudmastershub-dev || echo "⚠️  Failed to apply $yaml_file"
                                     fi
@@ -350,27 +350,27 @@ EOF" -n cloudmastershub-dev || echo "⚠️  Failed to apply $yaml_file"
                                 # Update deployment images for all services
                                 echo "✅ Updating deployment images to ${IMAGE_NAME}:${IMAGE_TAG}"
                                 for service in api-gateway user-service course-service lab-service; do
-                                    if ssh -i ~/.ssh/terraform_key -o StrictHostKeyChecking=no terraform@192.168.254.10 "kubectl get deployment cloudmastershub-$service -n cloudmastershub-dev" > /dev/null 2>&1; then
-                                        ssh -i ~/.ssh/terraform_key -o StrictHostKeyChecking=no terraform@192.168.254.10 "kubectl set image deployment/cloudmastershub-$service $service=${IMAGE_NAME}:${IMAGE_TAG} -n cloudmastershub-dev || echo 'Failed to update $service image'"
+                                    if ssh -i /var/lib/jenkins/.ssh/terraform_key -o StrictHostKeyChecking=no terraform@192.168.101.10 "kubectl get deployment cloudmastershub-$service -n cloudmastershub-dev" > /dev/null 2>&1; then
+                                        ssh -i /var/lib/jenkins/.ssh/terraform_key -o StrictHostKeyChecking=no terraform@192.168.101.10 "kubectl set image deployment/cloudmastershub-$service $service=${IMAGE_NAME}:${IMAGE_TAG} -n cloudmastershub-dev || echo 'Failed to update $service image'"
                                     fi
                                 done
                                 
                                 # Wait for rollouts
                                 echo "⏳ Waiting for rollouts to complete..."
                                 for service in api-gateway user-service course-service lab-service; do
-                                    if ssh -i ~/.ssh/terraform_key -o StrictHostKeyChecking=no terraform@192.168.254.10 "kubectl get deployment cloudmastershub-$service -n cloudmastershub-dev" > /dev/null 2>&1; then
-                                        ssh -i ~/.ssh/terraform_key -o StrictHostKeyChecking=no terraform@192.168.254.10 "kubectl rollout status deployment/cloudmastershub-$service -n cloudmastershub-dev --timeout=300s || echo '$service rollout may have issues'"
+                                    if ssh -i /var/lib/jenkins/.ssh/terraform_key -o StrictHostKeyChecking=no terraform@192.168.101.10 "kubectl get deployment cloudmastershub-$service -n cloudmastershub-dev" > /dev/null 2>&1; then
+                                        ssh -i /var/lib/jenkins/.ssh/terraform_key -o StrictHostKeyChecking=no terraform@192.168.101.10 "kubectl rollout status deployment/cloudmastershub-$service -n cloudmastershub-dev --timeout=300s || echo '$service rollout may have issues'"
                                     fi
                                 done
                             else
                                 echo "⚠️  k8s directory not found - creating basic deployment"
                                 # Create a basic deployment for the backend services
-                                ssh -i ~/.ssh/terraform_key -o StrictHostKeyChecking=no terraform@192.168.254.10 "kubectl create deployment cloudmastershub-backend --image=${IMAGE_NAME}:${IMAGE_TAG} -n cloudmastershub-dev || echo 'Failed to create basic deployment'"
+                                ssh -i /var/lib/jenkins/.ssh/terraform_key -o StrictHostKeyChecking=no terraform@192.168.101.10 "kubectl create deployment cloudmastershub-backend --image=${IMAGE_NAME}:${IMAGE_TAG} -n cloudmastershub-dev || echo 'Failed to create basic deployment'"
                             fi
                             
                             # Show current pods
                             echo "📋 Current backend pods in cloudmastershub-dev:"
-                            ssh -i ~/.ssh/terraform_key -o StrictHostKeyChecking=no terraform@192.168.254.10 "kubectl get pods -n cloudmastershub-dev -l app.kubernetes.io/component=backend || kubectl get pods -n cloudmastershub-dev | grep cloudmastershub || echo 'No backend pods found'"
+                            ssh -i /var/lib/jenkins/.ssh/terraform_key -o StrictHostKeyChecking=no terraform@192.168.101.10 "kubectl get pods -n cloudmastershub-dev -l app.kubernetes.io/component=backend || kubectl get pods -n cloudmastershub-dev | grep cloudmastershub || echo 'No backend pods found'"
                         '''
                     // Removed credential dependency - using SSH approach
                 }
@@ -442,19 +442,19 @@ EOF" -n cloudmastershub-dev || echo "⚠️  Failed to apply $yaml_file"
                             
                             sh '''
                                 echo "📋 Backend Services Status:"
-                                ssh -i ~/.ssh/terraform_key -o StrictHostKeyChecking=no terraform@192.168.254.10 "kubectl get services -n cloudmastershub-dev | grep cloudmastershub || echo 'No backend services found'"
+                                ssh -i /var/lib/jenkins/.ssh/terraform_key -o StrictHostKeyChecking=no terraform@192.168.101.10 "kubectl get services -n cloudmastershub-dev | grep cloudmastershub || echo 'No backend services found'"
                                 
                                 echo ""
                                 echo "📋 Backend Ingress Status:"
-                                ssh -i ~/.ssh/terraform_key -o StrictHostKeyChecking=no terraform@192.168.254.10 "kubectl get ingress -n cloudmastershub-dev | grep cloudmastershub || echo 'No backend ingress found'"
+                                ssh -i /var/lib/jenkins/.ssh/terraform_key -o StrictHostKeyChecking=no terraform@192.168.101.10 "kubectl get ingress -n cloudmastershub-dev | grep cloudmastershub || echo 'No backend ingress found'"
                                 
                                 echo ""
                                 echo "📋 Backend ConfigMaps:"
-                                ssh -i ~/.ssh/terraform_key -o StrictHostKeyChecking=no terraform@192.168.254.10 "kubectl get configmaps -n cloudmastershub-dev | grep cloudmastershub || echo 'No backend configmaps found'"
+                                ssh -i /var/lib/jenkins/.ssh/terraform_key -o StrictHostKeyChecking=no terraform@192.168.101.10 "kubectl get configmaps -n cloudmastershub-dev | grep cloudmastershub || echo 'No backend configmaps found'"
                                 
                                 echo ""
                                 echo "📋 Backend Secrets:"
-                                ssh -i ~/.ssh/terraform_key -o StrictHostKeyChecking=no terraform@192.168.254.10 "kubectl get secrets -n cloudmastershub-dev | grep cloudmastershub || echo 'No backend secrets found'"
+                                ssh -i /var/lib/jenkins/.ssh/terraform_key -o StrictHostKeyChecking=no terraform@192.168.101.10 "kubectl get secrets -n cloudmastershub-dev | grep cloudmastershub || echo 'No backend secrets found'"
                             '''
                         }
                     }
