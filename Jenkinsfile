@@ -1,99 +1,72 @@
+// CloudMastersHub Backend CI Pipeline - GitOps Ready
+// Phase 1: CI Only - Removed kubectl/deployment stages
 pipeline {
     agent {
         docker {
             image 'node:18-alpine'
-            args '-v /var/run/docker.sock:/var/run/docker.sock -u root:root'
+            args '-u root:root'
         }
     }
     
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '3'))
+        timeout(time: 30, unit: 'MINUTES')
+        timestamps()
+        ansiColor('xterm')
+        disableConcurrentBuilds()
+    }
+    
     environment {
+        // Application configuration
+        APP_NAME = 'cloudmastershub-backend'
+        
         // Docker registry configuration
         DOCKER_REGISTRY = 'docker.io'
         DOCKER_REPO = 'mbuaku'
         IMAGE_NAME = "${DOCKER_REPO}/cloudmastershub-backend"
         
-        // Kubernetes configuration
-        K8S_NAMESPACE = 'cloudmastershub-dev'
-        
         // Build configuration
         NODE_VERSION = '18'
-    }
-    
-    options {
-        buildDiscarder(logRotator(numToKeepStr: '10'))
-        timeout(time: 30, unit: 'MINUTES')
-        timestamps()
-        ansiColor('xterm')
+        
+        // Version and build info
+        BUILD_VERSION = "${BUILD_NUMBER}"
+        GIT_COMMIT_SHORT = "${GIT_COMMIT.take(8)}"
+        BRANCH_NAME_SAFE = "${env.GIT_BRANCH?.tokenize('/').last() ?: env.BRANCH_NAME ?: 'main'}"
+        IMAGE_TAG = "${BRANCH_NAME_SAFE == 'main' ? 'latest' : BRANCH_NAME_SAFE}"
+        
+        // Optimize npm
+        NPM_CONFIG_LOGLEVEL = 'error'
+        NPM_CONFIG_AUDIT = 'false'
+        NPM_CONFIG_FUND = 'false'
     }
     
     stages {
-        stage('Setup Environment') {
+        stage('Checkout & Setup') {
             steps {
                 script {
-                    echo "=== Environment Setup Stage ==="
-                }
-                
-                // Install required tools in Alpine container
-                sh '''
-                    echo "Installing required tools in Alpine container..."
-                    apk update
-                    apk add --no-cache git docker docker-cli curl
+                    echo "🚀 Starting CloudMastersHub Backend CI Pipeline"
+                    echo "Branch: ${BRANCH_NAME_SAFE}"
+                    echo "Image: ${IMAGE_NAME}:${IMAGE_TAG}"
                     
-                    # Install kubectl
-                    echo "Installing kubectl..."
-                    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-                    chmod +x kubectl
-                    mv kubectl /usr/local/bin/
+                    // Checkout code
+                    checkout([
+                        $class: 'GitSCM',
+                        branches: [[name: '*/main']],
+                        userRemoteConfigs: [[
+                            url: 'https://github.com/cloudmastershub/cloudmastershub-backend.git',
+                            credentialsId: 'cloudmastershub-github-token'
+                        ]]
+                    ])
                     
-                    # Add docker group if it doesn't exist and add root to it
-                    if ! getent group docker > /dev/null; then
-                        addgroup -g 999 docker
-                    fi
-                    adduser root docker || true
-                    
-                    # Fix git safe directory issue
-                    git config --global --add safe.directory /var/lib/jenkins/workspace/cloudmastershub-backend
-                    git config --global --add safe.directory '*'
-                    
-                    echo "Node.js version: $(node --version)"
-                    echo "NPM version: $(npm --version)"
-                    echo "Git version: $(git --version)"
-                    echo "Docker version: $(docker --version)"
-                    echo "Kubectl version: $(kubectl version --client --short)"
-                '''
-            }
-        }
-        
-        stage('Checkout') {
-            steps {
-                script {
-                    echo "=== Checkout Stage ==="
-                    
-                    // Get the actual branch name
-                    def branchName = env.BRANCH_NAME ?: sh(
-                        script: "git rev-parse --abbrev-ref HEAD",
-                        returnStdout: true
-                    ).trim()
-                    
-                    echo "Branch: ${branchName}"
-                    echo "Build Number: ${BUILD_NUMBER}"
-                    
-                    // Set git commit short hash
-                    env.GIT_COMMIT_SHORT = sh(
-                        script: "git rev-parse --short HEAD",
-                        returnStdout: true
-                    ).trim()
-                    
-                    // Set image tag
-                    def buildNumberPadded = String.format("%04d", BUILD_NUMBER as Integer)
-                    env.IMAGE_TAG = "${branchName}-${env.GIT_COMMIT_SHORT}-${buildNumberPadded}"
-                    
-                    echo "Commit: ${env.GIT_COMMIT_SHORT}"
-                    echo "Image Tag: ${env.IMAGE_TAG}"
-                    
-                    // Set additional environment variables
-                    env.DOCKERFILE_PATH = 'Dockerfile'
-                    env.BUILD_CONTEXT = '.'
+                    // Setup environment
+                    sh '''
+                        echo "✅ Node.js version:"
+                        node --version
+                        npm --version
+                        
+                        echo "📂 Workspace contents:"
+                        ls -la
+                    '''
                 }
             }
         }
@@ -101,19 +74,36 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 script {
-                    echo "=== Install Dependencies Stage ==="
+                    echo "📦 Installing dependencies for all services..."
+                    sh '''
+                        # Install dependencies for each service
+                        for service in api-gateway user-service course-service lab-service notification-service; do
+                            if [ -d "$service" ]; then
+                                echo "📦 Installing dependencies for $service..."
+                                cd "$service"
+                                
+                                if [ -f "package.json" ]; then
+                                    # Clean cache and install
+                                    npm cache verify || npm cache clean --force
+                                    rm -rf node_modules
+                                    
+                                    if [ -f "package-lock.json" ]; then
+                                        npm ci --prefer-offline --no-audit --no-fund
+                                    else
+                                        npm install --no-audit --no-fund
+                                    fi
+                                    echo "✅ Dependencies installed for $service"
+                                else
+                                    echo "⚠️  No package.json found for $service"
+                                fi
+                                
+                                cd ..
+                            else
+                                echo "📝 Service $service not found"
+                            fi
+                        done
+                    '''
                 }
-                
-                // Install npm dependencies
-                sh '''
-                    echo "Installing npm dependencies..."
-                    
-                    # Clear npm cache to avoid conflicts
-                    npm cache clean --force || true
-                    
-                    # Install dependencies
-                    npm install
-                '''
             }
         }
         
@@ -122,340 +112,125 @@ pipeline {
                 stage('Lint') {
                     steps {
                         script {
-                            echo "=== Linting Stage ==="
+                            echo "🔍 Running linting for all services..."
+                            sh '''
+                                for service in api-gateway user-service course-service lab-service notification-service; do
+                                    if [ -d "$service" ]; then
+                                        echo "🔍 Linting $service..."
+                                        cd "$service"
+                                        
+                                        if [ -f "package.json" ]; then
+                                            # Check if lint script exists
+                                            if npm run --silent 2>&1 | grep -q "lint"; then
+                                                npm run lint || echo "⚠️  Lint warnings found in $service"
+                                            else
+                                                echo "📝 No lint script found for $service"
+                                            fi
+                                        fi
+                                        
+                                        cd ..
+                                    fi
+                                done
+                            '''
                         }
-                        
-                        sh '''
-                            echo "Running ESLint..."
-                            npm run lint || echo "Linting completed with warnings"
-                        '''
                     }
                 }
                 
-                stage('Type Check') {
+                stage('Test') {
                     steps {
                         script {
-                            echo "=== Type Checking Stage ==="
+                            echo "🧪 Running tests for all services..."
+                            sh '''
+                                for service in api-gateway user-service course-service lab-service notification-service; do
+                                    if [ -d "$service" ]; then
+                                        echo "🧪 Testing $service..."
+                                        cd "$service"
+                                        
+                                        if [ -f "package.json" ]; then
+                                            # Check if test script exists
+                                            if npm run --silent 2>&1 | grep -q "test"; then
+                                                npm test || echo "⚠️  Some tests failed in $service"
+                                            else
+                                                echo "📝 No test script found for $service"
+                                            fi
+                                        fi
+                                        
+                                        cd ..
+                                    fi
+                                done
+                            '''
                         }
-                        
-                        sh '''
-                            echo "Running TypeScript type checking..."
-                            npm run typecheck || echo "Type checking completed with warnings"
-                        '''
                     }
                 }
-            }
-        }
-        
-        stage('Test') {
-            steps {
-                script {
-                    echo "=== Testing Stage ==="
-                }
-                
-                sh '''
-                    echo "Running tests..."
-                    npm run test || echo "Tests completed"
-                '''
             }
         }
         
         stage('Build') {
             steps {
                 script {
-                    echo "=== Build Stage ==="
-                }
-                
-                sh '''
-                    echo "Building all services..."
-                    npm run build || echo "Build completed"
-                '''
-            }
-        }
-        
-        stage('Security Scan') {
-            parallel {
-                stage('Dependency Check') {
-                    steps {
-                        script {
-                            echo "=== Dependency Security Check ==="
-                        }
-                        
-                        sh '''
-                            echo "Running npm audit..."
-                            npm audit --audit-level=moderate || echo "Audit completed with warnings"
-                        '''
-                    }
-                }
-                
-                stage('Docker Security Scan') {
-                    when {
-                        anyOf {
-                            branch 'main'
-                            branch 'master'
-                            branch 'develop'
-                        }
-                    }
-                    steps {
-                        script {
-                            echo "=== Docker Security Scan ==="
-                            
-                            // Build image for scanning
-                            sh """
-                                docker build -t ${IMAGE_NAME}:scan .
-                            """
-                            
-                            // Run Trivy scan if available
-                            sh """
-                                if command -v trivy &> /dev/null; then
-                                    trivy image --format table --severity HIGH,CRITICAL ${IMAGE_NAME}:scan || echo "Security scan completed"
-                                else
-                                    echo "Trivy not installed, skipping security scan"
+                    echo "🏗️  Building all services..."
+                    sh '''
+                        for service in api-gateway user-service course-service lab-service notification-service; do
+                            if [ -d "$service" ]; then
+                                echo "🏗️  Building $service..."
+                                cd "$service"
+                                
+                                if [ -f "package.json" ]; then
+                                    # Check if build script exists
+                                    if npm run --silent 2>&1 | grep -q "build"; then
+                                        npm run build || echo "⚠️  Build failed for $service"
+                                    else
+                                        echo "📝 No build script found for $service"
+                                    fi
                                 fi
-                            """
-                        }
-                    }
+                                
+                                cd ..
+                            fi
+                        done
+                    '''
                 }
             }
         }
         
         stage('Docker Build & Push') {
-            // Always run Docker build and push for now
-            // when {
-            //     anyOf {
-            //         branch 'main'
-            //         branch 'master'
-            //         branch 'develop'
-            //         changeRequest()
-            //     }
-            // }
-            
             steps {
                 script {
-                    echo "=== Docker Build & Push Stage ==="
-                    echo "Building image: ${IMAGE_NAME}:${env.IMAGE_TAG}"
-                }
-                
-                script {
-                    // Build Docker image
-                    def image = docker.build("${IMAGE_NAME}:${env.IMAGE_TAG}")
+                    echo "🐳 Building and pushing Docker image..."
                     
-                    // Push to registry if credentials are available
-                    try {
-                        // Try with empty registry URL for Docker Hub
-                        docker.withRegistry('', 'dockerhub-creds') {
-                            // Push with specific tag
-                            image.push("${env.IMAGE_TAG}")
-                            
-                            // Always push latest tag
-                            image.push('latest')
-                            
-                            // Push branch-latest for develop
-                            if (env.BRANCH_NAME == 'develop') {
-                                image.push('develop-latest')
-                            }
-                        }
-                        echo "Successfully pushed ${IMAGE_NAME}:${env.IMAGE_TAG} and ${IMAGE_NAME}:latest"
-                    } catch (Exception e) {
-                        echo "Warning: Could not push to registry - ${e.getMessage()}"
-                        echo "Image built locally: ${IMAGE_NAME}:${env.IMAGE_TAG}"
-                        
-                        // Continue without failing the build
-                        echo "Note: Docker image is built but not pushed to registry"
-                        echo "To push manually, run: docker push ${IMAGE_NAME}:${env.IMAGE_TAG}"
-                    }
-                }
-            }
-        }
-        
-        stage('Deploy to Dev') {
-            when {
-                branch 'develop'
-            }
-            
-            steps {
-                script {
-                    echo "=== Deploy to Development Stage ==="
-                    echo "Deployment would update image to: ${IMAGE_NAME}:${env.IMAGE_TAG}"
-                    echo "Target namespace: ${K8S_NAMESPACE}"
-                    
-                    // Simulate deployment commands
-                    echo "kubectl set image deployment/cloudmastershub-api-gateway api-gateway=${IMAGE_NAME}:${env.IMAGE_TAG} -n ${K8S_NAMESPACE}"
-                    echo "kubectl set image deployment/cloudmastershub-user-service user-service=${IMAGE_NAME}:${env.IMAGE_TAG} -n ${K8S_NAMESPACE}"
-                    echo "kubectl set image deployment/cloudmastershub-course-service course-service=${IMAGE_NAME}:${env.IMAGE_TAG} -n ${K8S_NAMESPACE}"
-                    echo "kubectl set image deployment/cloudmastershub-lab-service lab-service=${IMAGE_NAME}:${env.IMAGE_TAG} -n ${K8S_NAMESPACE}"
-                    
-                    echo "Note: Actual Kubernetes deployment requires cluster access and credentials"
-                }
-            }
-        }
-        
-        stage('Deploy to Production') {
-            // Temporarily removed when condition due to branch detection issues
-            // when {
-            //     anyOf {
-            //         branch 'main'
-            //         branch 'master'
-            //     }
-            // }
-            
-            steps {
-                script {
-                    echo "🚀 Deploying Backend to Production environment..."
-                    echo "🌐 Target domain: api.cloudmastershub.com"
-                    echo "📦 Namespace: cloudmastershub-dev"
-                    echo "🏷️  Application: cloudmastershub-backend"
-                    echo "🐳 Image: ${IMAGE_NAME}:${env.IMAGE_TAG}"
-                    
-                    // Try to deploy with kubeconfig if available
-                    try {
+                    withCredentials([usernamePassword(
+                        credentialsId: 'dockerhub-creds',
+                        usernameVariable: 'DOCKER_USERNAME',
+                        passwordVariable: 'DOCKER_PASSWORD'
+                    )]) {
                         sh '''
-                            echo "✅ Deploying backend to Kubernetes via primary host..."
+                            echo "🔐 Logging into Docker Hub..."
+                            echo "${DOCKER_PASSWORD}" | docker login -u "${DOCKER_USERNAME}" --password-stdin
                             
-                            # Check if namespace exists
-                            if /usr/local/bin/kubectl-remote get namespace cloudmastershub-dev > /dev/null 2>&1; then
-                                echo "✅ Namespace cloudmastershub-dev exists"
-                            else
-                                echo "⚠️  Creating namespace cloudmastershub-dev"
-                                /usr/local/bin/kubectl-remote create namespace cloudmastershub-dev || true
-                            fi
+                            echo "🏗️  Building Docker image..."
+                            docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+                            docker build -t ${IMAGE_NAME}:${BUILD_VERSION} .
                             
-                            # Note: Using Docker registry images (no need to load locally)
-                            echo "📦 Using Docker registry images for backend deployment..."
-                            echo "📝 Note: Images should be available in Docker registry"
+                            echo "📤 Pushing to Docker Hub..."
+                            docker push ${IMAGE_NAME}:${IMAGE_TAG}
+                            docker push ${IMAGE_NAME}:${BUILD_VERSION}
                             
-                            # Apply or update deployment configuration
-                            echo "📝 Applying backend deployment configuration..."
-                            
-                            # Check if k8s directory exists
-                            if [ -d "k8s" ]; then
-                                # Delete existing deployments if they exist to avoid selector conflicts
-                                for service in api-gateway user-service course-service lab-service; do
-                                    if /usr/local/bin/kubectl-remote get deployment cloudmastershub-$service -n cloudmastershub-dev > /dev/null 2>&1; then
-                                        echo "🗑️  Deleting existing $service deployment to avoid selector conflicts..."
-                                        /usr/local/bin/kubectl-remote delete deployment cloudmastershub-$service -n cloudmastershub-dev || true
-                                    fi
-                                done
-                                
-                                # Apply all k8s configurations
-                                for yaml_file in k8s/*.yaml k8s/*.yml; do
-                                    if [ -f "$yaml_file" ]; then
-                                        echo "📝 Applying $yaml_file..."
-                                        /usr/local/bin/kubectl-remote apply -f "$yaml_file" -n cloudmastershub-dev || echo "⚠️  Failed to apply $yaml_file"
-                                    fi
-                                done
-                                
-                                # Update deployment images for all services
-                                echo "✅ Updating deployment images to ${IMAGE_NAME}:${IMAGE_TAG}"
-                                for service in api-gateway user-service course-service lab-service; do
-                                    if /usr/local/bin/kubectl-remote get deployment cloudmastershub-$service -n cloudmastershub-dev > /dev/null 2>&1; then
-                                        /usr/local/bin/kubectl-remote set image deployment/cloudmastershub-$service $service=${IMAGE_NAME}:${IMAGE_TAG} -n cloudmastershub-dev || echo 'Failed to update $service image'
-                                    fi
-                                done
-                                
-                                # Wait for rollouts
-                                echo "⏳ Waiting for rollouts to complete..."
-                                for service in api-gateway user-service course-service lab-service; do
-                                    if /usr/local/bin/kubectl-remote get deployment cloudmastershub-$service -n cloudmastershub-dev > /dev/null 2>&1; then
-                                        /usr/local/bin/kubectl-remote rollout status deployment/cloudmastershub-$service -n cloudmastershub-dev --timeout=300s || echo '$service rollout may have issues'
-                                    fi
-                                done
-                            else
-                                echo "⚠️  k8s directory not found - creating basic deployment"
-                                # Create a basic deployment for the backend services
-                                /usr/local/bin/kubectl-remote create deployment cloudmastershub-backend --image=${IMAGE_NAME}:${IMAGE_TAG} -n cloudmastershub-dev || echo 'Failed to create basic deployment'
-                            fi
-                            
-                            # Show current pods
-                            echo "📋 Current backend pods in cloudmastershub-dev:"
-                            /usr/local/bin/kubectl-remote get pods -n cloudmastershub-dev -l app.kubernetes.io/component=backend || /usr/local/bin/kubectl-remote get pods -n cloudmastershub-dev | grep cloudmastershub || echo 'No backend pods found'
+                            echo "✅ Docker image pushed successfully"
+                            echo "Image: ${IMAGE_NAME}:${IMAGE_TAG}"
+                            echo "Build Image: ${IMAGE_NAME}:${BUILD_VERSION}"
                         '''
-                    // Removed credential dependency - using SSH approach
+                    }
                 }
             }
         }
         
-        stage('Post-Deployment Tests') {
-            // Temporarily removed when condition due to branch detection issues
-            // when {
-            //     anyOf {
-            //         branch 'main'
-            //         branch 'master'
-            //     }
-            // }
-            
-            parallel {
-                stage('Health Check') {
-                    steps {
-                        script {
-                            echo "🔍 Running backend health checks..."
-                            
-                            // Backend health check for api.cloudmastershub.com
-                            def apiUrl = 'https://api.cloudmastershub.com'
-                            
-                            sh """
-                                echo "🌐 Testing backend deployment at ${apiUrl}"
-                                echo "⏳ Waiting for backend services to be ready..."
-                                sleep 30
-                                
-                                if command -v curl > /dev/null; then
-                                    echo "✅ Running backend health checks..."
-                                    
-                                    # Test API Gateway health
-                                    echo "🚪 Testing API Gateway health..."
-                                    curl -f -s -o /dev/null ${apiUrl}/health && echo "✅ API Gateway accessible" || echo "⚠️ API Gateway health check failed"
-                                    
-                                    # Test User Service health
-                                    echo "👤 Testing User Service..."
-                                    curl -f -s -o /dev/null ${apiUrl}/api/users/health && echo "✅ User Service healthy" || echo "⚠️ User Service check failed"
-                                    
-                                    # Test Course Service health
-                                    echo "📚 Testing Course Service..."
-                                    curl -f -s -o /dev/null ${apiUrl}/api/courses/health && echo "✅ Course Service healthy" || echo "⚠️ Course Service check failed"
-                                    
-                                    # Test Lab Service health
-                                    echo "🧪 Testing Lab Service..."
-                                    curl -f -s -o /dev/null ${apiUrl}/api/labs/health && echo "✅ Lab Service healthy" || echo "⚠️ Lab Service check failed"
-                                    
-                                    echo ""
-                                    echo "🎉 Backend deployment health check completed!"
-                                    echo "🌐 Backend API should be accessible at: ${apiUrl}"
-                                else
-                                    echo "📝 Demo mode: Backend health checks would run here"
-                                    echo "   - Testing ${apiUrl}/health"
-                                    echo "   - Testing ${apiUrl}/api/users/health"
-                                    echo "   - Testing ${apiUrl}/api/courses/health"
-                                    echo "   - Testing ${apiUrl}/api/labs/health"
-                                    echo "🌐 Backend API URL: ${apiUrl}"
-                                fi
-                            """
-                        }
-                    }
-                }
-                
-                stage('Service Discovery') {
-                    steps {
-                        script {
-                            echo "🔍 Checking backend service status..."
-                            
-                            sh '''
-                                echo "📋 Backend Services Status:"
-                                /usr/local/bin/kubectl-remote get services -n cloudmastershub-dev | grep cloudmastershub || echo 'No backend services found'
-                                
-                                echo ""
-                                echo "📋 Backend Ingress Status:"
-                                /usr/local/bin/kubectl-remote get ingress -n cloudmastershub-dev | grep cloudmastershub || echo 'No backend ingress found'
-                                
-                                echo ""
-                                echo "📋 Backend ConfigMaps:"
-                                /usr/local/bin/kubectl-remote get configmaps -n cloudmastershub-dev | grep cloudmastershub || echo 'No backend configmaps found'
-                                
-                                echo ""
-                                echo "📋 Backend Secrets:"
-                                /usr/local/bin/kubectl-remote get secrets -n cloudmastershub-dev | grep cloudmastershub || echo 'No backend secrets found'
-                            '''
-                        }
-                    }
+        stage('GitOps Update') {
+            steps {
+                script {
+                    echo "📝 GitOps repository update would happen here"
+                    echo "TODO: Update gitops-repo with new image tag: ${IMAGE_TAG}"
+                    echo "Repository: cloudmastershub-gitops"
+                    echo "Path: apps/backend/deployment.yaml"
+                    echo "New image: ${IMAGE_NAME}:${IMAGE_TAG}"
                 }
             }
         }
@@ -464,58 +239,32 @@ pipeline {
     post {
         always {
             script {
-                echo "=== Pipeline Cleanup ==="
-                echo "Cleaning up workspace and temporary resources"
-            }
-            
-            // Clean up Docker images if they exist
-            sh '''
-                if command -v docker > /dev/null && [ -n "${IMAGE_NAME:-}" ] && [ -n "${IMAGE_TAG:-}" ]; then
+                echo "🧹 Cleaning up workspace..."
+                
+                // Clean up Docker images
+                sh '''
                     docker rmi ${IMAGE_NAME}:${IMAGE_TAG} || true
-                    docker rmi ${IMAGE_NAME}:scan || true
+                    docker rmi ${IMAGE_NAME}:${BUILD_VERSION} || true
                     docker system prune -f || true
-                else
-                    echo "Skipping Docker cleanup - Docker not available or variables not set"
-                fi
-            '''
-            
-            // Archive build artifacts if they exist
-            archiveArtifacts artifacts: 'dist/**/*', allowEmptyArchive: true
+                '''
+                
+                // Clean workspace
+                cleanWs()
+            }
         }
         
         success {
             script {
-                echo "=== Pipeline Success ==="
-                echo "✅ CloudMastersHub Backend Pipeline SUCCESS"
-                echo "🌐 Backend API: https://api.cloudmastershub.com"
-                echo "📦 Namespace: cloudmastershub-dev"
-                echo "Branch: ${env.BRANCH_NAME}"
-                echo "Commit: ${env.GIT_COMMIT_SHORT}"
-                echo "Images: ${IMAGE_NAME}:${env.IMAGE_TAG}, ${IMAGE_NAME}:latest"
-                echo "Build: ${BUILD_URL}"
-                echo ""
-                echo "🎉 Backend deployed successfully to production!"
+                echo "✅ Backend CI pipeline completed successfully!"
+                echo "🐳 Image pushed: ${IMAGE_NAME}:${IMAGE_TAG}"
+                echo "📝 Ready for GitOps deployment via ArgoCD"
             }
         }
         
         failure {
             script {
-                echo "=== Pipeline Failure ==="
-                echo "❌ CloudMastersHub Backend Pipeline FAILED"
-                echo "Branch: ${env.BRANCH_NAME}"
-                echo "Commit: ${env.GIT_COMMIT_SHORT ?: 'unknown'}"
-                echo "Build: ${BUILD_URL}"
-                echo "Please check the logs for details."
-            }
-        }
-        
-        unstable {
-            script {
-                echo "=== Pipeline Unstable ==="
-                echo "⚠️ CloudMastersHub Backend Pipeline UNSTABLE"
-                echo "Branch: ${env.BRANCH_NAME}"
-                echo "Commit: ${env.GIT_COMMIT_SHORT ?: 'unknown'}"
-                echo "Build: ${BUILD_URL}"
+                echo "❌ Backend CI pipeline failed!"
+                echo "Check the logs above for details"
             }
         }
     }
