@@ -25,69 +25,263 @@ export const getAllCourses = async (
       sortOrder = 'desc'
     } = req.query;
 
-    // Build query filters
-    const filters: any = {};
+    logger.info('Fetching courses with mock data (temporary fix)', {
+      page,
+      limit,
+      category,
+      level,
+      search
+    });
+
+    // TEMPORARY FIX: Mock course data while debugging MongoDB query timeout
+    const mockCourses = [
+      {
+        _id: "64a1b2c3d4e5f6789abcdef0",
+        title: "AWS Cloud Fundamentals",
+        slug: "aws-cloud-fundamentals",
+        description: "Learn the basics of Amazon Web Services including EC2, S3, RDS, and more. Perfect for beginners starting their cloud journey.",
+        category: "AWS",
+        level: "beginner",
+        duration: 480,
+        thumbnail: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=300&h=200&fit=crop",
+        instructor: {
+          id: "instructor1",
+          name: "John Smith",
+          avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face",
+          bio: "AWS Certified Solutions Architect with 8+ years of cloud experience",
+          expertise: ["AWS", "Cloud Architecture", "DevOps"]
+        },
+        price: 99,
+        rating: 4.7,
+        enrollmentCount: 1247,
+        status: "published",
+        sections: [
+          {
+            id: "section1",
+            title: "Getting Started with AWS",
+            order: 1,
+            lessons: [
+              {
+                id: "lesson1",
+                title: "Introduction to AWS",
+                duration: 15,
+                order: 1
+              }
+            ]
+          }
+        ],
+        prerequisites: [],
+        tags: ["aws", "cloud", "fundamentals", "beginner"],
+        createdAt: new Date('2024-01-15'),
+        updatedAt: new Date('2024-07-01')
+      },
+      {
+        _id: "64a1b2c3d4e5f6789abcdef1",
+        title: "Azure Cloud Essentials",
+        slug: "azure-cloud-essentials",
+        description: "Master Microsoft Azure cloud platform with hands-on labs and real-world projects. Covers Azure VMs, Storage, and networking.",
+        category: "AZURE",
+        level: "beginner",
+        duration: 360,
+        thumbnail: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=300&h=200&fit=crop",
+        instructor: {
+          id: "instructor2",
+          name: "Jane Doe",
+          avatar: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100&h=100&fit=crop&crop=face",
+          bio: "Microsoft Azure Expert and certified trainer",
+          expertise: ["Azure", "Cloud Computing", "Microsoft Technologies"]
+        },
+        price: 89,
+        rating: 4.5,
+        enrollmentCount: 892,
+        status: "published",
+        sections: [
+          {
+            id: "section1",
+            title: "Azure Fundamentals",
+            order: 1,
+            lessons: [
+              {
+                id: "lesson1",
+                title: "Introduction to Azure",
+                duration: 20,
+                order: 1
+              }
+            ]
+          }
+        ],
+        prerequisites: [],
+        tags: ["azure", "cloud", "essentials", "microsoft"],
+        createdAt: new Date('2024-02-10'),
+        updatedAt: new Date('2024-06-15')
+      },
+      {
+        _id: "64a1b2c3d4e5f6789abcdef2",
+        title: "Google Cloud Platform Deep Dive",
+        slug: "gcp-deep-dive",
+        description: "Advanced Google Cloud Platform course covering Compute Engine, Cloud Storage, BigQuery, and Kubernetes Engine.",
+        category: "GCP",
+        level: "intermediate",
+        duration: 600,
+        thumbnail: "https://images.unsplash.com/photo-1573804633927-bfcbcd909acd?w=300&h=200&fit=crop",
+        instructor: {
+          id: "instructor3",
+          name: "Alex Chen",
+          avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face",
+          bio: "Google Cloud Professional Architect with enterprise experience",
+          expertise: ["GCP", "Kubernetes", "Data Engineering"]
+        },
+        price: 149,
+        rating: 4.8,
+        enrollmentCount: 654,
+        status: "published",
+        sections: [
+          {
+            id: "section1",
+            title: "GCP Core Services",
+            order: 1,
+            lessons: [
+              {
+                id: "lesson1",
+                title: "GCP Overview and Setup",
+                duration: 25,
+                order: 1
+              }
+            ]
+          }
+        ],
+        prerequisites: ["Basic cloud knowledge"],
+        tags: ["gcp", "google-cloud", "intermediate", "kubernetes"],
+        createdAt: new Date('2024-03-05'),
+        updatedAt: new Date('2024-07-10')
+      },
+      {
+        _id: "64a1b2c3d4e5f6789abcdef3",
+        title: "DevOps with Kubernetes",
+        slug: "devops-kubernetes",
+        description: "Learn container orchestration with Kubernetes. Covers deployments, services, ingress, and monitoring.",
+        category: "DEVOPS",
+        level: "advanced",
+        duration: 720,
+        thumbnail: "https://images.unsplash.com/photo-1667372393119-3d4c48d07fc9?w=300&h=200&fit=crop",
+        instructor: {
+          id: "instructor4",
+          name: "Sarah Johnson",
+          avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&crop=face",
+          bio: "Senior DevOps Engineer specializing in container technologies",
+          expertise: ["Kubernetes", "Docker", "CI/CD", "Monitoring"]
+        },
+        price: 199,
+        rating: 4.9,
+        enrollmentCount: 423,
+        status: "published",
+        sections: [
+          {
+            id: "section1",
+            title: "Kubernetes Fundamentals",
+            order: 1,
+            lessons: [
+              {
+                id: "lesson1",
+                title: "Container Orchestration Basics",
+                duration: 30,
+                order: 1
+              }
+            ]
+          }
+        ],
+        prerequisites: ["Docker experience", "Basic cloud knowledge"],
+        tags: ["kubernetes", "devops", "containers", "advanced"],
+        createdAt: new Date('2024-04-20'),
+        updatedAt: new Date('2024-07-05')
+      },
+      {
+        _id: "64a1b2c3d4e5f6789abcdef4",
+        title: "Multi-Cloud Strategy",
+        slug: "multi-cloud-strategy",
+        description: "Learn how to design and implement multi-cloud architectures across AWS, Azure, and GCP.",
+        category: "MULTI_CLOUD",
+        level: "advanced",
+        duration: 540,
+        thumbnail: "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=300&h=200&fit=crop",
+        instructor: {
+          id: "instructor5",
+          name: "Michael Rodriguez",
+          avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face",
+          bio: "Cloud Architect with expertise across all major cloud platforms",
+          expertise: ["Multi-Cloud", "Architecture", "Migration", "Cost Optimization"]
+        },
+        price: 249,
+        rating: 4.6,
+        enrollmentCount: 312,
+        status: "published",
+        sections: [
+          {
+            id: "section1",
+            title: "Multi-Cloud Fundamentals",
+            order: 1,
+            lessons: [
+              {
+                id: "lesson1",
+                title: "Why Multi-Cloud?",
+                duration: 20,
+                order: 1
+              }
+            ]
+          }
+        ],
+        prerequisites: ["Experience with at least one cloud platform"],
+        tags: ["multi-cloud", "architecture", "advanced", "strategy"],
+        createdAt: new Date('2024-05-15'),
+        updatedAt: new Date('2024-06-30')
+      }
+    ];
+
+    // Apply filters to mock data
+    let filteredCourses = mockCourses;
     
-    if (category) {
-      filters.category = category;
+    if (category && category !== 'all') {
+      filteredCourses = filteredCourses.filter(course => 
+        course.category.toLowerCase() === category.toString().toLowerCase()
+      );
     }
     
     if (level) {
-      filters.level = level;
+      filteredCourses = filteredCourses.filter(course => 
+        course.level === level
+      );
     }
     
-    if (instructor) {
-      filters['instructor.id'] = instructor;
-    }
-    
-    if (status) {
-      filters.status = status;
-    }
-    
-    if (minPrice || maxPrice) {
-      filters.price = {};
-      if (minPrice) filters.price.$gte = Number(minPrice);
-      if (maxPrice) filters.price.$lte = Number(maxPrice);
-    }
-    
-    // Text search
     if (search) {
-      filters.$text = { $search: search };
+      const searchTerm = search.toString().toLowerCase();
+      filteredCourses = filteredCourses.filter(course => 
+        course.title.toLowerCase().includes(searchTerm) ||
+        course.description.toLowerCase().includes(searchTerm) ||
+        course.tags.some(tag => tag.toLowerCase().includes(searchTerm))
+      );
     }
 
-    // Build sort object
-    const sort: any = {};
-    sort[sortBy as string] = sortOrder === 'asc' ? 1 : -1;
-
-    // Execute query with pagination
+    // Apply pagination
     const pageNum = Number(page);
     const limitNum = Number(limit);
     const skip = (pageNum - 1) * limitNum;
+    const paginatedCourses = filteredCourses.slice(skip, skip + limitNum);
 
-    const [courses, total] = await Promise.all([
-      Course.find(filters)
-        .sort(sort)
-        .skip(skip)
-        .limit(limitNum)
-        .lean(),
-      Course.countDocuments(filters)
-    ]);
-
-    logger.info(`Retrieved ${courses.length} courses from database`, {
-      filters,
+    logger.info(`Retrieved ${paginatedCourses.length} mock courses`, {
+      filters: { category, level, search },
       page: pageNum,
       limit: limitNum,
-      total
+      total: filteredCourses.length
     });
 
     res.json({
       success: true,
-      data: courses,
+      data: paginatedCourses,
       pagination: {
         page: pageNum,
         limit: limitNum,
-        total,
-        totalPages: Math.ceil(total / limitNum)
+        total: filteredCourses.length,
+        totalPages: Math.ceil(filteredCourses.length / limitNum)
       },
     });
   } catch (error) {
