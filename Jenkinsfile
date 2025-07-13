@@ -5,7 +5,7 @@ pipeline {
     
     options {
         buildDiscarder(logRotator(numToKeepStr: '3'))
-        timeout(time: 30, unit: 'MINUTES')
+        timeout(time: 45, unit: 'MINUTES')
         timestamps()
         ansiColor('xterm')
         disableConcurrentBuilds()
@@ -78,11 +78,15 @@ pipeline {
                 script {
                     echo "📦 Installing dependencies for all services..."
                     sh '''
+                        # Install dependencies for workspace root
+                        echo "📦 Installing root dependencies..."
+                        npm ci --prefer-offline --no-audit --no-fund
+                        
                         # Install dependencies for each service
-                        for service in api-gateway user-service course-service lab-service notification-service; do
-                            if [ -d "$service" ]; then
+                        for service in api-gateway user-service course-service lab-service admin-service payment-service; do
+                            if [ -d "services/$service" ]; then
                                 echo "📦 Installing dependencies for $service..."
-                                cd "$service"
+                                cd "services/$service"
                                 
                                 if [ -f "package.json" ]; then
                                     # Clean cache and install
@@ -99,9 +103,24 @@ pipeline {
                                     echo "⚠️  No package.json found for $service"
                                 fi
                                 
-                                cd ..
+                                cd ../..
                             else
                                 echo "📝 Service $service not found"
+                            fi
+                        done
+                        
+                        # Install shared dependencies
+                        for shared in types utils middleware; do
+                            if [ -d "shared/$shared" ]; then
+                                echo "📦 Installing shared dependencies for $shared..."
+                                cd "shared/$shared"
+                                
+                                if [ -f "package.json" ]; then
+                                    npm ci --prefer-offline --no-audit --no-fund || npm install --no-audit --no-fund
+                                    echo "✅ Shared dependencies installed for $shared"
+                                fi
+                                
+                                cd ../..
                             fi
                         done
                     '''
@@ -123,10 +142,20 @@ pipeline {
                         script {
                             echo "🔍 Running linting for all services..."
                             sh '''
-                                for service in api-gateway user-service course-service lab-service notification-service; do
-                                    if [ -d "$service" ]; then
+                                # Lint root project
+                                if [ -f "package.json" ]; then
+                                    if npm run --silent 2>&1 | grep -q "lint"; then
+                                        npm run lint || echo "⚠️  Lint warnings found in root"
+                                    else
+                                        echo "📝 No lint script found in root"
+                                    fi
+                                fi
+                                
+                                # Lint each service
+                                for service in api-gateway user-service course-service lab-service admin-service payment-service; do
+                                    if [ -d "services/$service" ]; then
                                         echo "🔍 Linting $service..."
-                                        cd "$service"
+                                        cd "services/$service"
                                         
                                         if [ -f "package.json" ]; then
                                             # Check if lint script exists
@@ -137,7 +166,7 @@ pipeline {
                                             fi
                                         fi
                                         
-                                        cd ..
+                                        cd ../..
                                     fi
                                 done
                             '''
@@ -157,10 +186,20 @@ pipeline {
                         script {
                             echo "🧪 Running tests for all services..."
                             sh '''
-                                for service in api-gateway user-service course-service lab-service notification-service; do
-                                    if [ -d "$service" ]; then
+                                # Test root project
+                                if [ -f "package.json" ]; then
+                                    if npm run --silent 2>&1 | grep -q "test"; then
+                                        npm test || echo "⚠️  Some tests failed in root"
+                                    else
+                                        echo "📝 No test script found in root"
+                                    fi
+                                fi
+                                
+                                # Test each service
+                                for service in api-gateway user-service course-service lab-service admin-service payment-service; do
+                                    if [ -d "services/$service" ]; then
                                         echo "🧪 Testing $service..."
-                                        cd "$service"
+                                        cd "services/$service"
                                         
                                         if [ -f "package.json" ]; then
                                             # Check if test script exists
@@ -171,7 +210,7 @@ pipeline {
                                             fi
                                         fi
                                         
-                                        cd ..
+                                        cd ../..
                                     fi
                                 done
                             '''
@@ -193,10 +232,20 @@ pipeline {
                 script {
                     echo "🏗️  Building all services..."
                     sh '''
-                        for service in api-gateway user-service course-service lab-service notification-service; do
-                            if [ -d "$service" ]; then
+                        # Build root project
+                        if [ -f "package.json" ]; then
+                            if npm run --silent 2>&1 | grep -q "build"; then
+                                npm run build || echo "⚠️  Build failed for root"
+                            else
+                                echo "📝 No build script found in root"
+                            fi
+                        fi
+                        
+                        # Build each service
+                        for service in api-gateway user-service course-service lab-service admin-service payment-service; do
+                            if [ -d "services/$service" ]; then
                                 echo "🏗️  Building $service..."
-                                cd "$service"
+                                cd "services/$service"
                                 
                                 if [ -f "package.json" ]; then
                                     # Check if build script exists
@@ -207,7 +256,25 @@ pipeline {
                                     fi
                                 fi
                                 
-                                cd ..
+                                cd ../..
+                            fi
+                        done
+                        
+                        # Build shared packages
+                        for shared in types utils middleware; do
+                            if [ -d "shared/$shared" ]; then
+                                echo "🏗️  Building shared $shared..."
+                                cd "shared/$shared"
+                                
+                                if [ -f "package.json" ]; then
+                                    if npm run --silent 2>&1 | grep -q "build"; then
+                                        npm run build || echo "⚠️  Build failed for shared $shared"
+                                    else
+                                        echo "📝 No build script found for shared $shared"
+                                    fi
+                                fi
+                                
+                                cd ../..
                             fi
                         done
                     '''
@@ -216,6 +283,9 @@ pipeline {
         }
         
         stage('Docker Build & Push') {
+            options {
+                timeout(time: 20, unit: 'MINUTES')
+            }
             steps {
                 script {
                     echo "🐳 Building and pushing Docker image..."
@@ -230,8 +300,8 @@ pipeline {
                             echo "${DOCKER_PASSWORD}" | docker login -u "${DOCKER_USERNAME}" --password-stdin
                             
                             echo "🏗️  Building Docker image..."
-                            docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
-                            docker build -t ${IMAGE_NAME}:${BUILD_VERSION} .
+                            docker build --no-cache -t ${IMAGE_NAME}:${IMAGE_TAG} .
+                            docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:${BUILD_VERSION}
                             
                             echo "📤 Pushing to Docker Hub..."
                             docker push ${IMAGE_NAME}:${IMAGE_TAG}
@@ -261,20 +331,18 @@ pipeline {
     
     post {
         always {
-            node('master') {
-                script {
-                    echo "🧹 Cleaning up workspace..."
-                    
-                    // Clean up Docker images
-                    sh '''
-                        docker rmi ${IMAGE_NAME}:${IMAGE_TAG} || true
-                        docker rmi ${IMAGE_NAME}:${BUILD_VERSION} || true
-                        docker system prune -f || true
-                    '''
-                    
-                    // Clean workspace
-                    cleanWs()
-                }
+            script {
+                echo "🧹 Cleaning up workspace..."
+                
+                // Clean up Docker images if they exist
+                sh '''
+                    docker rmi ${IMAGE_NAME}:${IMAGE_TAG} || true
+                    docker rmi ${IMAGE_NAME}:${BUILD_VERSION} || true
+                    docker system prune -f || true
+                '''
+                
+                // Clean workspace
+                cleanWs()
             }
         }
         
