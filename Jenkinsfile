@@ -49,7 +49,7 @@ pipeline {
                         branches: [[name: '*/main']],
                         userRemoteConfigs: [[
                             url: 'https://github.com/cloudmastershub/cloudmastershub-backend.git',
-                            credentialsId: 'cloudmastershub-github-token'
+                            credentialsId: 'cloudmastershub-github-userpass'
                         ]]
                     ])
                     
@@ -110,15 +110,15 @@ pipeline {
         }
         
         stage('Code Quality') {
-            agent {
-                docker {
-                    image 'node:18-alpine'
-                    args '-u root:root'
-                    reuseNode true
-                }
-            }
             parallel {
                 stage('Lint') {
+                    agent {
+                        docker {
+                            image 'node:18-alpine'
+                            args '-u root:root'
+                            reuseNode true
+                        }
+                    }
                     steps {
                         script {
                             echo "🔍 Running linting for all services..."
@@ -146,6 +146,13 @@ pipeline {
                 }
                 
                 stage('Test') {
+                    agent {
+                        docker {
+                            image 'node:18-alpine'
+                            args '-u root:root'
+                            reuseNode true
+                        }
+                    }
                     steps {
                         script {
                             echo "🧪 Running tests for all services..."
