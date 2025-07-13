@@ -1,12 +1,7 @@
 // CloudMastersHub Backend CI Pipeline - GitOps Ready
 // Phase 1: CI Only - Removed kubectl/deployment stages
 pipeline {
-    agent {
-        docker {
-            image 'node:18-alpine'
-            args '-u root:root'
-        }
-    }
+    agent any
     
     options {
         buildDiscarder(logRotator(numToKeepStr: '3'))
@@ -72,6 +67,13 @@ pipeline {
         }
         
         stage('Install Dependencies') {
+            agent {
+                docker {
+                    image 'node:18-alpine'
+                    args '-u root:root'
+                    reuseNode true
+                }
+            }
             steps {
                 script {
                     echo "📦 Installing dependencies for all services..."
@@ -108,6 +110,13 @@ pipeline {
         }
         
         stage('Code Quality') {
+            agent {
+                docker {
+                    image 'node:18-alpine'
+                    args '-u root:root'
+                    reuseNode true
+                }
+            }
             parallel {
                 stage('Lint') {
                     steps {
@@ -166,6 +175,13 @@ pipeline {
         }
         
         stage('Build') {
+            agent {
+                docker {
+                    image 'node:18-alpine'
+                    args '-u root:root'
+                    reuseNode true
+                }
+            }
             steps {
                 script {
                     echo "🏗️  Building all services..."
@@ -238,18 +254,20 @@ pipeline {
     
     post {
         always {
-            script {
-                echo "🧹 Cleaning up workspace..."
-                
-                // Clean up Docker images
-                sh '''
-                    docker rmi ${IMAGE_NAME}:${IMAGE_TAG} || true
-                    docker rmi ${IMAGE_NAME}:${BUILD_VERSION} || true
-                    docker system prune -f || true
-                '''
-                
-                // Clean workspace
-                cleanWs()
+            node('master') {
+                script {
+                    echo "🧹 Cleaning up workspace..."
+                    
+                    // Clean up Docker images
+                    sh '''
+                        docker rmi ${IMAGE_NAME}:${IMAGE_TAG} || true
+                        docker rmi ${IMAGE_NAME}:${BUILD_VERSION} || true
+                        docker system prune -f || true
+                    '''
+                    
+                    // Clean workspace
+                    cleanWs()
+                }
             }
         }
         
