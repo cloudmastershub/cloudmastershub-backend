@@ -21,7 +21,7 @@ pipeline {
         IMAGE_NAME = "${DOCKER_REPO}/cloudmastershub-backend"
         
         // Build configuration
-        NODE_VERSION = '18'
+        NODE_VERSION = '20'
         
         // Version and build info
         BUILD_VERSION = "${BUILD_NUMBER}"
@@ -69,7 +69,7 @@ pipeline {
         stage('Install Dependencies') {
             agent {
                 docker {
-                    image 'node:18-alpine'
+                    image 'node:20-alpine'
                     args '-u root:root'
                     reuseNode true
                 }
@@ -133,7 +133,7 @@ pipeline {
                 stage('Lint') {
                     agent {
                         docker {
-                            image 'node:18-alpine'
+                            image 'node:20-alpine'
                             args '-u root:root'
                             reuseNode true
                         }
@@ -177,7 +177,7 @@ pipeline {
                 stage('Test') {
                     agent {
                         docker {
-                            image 'node:18-alpine'
+                            image 'node:20-alpine'
                             args '-u root:root'
                             reuseNode true
                         }
@@ -223,7 +223,7 @@ pipeline {
         stage('Build') {
             agent {
                 docker {
-                    image 'node:18-alpine'
+                    image 'node:20-alpine'
                     args '-u root:root'
                     reuseNode true
                 }
@@ -285,6 +285,7 @@ pipeline {
         stage('Docker Build & Push') {
             options {
                 timeout(time: 20, unit: 'MINUTES')
+                retry(2)
             }
             steps {
                 script {
@@ -300,7 +301,9 @@ pipeline {
                             echo "${DOCKER_PASSWORD}" | docker login -u "${DOCKER_USERNAME}" --password-stdin
                             
                             echo "🏗️  Building Docker image..."
-                            docker build --no-cache -t ${IMAGE_NAME}:${IMAGE_TAG} .
+                            # Use buildkit for better caching and performance
+                            export DOCKER_BUILDKIT=1
+                            docker build --progress=plain -t ${IMAGE_NAME}:${IMAGE_TAG} .
                             docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:${BUILD_VERSION}
                             
                             echo "📤 Pushing to Docker Hub..."

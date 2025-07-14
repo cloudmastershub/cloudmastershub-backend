@@ -1,7 +1,7 @@
 # Multi-stage Dockerfile for CloudMastersHub Backend
 # This builds all microservices in a single image for production
 
-FROM node:18-alpine AS base
+FROM node:20-alpine AS base
 
 # Install dumb-init for proper signal handling
 RUN apk add --no-cache dumb-init
@@ -38,7 +38,7 @@ RUN npm run build --workspace=@cloudmastershub/payment-service
 FROM base AS production
 
 # Install only production dependencies
-RUN npm ci --only=production && npm cache clean --force
+RUN npm ci --omit=dev && npm cache clean --force
 
 # Copy built artifacts from builder stage
 COPY --from=builder /app/shared/types/dist ./shared/types/dist
