@@ -12,6 +12,7 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 COPY tsconfig.json ./
+COPY tsconfig.base.json ./
 
 # Copy all source code
 COPY shared ./shared
