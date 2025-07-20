@@ -18,7 +18,11 @@ app.set('trust proxy', 1);
 
 app.use(helmet());
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3001'],
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || [
+    'http://localhost:3000',
+    'http://localhost:3001', 
+    'https://cloudmastershub.com'
+  ],
   credentials: true,
 }));
 
