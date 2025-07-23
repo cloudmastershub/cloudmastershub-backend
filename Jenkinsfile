@@ -344,16 +344,16 @@ pipeline {
                         """
                     }
                     
-                    // Update backend deployment image tag
+                    // Update backend kustomization image tag
                     sh """
                         cd gitops-temp
                         
-                        # Update the backend deployment with new image tag
-                        sed -i 's|image: ${IMAGE_NAME}:.*|image: ${IMAGE_NAME}:${IMAGE_TAG}|g' apps/backend/deployment.yaml
+                        # Update the backend kustomization with new image tag
+                        sed -i 's|newTag: .*|newTag: ${IMAGE_TAG}|g' apps/backend/kustomization.yaml
                         
                         # Verify the change was made
-                        echo "Updated deployment.yaml:"
-                        grep -A 2 -B 2 "image: ${IMAGE_NAME}" apps/backend/deployment.yaml || echo "Pattern not found"
+                        echo "Updated kustomization.yaml:"
+                        grep -A 2 -B 2 "newTag:" apps/backend/kustomization.yaml || echo "Pattern not found"
                     """
                     
                     // Commit and push changes
@@ -372,7 +372,7 @@ pipeline {
                             if git diff --quiet; then
                                 echo "No changes to commit - image tag already up to date"
                             else
-                                git add apps/backend/deployment.yaml
+                                git add apps/backend/kustomization.yaml
                                 git commit -m "Update backend image to ${IMAGE_TAG}
                                 
                                 - Jenkins build: ${BUILD_NUMBER}
