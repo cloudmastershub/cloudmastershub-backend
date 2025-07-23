@@ -47,7 +47,13 @@ app.use(cors({
 
 // Health check endpoint (exclude from rate limiting)
 app.get('/health', (req, res) => {
-  res.json({ status: 'healthy', service: 'api-gateway', timestamp: new Date().toISOString() });
+  res.json({ 
+    status: 'healthy', 
+    service: 'api-gateway', 
+    timestamp: new Date().toISOString(),
+    version: 'v2.0-cors-fix',
+    corsUpdate: 'Applied dynamic origin validation'
+  });
 });
 
 // Apply rate limiter before body parsing
