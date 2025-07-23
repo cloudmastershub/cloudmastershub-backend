@@ -27,7 +27,12 @@ pipeline {
         BUILD_VERSION = "${BUILD_NUMBER}"
         GIT_COMMIT_SHORT = "${GIT_COMMIT.take(8)}"
         BRANCH_NAME_SAFE = "${env.GIT_BRANCH?.tokenize('/').last() ?: env.BRANCH_NAME ?: 'main'}"
-        IMAGE_TAG = "${BRANCH_NAME_SAFE == 'main' ? 'latest' : BRANCH_NAME_SAFE}"
+        IMAGE_TAG = "build-${BUILD_VERSION}"
+        IMAGE_TAG_LATEST = "latest"
+        
+        // GitOps Configuration
+        GITOPS_REPO = "cloudmastershub/cloudmastershub-gitop"
+        GITOPS_BRANCH = "main"
         
         // Optimize npm
         NPM_CONFIG_LOGLEVEL = 'error'
@@ -303,12 +308,11 @@ pipeline {
                             echo "🏗️  Building Docker image..."
                             # Use buildkit for better caching and performance
                             export DOCKER_BUILDKIT=1
-                            docker build --progress=plain -t ${IMAGE_NAME}:${IMAGE_TAG} .
-                            docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:${BUILD_VERSION}
+                            docker build --progress=plain -t ${IMAGE_NAME}:${IMAGE_TAG} -t ${IMAGE_NAME}:${IMAGE_TAG_LATEST} .
                             
                             echo "📤 Pushing to Docker Hub..."
                             docker push ${IMAGE_NAME}:${IMAGE_TAG}
-                            docker push ${IMAGE_NAME}:${BUILD_VERSION}
+                            docker push ${IMAGE_NAME}:${IMAGE_TAG_LATEST}
                             
                             echo "✅ Docker image pushed successfully"
                             echo "Image: ${IMAGE_NAME}:${IMAGE_TAG}"
@@ -322,11 +326,67 @@ pipeline {
         stage('GitOps Update') {
             steps {
                 script {
-                    echo "📝 GitOps repository update would happen here"
-                    echo "TODO: Update gitops-repo with new image tag: ${IMAGE_TAG}"
-                    echo "Repository: cloudmastershub-gitops"
-                    echo "Path: apps/backend/deployment.yaml"
+                    echo "📝 Updating GitOps repository with new image tag"
+                    echo "Repository: ${GITOPS_REPO}"
                     echo "New image: ${IMAGE_NAME}:${IMAGE_TAG}"
+                    
+                    // Clean up any existing gitops directory
+                    sh 'rm -rf gitops-temp || true'
+                    
+                    // Clone gitops repository with credentials
+                    withCredentials([usernamePassword(credentialsId: 'cloudmastershub-github-userpass', 
+                                                    usernameVariable: 'GIT_USERNAME', 
+                                                    passwordVariable: 'GIT_PASSWORD')]) {
+                        sh """
+                            git clone https://\${GIT_USERNAME}:\${GIT_PASSWORD}@github.com/${GITOPS_REPO}.git gitops-temp
+                            cd gitops-temp
+                            git checkout ${GITOPS_BRANCH}
+                        """
+                    }
+                    
+                    // Update backend deployment image tag
+                    sh """
+                        cd gitops-temp
+                        
+                        # Update the backend deployment with new image tag
+                        sed -i 's|image: ${IMAGE_NAME}:.*|image: ${IMAGE_NAME}:${IMAGE_TAG}|g' apps/backend/deployment.yaml
+                        
+                        # Verify the change was made
+                        echo "Updated deployment.yaml:"
+                        grep -A 2 -B 2 "image: ${IMAGE_NAME}" apps/backend/deployment.yaml || echo "Pattern not found"
+                    """
+                    
+                    // Commit and push changes
+                    withCredentials([usernamePassword(credentialsId: 'cloudmastershub-github-userpass', 
+                                                    usernameVariable: 'GIT_USERNAME', 
+                                                    passwordVariable: 'GIT_PASSWORD')]) {
+                        sh """
+                            cd gitops-temp
+                            git config user.name "Jenkins CI"
+                            git config user.email "jenkins@cloudmastershub.com"
+                            
+                            # Set up authentication for push
+                            git remote set-url origin https://\${GIT_USERNAME}:\${GIT_PASSWORD}@github.com/${GITOPS_REPO}.git
+                            
+                            # Check if there are changes to commit
+                            if git diff --quiet; then
+                                echo "No changes to commit - image tag already up to date"
+                            else
+                                git add apps/backend/deployment.yaml
+                                git commit -m "Update backend image to ${IMAGE_TAG}
+                                
+                                - Jenkins build: ${BUILD_NUMBER}
+                                - Git commit: ${GIT_COMMIT_SHORT}
+                                - Timestamp: \$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+                                
+                                git push origin ${GITOPS_BRANCH}
+                                echo "✅ GitOps repository updated successfully"
+                            fi
+                        """
+                    }
+                    
+                    // Clean up
+                    sh 'rm -rf gitops-temp'
                 }
             }
         }
