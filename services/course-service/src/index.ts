@@ -17,7 +17,34 @@ const app = express();
 const PORT = process.env.PORT || 3002;
 
 app.use(helmet());
-app.use(cors());
+
+// CORS configuration with proper origin handling
+const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(origin => origin.trim()) || [
+  'http://localhost:3000',
+  'http://localhost:3001', 
+  'https://cloudmastershub.com',
+  'https://www.cloudmastershub.com'
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or Postman)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`CORS: Blocked request from origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Request-ID'],
+  exposedHeaders: ['X-Total-Count', 'X-Page-Count'],
+  maxAge: 86400 // 24 hours
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -29,6 +56,8 @@ app.get('/health', async (req, res) => {
     status: 'healthy', 
     service: 'course-service', 
     timestamp: new Date().toISOString(),
+    version: 'v2.0-cors-fix',
+    corsUpdate: 'Applied dynamic origin validation',
     database: {
       status: dbStatus ? 'connected' : 'disconnected',
       type: 'MongoDB'
