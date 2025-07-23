@@ -20,7 +20,9 @@ spec:
           tier: backend
     ports:
     - protocol: TCP
-      port: 3000  # API Gateway
+      port: 3000  # API Gateway (legacy)
+    - protocol: TCP
+      port: 5000  # API Gateway (current)
     - protocol: TCP
       port: 3001  # User Service
     - protocol: TCP
@@ -38,7 +40,9 @@ spec:
           tier: backend
     ports:
     - protocol: TCP
-      port: 3000  # API Gateway
+      port: 3000  # API Gateway (legacy)
+    - protocol: TCP
+      port: 5000  # API Gateway (current)
     - protocol: TCP
       port: 3001  # User Service
     - protocol: TCP
@@ -60,3 +64,10 @@ spec:
       port: 6379  # Redis
     - protocol: TCP
       port: 27017  # MongoDB
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53  # DNS
+    - protocol: TCP
+      port: 53  # DNS
