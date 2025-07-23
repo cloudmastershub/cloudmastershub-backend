@@ -298,14 +298,240 @@ export const getCourseById = async (
   try {
     const { id } = req.params;
 
+    logger.info('Fetching course by ID/slug with mock data (temporary fix)', { id });
+
+    // TEMPORARY FIX: Use same mock data as getAllCourses
+    const mockCourses = [
+      {
+        _id: "64a1b2c3d4e5f6789abcdef0",
+        title: "AWS Cloud Fundamentals",
+        slug: "aws-cloud-fundamentals",
+        description: "Learn the basics of Amazon Web Services including EC2, S3, RDS, and more. Perfect for beginners starting their cloud journey.",
+        category: "AWS",
+        level: "beginner",
+        duration: 480,
+        thumbnail: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=300&h=200&fit=crop",
+        instructor: {
+          id: "instructor1",
+          name: "John Smith",
+          avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face",
+          bio: "AWS Certified Solutions Architect with 8+ years of cloud experience",
+          expertise: ["AWS", "Cloud Architecture", "DevOps"]
+        },
+        price: 99,
+        rating: 4.7,
+        enrollmentCount: 1247,
+        status: "published",
+        curriculum: [
+          {
+            title: "Getting Started with AWS",
+            duration: 120,
+            lessons: [
+              { title: "Introduction to AWS", duration: 15 },
+              { title: "AWS Management Console", duration: 20 },
+              { title: "IAM Fundamentals", duration: 25 },
+              { title: "Lab: Setting up your AWS Account", duration: 30 }
+            ]
+          }
+        ],
+        objectives: [
+          "Understand core AWS services and their use cases",
+          "Learn to navigate the AWS Management Console",
+          "Master Identity and Access Management (IAM)",
+          "Deploy and manage EC2 instances",
+          "Configure S3 buckets and storage solutions"
+        ],
+        prerequisites: [],
+        tags: ["aws", "cloud", "fundamentals", "beginner"],
+        createdAt: new Date('2024-01-15'),
+        updatedAt: new Date('2024-07-01')
+      },
+      {
+        _id: "64a1b2c3d4e5f6789abcdef1",
+        title: "Azure Cloud Essentials",
+        slug: "azure-cloud-essentials",
+        description: "Master Microsoft Azure cloud platform with hands-on labs and real-world projects. Covers Azure VMs, Storage, and networking.",
+        category: "AZURE",
+        level: "beginner",
+        duration: 360,
+        thumbnail: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=300&h=200&fit=crop",
+        instructor: {
+          id: "instructor2",
+          name: "Jane Doe",
+          avatar: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100&h=100&fit=crop&crop=face",
+          bio: "Microsoft Azure Expert and certified trainer",
+          expertise: ["Azure", "Cloud Computing", "Microsoft Technologies"]
+        },
+        price: 89,
+        rating: 4.5,
+        enrollmentCount: 892,
+        status: "published",
+        curriculum: [
+          {
+            title: "Azure Fundamentals",
+            duration: 150,
+            lessons: [
+              { title: "Introduction to Azure", duration: 20 },
+              { title: "Azure Portal Overview", duration: 15 },
+              { title: "Resource Groups and ARM", duration: 25 },
+              { title: "Lab: Creating your first VM", duration: 35 }
+            ]
+          }
+        ],
+        objectives: [
+          "Navigate the Azure portal with confidence",
+          "Understand Azure resource management",
+          "Deploy and configure virtual machines",
+          "Implement Azure storage solutions",
+          "Configure virtual networks and security"
+        ],
+        prerequisites: [],
+        tags: ["azure", "cloud", "essentials", "microsoft"],
+        createdAt: new Date('2024-02-10'),
+        updatedAt: new Date('2024-06-15')
+      },
+      {
+        _id: "64a1b2c3d4e5f6789abcdef2",
+        title: "Google Cloud Platform Deep Dive",
+        slug: "gcp-deep-dive",
+        description: "Advanced Google Cloud Platform course covering Compute Engine, Cloud Storage, BigQuery, and Kubernetes Engine.",
+        category: "GCP",
+        level: "intermediate",
+        duration: 600,
+        thumbnail: "https://images.unsplash.com/photo-1573804633927-bfcbcd909acd?w=300&h=200&fit=crop",
+        instructor: {
+          id: "instructor3",
+          name: "Alex Chen",
+          avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face",
+          bio: "Google Cloud Professional Architect with enterprise experience",
+          expertise: ["GCP", "Kubernetes", "Data Engineering"]
+        },
+        price: 149,
+        rating: 4.8,
+        enrollmentCount: 654,
+        status: "published",
+        curriculum: [
+          {
+            title: "GCP Core Services",
+            duration: 180,
+            lessons: [
+              { title: "GCP Overview and Setup", duration: 25 },
+              { title: "Compute Engine Deep Dive", duration: 45 },
+              { title: "Cloud Storage Solutions", duration: 35 },
+              { title: "Lab: Building a scalable architecture", duration: 60 }
+            ]
+          }
+        ],
+        objectives: [
+          "Master GCP core infrastructure services",
+          "Implement scalable compute solutions",
+          "Design effective data storage strategies",
+          "Deploy containerized applications with GKE",
+          "Monitor and optimize cloud costs"
+        ],
+        prerequisites: ["Basic cloud knowledge"],
+        tags: ["gcp", "google-cloud", "intermediate", "kubernetes"],
+        createdAt: new Date('2024-03-05'),
+        updatedAt: new Date('2024-07-10')
+      },
+      {
+        _id: "64a1b2c3d4e5f6789abcdef3",
+        title: "DevOps with Kubernetes",
+        slug: "devops-kubernetes",
+        description: "Learn container orchestration with Kubernetes. Covers deployments, services, ingress, and monitoring.",
+        category: "DEVOPS",
+        level: "advanced",
+        duration: 720,
+        thumbnail: "https://images.unsplash.com/photo-1667372393119-3d4c48d07fc9?w=300&h=200&fit=crop",
+        instructor: {
+          id: "instructor4",
+          name: "Sarah Johnson",
+          avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&crop=face",
+          bio: "Senior DevOps Engineer specializing in container technologies",
+          expertise: ["Kubernetes", "Docker", "CI/CD", "Monitoring"]
+        },
+        price: 199,
+        rating: 4.9,
+        enrollmentCount: 423,
+        status: "published",
+        curriculum: [
+          {
+            title: "Kubernetes Fundamentals",
+            duration: 240,
+            lessons: [
+              { title: "Container Orchestration Basics", duration: 30 },
+              { title: "Kubernetes Architecture", duration: 40 },
+              { title: "Pods, Deployments, and Services", duration: 50 },
+              { title: "Lab: Deploy a multi-tier application", duration: 90 }
+            ]
+          }
+        ],
+        objectives: [
+          "Understand Kubernetes architecture and components",
+          "Deploy and manage containerized applications",
+          "Configure services and ingress controllers",
+          "Implement monitoring and logging solutions",
+          "Optimize cluster performance and security"
+        ],
+        prerequisites: ["Docker experience", "Basic cloud knowledge"],
+        tags: ["kubernetes", "devops", "containers", "advanced"],
+        createdAt: new Date('2024-04-20'),
+        updatedAt: new Date('2024-07-05')
+      },
+      {
+        _id: "64a1b2c3d4e5f6789abcdef4",
+        title: "Multi-Cloud Strategy",
+        slug: "multi-cloud-strategy",
+        description: "Learn how to design and implement multi-cloud architectures across AWS, Azure, and GCP.",
+        category: "MULTI_CLOUD",
+        level: "advanced",
+        duration: 540,
+        thumbnail: "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=300&h=200&fit=crop",
+        instructor: {
+          id: "instructor5",
+          name: "Michael Rodriguez",
+          avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face",
+          bio: "Cloud Architect with expertise across all major cloud platforms",
+          expertise: ["Multi-Cloud", "Architecture", "Migration", "Cost Optimization"]
+        },
+        price: 249,
+        rating: 4.6,
+        enrollmentCount: 312,
+        status: "published",
+        curriculum: [
+          {
+            title: "Multi-Cloud Fundamentals",
+            duration: 180,
+            lessons: [
+              { title: "Why Multi-Cloud?", duration: 20 },
+              { title: "Multi-Cloud Architecture Patterns", duration: 45 },
+              { title: "Cost Optimization Strategies", duration: 35 },
+              { title: "Lab: Hybrid cloud deployment", duration: 80 }
+            ]
+          }
+        ],
+        objectives: [
+          "Design effective multi-cloud strategies",
+          "Implement cross-cloud networking solutions",
+          "Optimize costs across multiple providers",
+          "Manage security and compliance requirements",
+          "Plan successful cloud migrations"
+        ],
+        prerequisites: ["Experience with at least one cloud platform"],
+        tags: ["multi-cloud", "architecture", "advanced", "strategy"],
+        createdAt: new Date('2024-05-15'),
+        updatedAt: new Date('2024-06-30')
+      }
+    ];
+
     // Check if the id is a valid ObjectId or a slug
     let course;
     if (id.match(/^[0-9a-fA-F]{24}$/)) {
-      // It's a valid ObjectId
-      course = await Course.findById(id).lean();
+      // It's a valid ObjectId - find by _id
+      course = mockCourses.find(c => c._id === id);
     } else {
       // Try to find by slug
-      course = await Course.findOne({ slug: id }).lean();
+      course = mockCourses.find(c => c.slug === id);
     }
 
     if (!course) {
