@@ -56,8 +56,9 @@ app.get('/health', async (req, res) => {
     status: 'healthy', 
     service: 'course-service', 
     timestamp: new Date().toISOString(),
-    version: 'v2.0-cors-fix',
-    corsUpdate: 'Applied dynamic origin validation',
+    version: 'v2.1-cors-fix-rebuild',
+    corsUpdate: 'Applied dynamic origin validation - REBUILD',
+    buildTime: new Date().toLocaleString(),
     database: {
       status: dbStatus ? 'connected' : 'disconnected',
       type: 'MongoDB'
