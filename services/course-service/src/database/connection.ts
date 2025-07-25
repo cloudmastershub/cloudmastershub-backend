@@ -1,7 +1,21 @@
 import mongoose from 'mongoose';
 import logger from '../utils/logger';
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://admin:admin123@mongodb.cloudmastershub-dev.svc.cluster.local:27017/cloudmastershub_courses';
+// Build MongoDB URI from environment variables
+const DATABASE_URL = process.env.DATABASE_URL || 'mongodb://mongodb.cloudmastershub-dev.svc.cluster.local:27017/cloudmastershub';
+const MONGO_USERNAME = process.env.MONGO_USERNAME;
+const MONGO_PASSWORD = process.env.MONGO_PASSWORD;
+
+let MONGODB_URI: string;
+
+if (MONGO_USERNAME && MONGO_PASSWORD) {
+  // Use authentication
+  const url = new URL(DATABASE_URL);
+  MONGODB_URI = `mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@${url.host}${url.pathname}?authSource=admin`;
+} else {
+  // No authentication
+  MONGODB_URI = DATABASE_URL;
+}
 
 class DatabaseConnection {
   private static instance: DatabaseConnection;
