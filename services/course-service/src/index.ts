@@ -3,6 +3,7 @@ import helmet from 'helmet';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import courseRoutes from './routes/courseRoutes';
+import instructorRoutes from './routes/instructorRoutes';
 import lessonRoutes from './routes/lessonRoutes';
 import progressRoutes from './routes/progressRoutes';
 import learningPathRoutes from './routes/learningPathRoutes';
@@ -67,6 +68,7 @@ app.get('/health', async (req, res) => {
 });
 
 app.use('/courses', courseRoutes);
+app.use('/instructor', instructorRoutes);
 app.use('/courses/:courseId/lessons', lessonRoutes);
 app.use('/progress', progressRoutes);
 app.use('/paths', learningPathRoutes);

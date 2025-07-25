@@ -86,6 +86,15 @@ const serviceRoutes = {
       '^/api/webhooks': '/webhooks'
     }
   },
+  '/instructor': {
+    target: process.env.COURSE_SERVICE_URL || 'http://course-service:3002',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/instructor': '/instructor'
+    }
+  },
   '/admin': {
     target: process.env.ADMIN_SERVICE_URL || 'http://admin-service:3005',
     changeOrigin: true,
