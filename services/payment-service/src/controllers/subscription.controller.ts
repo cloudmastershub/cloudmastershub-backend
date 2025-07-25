@@ -44,6 +44,40 @@ export const getSubscriptionPlans = async (req: Request, res: Response) => {
   }
 };
 
+export const getPlanByStripePrice = async (req: Request, res: Response) => {
+  try {
+    const { stripePriceId } = req.params;
+    
+    const plans = await executeQuery<SubscriptionPlan>(
+      'SELECT id, name, tier, stripe_price_id FROM subscription_plans WHERE stripe_price_id = $1 AND active = true',
+      [stripePriceId]
+    );
+
+    if (plans.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Plan not found for the provided Stripe price ID'
+      });
+    }
+
+    const plan = plans[0];
+    res.json({
+      success: true,
+      data: {
+        plan_id: plan.id,
+        tier: plan.tier,
+        name: plan.name
+      }
+    });
+  } catch (error) {
+    logger.error('Error fetching plan by Stripe price:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch plan by Stripe price ID'
+    });
+  }
+};
+
 export const getSubscriptionStatus = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;

@@ -1,13 +1,17 @@
 export interface SubscriptionPlan {
   id: string;
   name: string;
+  description?: string;
   price: number;
+  currency: string;
   interval: 'month' | 'year';
-  features_json: Record<string, any>;
+  stripe_price_id: string;
+  stripe_product_id?: string;
+  features?: string[];
   max_courses: number | null;
   max_labs: number | null;
-  stripe_price_id: string;
   active: boolean;
+  tier: string;
   created_at: Date;
   updated_at: Date;
 }

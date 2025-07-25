@@ -5,6 +5,7 @@ import {
   createCheckoutSession,
   cancelSubscription,
   getSubscriptionPlans,
+  getPlanByStripePrice,
   createSubscription,
   updateSubscription
 } from '../controllers/subscription.controller';
@@ -13,6 +14,7 @@ const router = Router();
 
 // Public routes
 router.get('/plans', getSubscriptionPlans);
+router.get('/plans/by-stripe-price/:stripePriceId', getPlanByStripePrice);
 
 // Protected routes (require authentication)
 router.use(authenticateToken);
