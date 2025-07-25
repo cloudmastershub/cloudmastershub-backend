@@ -2,7 +2,69 @@
 
 ## Common Issues and Solutions
 
-### 1. HTTPS API Timeout with CloudFlare 524 Error
+### 1. Service CrashLoopBackOff - "Cannot find module" Error
+
+**Symptoms:**
+```
+Error: Cannot find module '/app/dist/services/user-service/src/index.js'
+```
+
+**Root Cause:** Incorrect command path in Kubernetes deployment
+
+**Solution:**
+1. Remove the hardcoded command from deployment:
+   ```yaml
+   # Remove this:
+   command: ["node", "dist/services/user-service/src/index.js"]
+   ```
+
+2. Add SERVICE_NAME environment variable:
+   ```yaml
+   env:
+   - name: SERVICE_NAME
+     value: "user-service"  # or course-service, payment-service, etc.
+   ```
+
+3. Update to latest Docker image that includes the fix:
+   ```bash
+   # In GitOps repo
+   sed -i 's/newTag: .*/newTag: build-21/' apps/backend/kustomization.yaml
+   git add . && git commit -m "Update to fixed image" && git push
+   ```
+
+### 2. MongoDB Authentication Failed (Course Service)
+
+**Symptoms:**
+```
+error: Failed to connect to MongoDB: Authentication failed. {"code":18,"codeName":"AuthenticationFailed"}
+```
+
+**Root Cause:** Course service using wrong environment variable or missing credentials
+
+**Solution:**
+1. Ensure MongoDB password secret exists:
+   ```bash
+   kubectl get secret cloudmastershub-secrets -n cloudmastershub-dev -o jsonpath='{.data.mongodb-password}' | base64 -d
+   ```
+
+2. Update deployment with proper environment variables:
+   ```yaml
+   env:
+   - name: DATABASE_URL
+     value: "mongodb://mongodb.cloudmastershub-dev.svc.cluster.local:27017/cloudmastershub"
+   - name: MONGO_USERNAME
+     value: "admin"
+   - name: MONGO_PASSWORD
+     valueFrom:
+       secretKeyRef:
+         name: cloudmastershub-secrets
+         key: mongodb-password
+   ```
+
+3. Ensure course service code uses these variables (fixed in build-21+):
+   - The service now dynamically builds connection string with `authSource=admin`
+
+### 3. HTTPS API Timeout with CloudFlare 524 Error
 
 **Symptoms:**
 - `curl https://api.cloudmastershub.com/health` times out

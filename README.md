@@ -12,12 +12,14 @@
 
 Microservices-based backend with modern DevOps practices:
 
-| Service | Port | Purpose | Database |
-|---------|------|---------|----------|
-| **API Gateway** | 3000 | Request routing, rate limiting, auth | - |
-| **User Service** | 3001 | Authentication, profiles, subscriptions | PostgreSQL |
-| **Course Service** | 3002 | Content management, progress tracking | MongoDB |
-| **Lab Service** | 3003 | Cloud lab provisioning, queue management | Redis |
+| Service | Port | Purpose | Database | Status |
+|---------|------|---------|----------|---------|
+| **API Gateway** | 3000 | Request routing, rate limiting, auth | - | ✅ Deployed |
+| **User Service** | 3001 | Authentication, profiles, subscriptions | PostgreSQL | ✅ Deployed |
+| **Course Service** | 3002 | Content management, progress tracking | MongoDB | ✅ Deployed |
+| **Lab Service** | 3003 | Cloud lab provisioning, queue management | Redis | ✅ Deployed |
+| **Payment Service** | 3004 | Stripe integration, subscriptions | PostgreSQL | ⏳ Ready to Deploy |
+| **Admin Service** | 3005 | Platform administration, monitoring | PostgreSQL | ⏳ Ready to Deploy |
 
 ## 🛠️ Tech Stack
 
@@ -204,6 +206,42 @@ BackEnd/
 ├── k8s/                 # Kubernetes configurations
 ├── docker-compose.yml   # Production compose
 └── docker-compose.dev.yml # Development compose
+```
+
+## 🔧 Troubleshooting
+
+### MongoDB Connection Issues (Course Service)
+
+If the course service fails with authentication errors:
+
+1. **Ensure MongoDB credentials are properly set**:
+   ```bash
+   # Check if MongoDB password secret exists
+   kubectl get secret cloudmastershub-secrets -n cloudmastershub-dev -o jsonpath='{.data.mongodb-password}' | base64 -d
+   ```
+
+2. **Verify environment variables in deployment**:
+   - Course Service now uses `DATABASE_URL`, `MONGO_USERNAME`, and `MONGO_PASSWORD` env vars
+   - The service builds the connection string dynamically with `authSource=admin`
+
+3. **Check MongoDB is running with authentication**:
+   ```bash
+   kubectl exec -it <mongodb-pod> -n cloudmastershub-dev -- mongo -u admin -p <password> --authenticationDatabase admin
+   ```
+
+### Service CrashLoopBackOff Issues
+
+If services fail with "Cannot find module" errors:
+
+1. **Remove incorrect command overrides** in deployments
+2. **Add SERVICE_NAME environment variable** to identify which service to start
+3. **Ensure the Docker image includes the start.sh script**
+
+Example fix:
+```yaml
+env:
+- name: SERVICE_NAME
+  value: "user-service"  # or course-service, payment-service, etc.
 ```
 
 ## Contributing
