@@ -25,7 +25,7 @@ export const getAllCourses = async (
       sortOrder = 'desc'
     } = req.query;
 
-    logger.info('Fetching courses with mock data (temporary fix)', {
+    logger.info('Fetching courses from MongoDB', {
       page,
       limit,
       category,
@@ -33,8 +33,74 @@ export const getAllCourses = async (
       search
     });
 
-    // TEMPORARY FIX: Mock course data while debugging MongoDB query timeout
-    const mockCourses = [
+    // Build query filter
+    const filter: any = { status };
+    
+    if (category && category !== 'all') {
+      filter.category = category.toString().toUpperCase();
+    }
+    
+    if (level) {
+      filter.level = level;
+    }
+    
+    if (search) {
+      filter.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { tags: { $elemMatch: { $regex: search, $options: 'i' } } }
+      ];
+    }
+    
+    if (instructor) {
+      filter['instructor.id'] = instructor;
+    }
+    
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      filter.price = {};
+      if (minPrice !== undefined) filter.price.$gte = Number(minPrice);
+      if (maxPrice !== undefined) filter.price.$lte = Number(maxPrice);
+    }
+
+    // Build sort object
+    const sortOptions: any = {};
+    sortOptions[sortBy.toString()] = sortOrder === 'asc' ? 1 : -1;
+
+    try {
+      // Execute query with timeout
+      const [courses, total] = await Promise.all([
+        Course.find(filter)
+          .sort(sortOptions)
+          .skip((Number(page) - 1) * Number(limit))
+          .limit(Number(limit))
+          .select('-__v')
+          .lean()
+          .maxTimeMS(5000), // 5 second timeout
+        Course.countDocuments(filter).maxTimeMS(5000)
+      ]);
+
+      logger.info(`Retrieved ${courses.length} courses from MongoDB`, {
+        filters: filter,
+        page: Number(page),
+        limit: Number(limit),
+        total
+      });
+
+      res.json({
+        success: true,
+        data: courses,
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          total,
+          totalPages: Math.ceil(total / Number(limit))
+        },
+      });
+    } catch (dbError: any) {
+      logger.error('MongoDB query error, falling back to mock data', dbError);
+      
+      // FALLBACK: Mock course data if MongoDB fails
+      const mockCourses = [
       {
         _id: "64a1b2c3d4e5f6789abcdef0",
         title: "AWS Cloud Fundamentals",
@@ -284,6 +350,7 @@ export const getAllCourses = async (
         totalPages: Math.ceil(filteredCourses.length / limitNum)
       },
     });
+    } // End of MongoDB error catch block
   } catch (error) {
     logger.error('Error fetching courses:', error);
     next(error);
@@ -298,10 +365,43 @@ export const getCourseById = async (
   try {
     const { id } = req.params;
 
-    logger.info('Fetching course by ID/slug with mock data (temporary fix)', { id });
+    logger.info('Fetching course by ID/slug from MongoDB', { id });
 
-    // TEMPORARY FIX: Use same mock data as getAllCourses
-    const mockCourses = [
+    try {
+      // Try to find by ID first, then by slug
+      let course = await Course.findById(id).select('-__v').lean().maxTimeMS(5000);
+      
+      if (!course) {
+        // If not found by ID, try by slug
+        course = await Course.findOne({ slug: id }).select('-__v').lean().maxTimeMS(5000);
+      }
+      
+      if (!course) {
+        res.status(404).json({
+          success: false,
+          message: 'Course not found',
+          error: {
+            code: 'COURSE_NOT_FOUND',
+            details: `No course found with ID or slug: ${id}`
+          }
+        });
+        return;
+      }
+
+      logger.info('Retrieved course from MongoDB', { 
+        courseId: course._id, 
+        title: course.title 
+      });
+
+      res.json({
+        success: true,
+        data: course,
+      });
+    } catch (dbError: any) {
+      logger.error('MongoDB query error, falling back to mock data', dbError);
+      
+      // FALLBACK: Use mock data if MongoDB fails
+      const mockCourses = [
       {
         _id: "64a1b2c3d4e5f6789abcdef0",
         title: "AWS Cloud Fundamentals",
@@ -555,6 +655,7 @@ export const getCourseById = async (
       success: true,
       data: course,
     });
+    } // End of MongoDB error catch block
   } catch (error) {
     logger.error('Error fetching course:', error);
     next(error);
