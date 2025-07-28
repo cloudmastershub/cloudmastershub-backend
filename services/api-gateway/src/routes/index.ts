@@ -104,6 +104,33 @@ const serviceRoutes = {
       '^/api/admin': '/admin'
     }
   },
+  '/admin/courses': {
+    target: process.env.COURSE_SERVICE_URL || 'http://course-service:3002',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/admin/courses': '/admin/courses'
+    }
+  },
+  '/admin/instructors': {
+    target: process.env.COURSE_SERVICE_URL || 'http://course-service:3002',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/admin/instructors': '/admin/instructors'
+    }
+  },
+  '/admin/stats': {
+    target: process.env.COURSE_SERVICE_URL || 'http://course-service:3002',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/admin/stats': '/admin/stats'
+    }
+  },
 };
 
 Object.entries(serviceRoutes).forEach(([path, config]) => {

@@ -15,6 +15,7 @@
     "migrate:status": "migrate-mongo status",
     "migrate:create": "migrate-mongo create",
     "seed": "ts-node scripts/seed.ts",
+    "seed-db": "ts-node src/scripts/seedDatabase.ts",
     "migrate:slugs": "ts-node scripts/add-slugs-migration.ts"
   },
   "dependencies": {
