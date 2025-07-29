@@ -5,6 +5,11 @@ export interface AuthRequest extends Request {
   userId?: string;
   userEmail?: string;
   userRoles?: string[];
+  user?: {
+    id: string;
+    email: string;
+    roles: string[];
+  };
 }
 
 export const authenticate = (req: AuthRequest, res: Response, next: NextFunction): void => {
@@ -19,6 +24,13 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
     req.userId = decoded.userId;
     req.userEmail = decoded.email;
     req.userRoles = decoded.roles;
+    
+    // Also populate the user object for consistency with types
+    req.user = {
+      id: decoded.userId,
+      email: decoded.email,
+      roles: decoded.roles || []
+    };
 
     next();
   } catch (error) {
