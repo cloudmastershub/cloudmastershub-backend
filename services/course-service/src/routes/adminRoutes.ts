@@ -25,8 +25,9 @@ router.get('/courses', async (req: AuthRequest, res: Response, next: NextFunctio
     const originalQuery = { ...req.query };
     
     // Allow admins to see all courses including drafts
+    // Set status to 'all' to override the default PUBLISHED filter
     if (!req.query.status) {
-      delete req.query.status; // Remove default PUBLISHED filter
+      req.query.status = 'all'; // Override default PUBLISHED filter
     }
     
     // Don't filter by instructor - show all courses

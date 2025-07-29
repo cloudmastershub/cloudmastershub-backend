@@ -22,6 +22,10 @@ router.get('/courses', async (req: AuthRequest, res: Response, next: NextFunctio
   try {
     // Add instructor filter to the request to only show courses created by this instructor
     req.query.instructor = req.userId;
+    // Allow instructors to see all their courses regardless of status
+    if (!req.query.status) {
+      req.query.status = 'all';
+    }
     await getAllCourses(req, res, next);
   } catch (error: any) {
     res.status(500).json({

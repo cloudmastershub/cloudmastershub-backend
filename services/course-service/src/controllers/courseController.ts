@@ -34,7 +34,18 @@ export const getAllCourses = async (
     });
 
     // Build query filter
-    const filter: any = { status };
+    const filter: any = {};
+    
+    // Add status filter - 'all' means no status filter (admin view)
+    if (status === 'all') {
+      // Admin view: no status filter, show all courses
+    } else if (status) {
+      // Specific status requested
+      filter.status = status;
+    } else {
+      // Default to published for public endpoints
+      filter.status = CourseStatus.PUBLISHED;
+    }
     
     if (category && category !== 'all') {
       filter.category = category.toString().toUpperCase();
