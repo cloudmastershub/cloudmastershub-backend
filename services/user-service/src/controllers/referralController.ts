@@ -268,10 +268,10 @@ export const getAdminReferrers = async (
     const { userType, status, sortBy, sortOrder, page = 1, limit = 20 } = req.query;
     
     const filters = {
-      userType: userType as string,
-      status: status as string,
-      sortBy: sortBy as string,
-      sortOrder: sortOrder as string,
+      userType: userType as 'normal' | 'subscribed' | undefined,
+      status: status as 'active' | 'inactive' | undefined,
+      sortBy: sortBy as 'earnings' | 'referrals' | 'conversion_rate' | 'recent_activity' | undefined,
+      sortOrder: sortOrder as 'asc' | 'desc' | undefined,
       page: Number(page),
       limit: Number(limit)
     };
