@@ -137,15 +137,23 @@ export const getCourseById = async (
     logger.info('Fetching course by ID/slug from MongoDB', { id });
 
     try {
-      // Try to find by ID first, then by slug
-      let course = await Course.findById(id).select('-__v').lean().maxTimeMS(5000);
+      let course = null;
+      
+      // First, check if it's a valid MongoDB ObjectId
+      const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+      
+      if (isValidObjectId) {
+        // Try to find by MongoDB ObjectId first
+        course = await Course.findById(id).select('-__v').lean().maxTimeMS(5000);
+      }
       
       if (!course) {
-        // If not found by ID, try by slug
+        // If not found by ID or not a valid ObjectId, try by slug
         course = await Course.findOne({ slug: id }).select('-__v').lean().maxTimeMS(5000);
       }
       
       if (!course) {
+        logger.warn('Course not found', { searchId: id, isValidObjectId });
         res.status(404).json({
           success: false,
           message: 'Course not found',
@@ -159,7 +167,9 @@ export const getCourseById = async (
 
       logger.info('Retrieved course from MongoDB', { 
         courseId: course._id, 
-        title: course.title 
+        title: course.title,
+        slug: course.slug || 'no-slug',
+        searchedBy: isValidObjectId ? 'ObjectId' : 'slug'
       });
 
       res.json({
@@ -167,7 +177,11 @@ export const getCourseById = async (
         data: course,
       });
     } catch (dbError: any) {
-      logger.error('MongoDB query error:', dbError);
+      logger.error('MongoDB query error:', { 
+        error: dbError.message, 
+        searchId: id,
+        stack: dbError.stack 
+      });
       
       res.status(500).json({
         success: false,

@@ -1,11 +1,13 @@
 import DatabaseConnection from '../database/connection';
 import { Course, LearningPath } from '../models';
 import { CourseCategory, DifficultyLevel, CourseStatus } from '@cloudmastershub/types';
+import { generateSlug } from '@cloudmastershub/utils';
 import logger from '../utils/logger';
 
 const sampleCourses = [
   {
     title: 'AWS Fundamentals',
+    slug: generateSlug('AWS Fundamentals'),
     description: 'Learn the basics of Amazon Web Services cloud computing platform',
     category: CourseCategory.AWS,
     level: DifficultyLevel.BEGINNER,
@@ -106,6 +108,7 @@ const sampleCourses = [
   },
   {
     title: 'Azure DevOps Mastery',
+    slug: generateSlug('Azure DevOps Mastery'),
     description: 'Master CI/CD pipelines and DevOps practices with Microsoft Azure',
     category: CourseCategory.AZURE,
     level: DifficultyLevel.INTERMEDIATE,
@@ -154,6 +157,7 @@ const sampleCourses = [
   },
   {
     title: 'Google Cloud Platform Security',
+    slug: generateSlug('Google Cloud Platform Security'),
     description: 'Comprehensive security practices for Google Cloud Platform',
     category: CourseCategory.GCP,
     level: DifficultyLevel.ADVANCED,
@@ -202,6 +206,7 @@ const sampleCourses = [
   },
   {
     title: 'Multi-Cloud Architecture Patterns',
+    slug: generateSlug('Multi-Cloud Architecture Patterns'),
     description: 'Design and implement applications across multiple cloud providers',
     category: CourseCategory.MULTICLOUD,
     level: DifficultyLevel.EXPERT,
@@ -250,6 +255,7 @@ const sampleCourses = [
   },
   {
     title: 'Kubernetes for Beginners',
+    slug: generateSlug('Kubernetes for Beginners'),
     description: 'Learn container orchestration with Kubernetes from scratch',
     category: CourseCategory.DEVOPS,
     level: DifficultyLevel.BEGINNER,
