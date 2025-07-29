@@ -23,6 +23,15 @@ const serviceRoutes = {
       '^/api/users': '/users'
     }
   },
+  '/referrals': {
+    target: process.env.USER_SERVICE_URL || 'http://user-service:3001',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/referrals': '/referrals'
+    }
+  },
   '/courses': {
     target: process.env.COURSE_SERVICE_URL || 'http://course-service:3002',
     changeOrigin: true,

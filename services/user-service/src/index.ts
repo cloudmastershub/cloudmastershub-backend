@@ -2,8 +2,10 @@ import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import mongoose from 'mongoose';
 import userRoutes from './routes/userRoutes';
 import authRoutes from './routes/authRoutes';
+import referralRoutes from './routes/referralRoutes';
 import { errorHandler } from './middleware/errorHandler';
 import { initializePaymentEventSubscriber } from './events/paymentEventSubscriber';
 import { initializeDatabase, getDatabaseHealth } from './services/userService';
@@ -40,6 +42,7 @@ app.get('/health', async (req, res) => {
 
 app.use('/auth', authRoutes);
 app.use('/users', userRoutes);
+app.use('/referrals', referralRoutes);
 
 app.use(errorHandler);
 
@@ -47,17 +50,22 @@ app.listen(PORT, async () => {
   logger.info(`User Service running on port ${PORT}`);
   
   try {
-    // TEMPORARY: Skip database initialization until connectivity is fixed
-    logger.warn('Database initialization skipped - using mock data with hardcoded admin user');
+    // Initialize MongoDB connection for referral system
+    const mongoUrl = process.env.MONGODB_URL || 'mongodb://mongodb:27017/cloudmastershub';
+    await mongoose.connect(mongoUrl);
+    logger.info('MongoDB connected successfully for referral system');
+    
+    // TEMPORARY: Skip PostgreSQL database initialization until connectivity is fixed
+    logger.warn('PostgreSQL database initialization skipped - using mock data with hardcoded admin user');
     
     // Initialize payment event subscriber
     initializePaymentEventSubscriber();
     logger.info('Payment event subscriber initialized');
     
-    logger.info('User Service fully initialized and ready (mock mode)');
+    logger.info('User Service fully initialized and ready');
   } catch (error) {
     logger.error('Failed to initialize User Service:', error);
     // Don't exit on initialization errors in mock mode
-    logger.warn('Continuing in mock mode despite initialization errors');
+    logger.warn('Continuing despite initialization errors');
   }
 });

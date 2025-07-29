@@ -30,6 +30,7 @@
     "pg": "^8.11.3",
     "redis": "^4.6.12",
     "uuid": "^9.0.0",
+    "mongoose": "^7.5.0",
     "@cloudmastershub/types": "file:../../shared/types",
     "@cloudmastershub/middleware": "file:../../shared/middleware",
     "@cloudmastershub/utils": "file:../../shared/utils"
