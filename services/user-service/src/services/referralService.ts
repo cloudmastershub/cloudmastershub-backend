@@ -345,7 +345,7 @@ export class ReferralService {
       for (const earning of eligibleEarnings) {
         if (remainingAmount <= 0) break;
         
-        selectedEarnings.push(earning._id.toString());
+        selectedEarnings.push((earning._id as any).toString());
         remainingAmount -= earning.earningAmount;
         
         if (remainingAmount <= 0) break;

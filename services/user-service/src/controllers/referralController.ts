@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { referralService } from '../services/referralService';
-import { AuthRequest } from '@cloudmastershub/middleware';
+import { AuthRequest } from '@cloudmastershub/types';
 import logger from '../utils/logger';
 import { body, param, query, validationResult } from 'express-validator';
 
@@ -21,7 +21,7 @@ export const getUserReferralDashboard = async (
       referralService.getEligibleEarnings(userId)
     ]);
 
-    const eligibleAmount = eligibleEarnings.reduce((sum, earning) => sum + earning.earningAmount, 0);
+    const eligibleAmount = eligibleEarnings.reduce((sum: number, earning: any) => sum + earning.earningAmount, 0);
 
     res.json({
       success: true,
