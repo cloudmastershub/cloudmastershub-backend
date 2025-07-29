@@ -5,6 +5,9 @@ export interface IUserDocument extends Omit<IUser, 'id'>, Document {
   _id: mongoose.Types.ObjectId;
   referredBy?: string; // ID of the user who referred this user
   referralDate?: Date; // When this user was referred
+  referrerId?: string; // ID of the user who referred this user (alias for referredBy)
+  referralCode?: string; // The referral code used to signup
+  isActive?: boolean; // Whether the user is active
   password?: string; // Hashed password (if using email/password auth)
   emailVerified?: boolean;
   lastLogin?: Date;
@@ -53,6 +56,17 @@ const UserSchema = new Schema<IUserDocument>({
   referralDate: { 
     type: Date
   },
+  referrerId: { 
+    type: String,
+    index: true
+  },
+  referralCode: { 
+    type: String
+  },
+  isActive: { 
+    type: Boolean, 
+    default: true 
+  },
   // Auth fields
   password: { 
     type: String 
@@ -72,7 +86,10 @@ const UserSchema = new Schema<IUserDocument>({
 // Indexes for efficient queries
 UserSchema.index({ email: 1 });
 UserSchema.index({ referredBy: 1 });
+UserSchema.index({ referrerId: 1 });
+UserSchema.index({ referralCode: 1 });
 UserSchema.index({ subscription: 1, roles: 1 });
+UserSchema.index({ isActive: 1 });
 UserSchema.index({ createdAt: -1 });
 
 // Virtual for full name

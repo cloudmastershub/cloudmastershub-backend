@@ -66,22 +66,16 @@ export const getUserReferralEarnings = async (
 
     const skip = (Number(page) - 1) * Number(limit);
 
-    const [earnings, total] = await Promise.all([
-      referralService.getUserReferralEarnings(query, skip, Number(limit)),
-      referralService.getUserReferralEarningsCount(query)
-    ]);
+    const result = await referralService.getUserReferralEarnings(userId, {
+      status: status as 'pending' | 'approved' | 'paid' | 'cancelled' | undefined,
+      earningType: earningType as 'initial' | 'recurring' | undefined,
+      page: Number(page),
+      limit: Number(limit)
+    });
 
     res.json({
       success: true,
-      data: {
-        earnings,
-        pagination: {
-          page: Number(page),
-          limit: Number(limit),
-          total,
-          pages: Math.ceil(total / Number(limit))
-        }
-      }
+      data: result
     });
   } catch (error) {
     logger.error('Failed to get user referral earnings', { userId: req.user?.id, error });
@@ -299,11 +293,11 @@ export const getAdminPayoutRequests = async (
   try {
     const { status, page = 1, limit = 20 } = req.query;
     
-    const payouts = await referralService.getAdminPayoutRequests({
-      status: status as string,
-      page: Number(page),
-      limit: Number(limit)
-    });
+    const payouts = await referralService.getAdminPayoutRequests(
+      status as string,
+      Number(page),
+      Number(limit)
+    );
     
     res.json({
       success: true,
@@ -338,7 +332,7 @@ export const processPayoutRequest = async (
     const updates = req.body;
     const adminUserId = req.user!.id;
 
-    const payout = await referralService.processPayoutRequest(payoutId, updates, adminUserId);
+    const payout = await referralService.updatePayoutRequest(payoutId, updates, adminUserId);
     
     res.json({
       success: true,

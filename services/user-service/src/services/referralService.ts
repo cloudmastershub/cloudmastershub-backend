@@ -28,6 +28,15 @@ export class ReferralService {
    */
   async initializeUserReferral(userId: string, userType: 'normal' | 'subscribed' = 'normal') {
     try {
+      // Check if referral already exists
+      const existingLink = await ReferralLink.findOne({ userId });
+      if (existingLink) {
+        return {
+          referralLink: existingLink.referralCode,
+          commissionSettings: await ReferralCommissionSettings.findOne({ userId })
+        };
+      }
+
       // Create referral link
       const referralLink = new ReferralLink({ userId });
       await referralLink.save();
@@ -99,21 +108,21 @@ export class ReferralService {
 
       // Update user record with referrer information
       await User.findByIdAndUpdate(referredUserId, {
-        referredBy: referralLink.userId,
-        referralDate: new Date()
+        referrerId: referralLink.userId,
+        referralCode: referralCode
       });
 
-      // Increment conversion count
+      // Increment conversions count
       referralLink.conversions += 1;
       await referralLink.save();
 
       logger.info('Referral signup recorded', { 
         referredUserId, 
-        referrerId: referralLink.userId,
+        referrerId: referralLink.userId, 
         referralCode 
       });
 
-      return referralLink.userId;
+      return referralLink;
     } catch (error) {
       logger.error('Failed to record referral signup', { referredUserId, referralCode, error });
       throw error;
@@ -121,129 +130,126 @@ export class ReferralService {
   }
 
   /**
-   * Create referral earning when referred user makes a purchase
+   * Create referral earning
    */
-  async createReferralEarning(request: CreateReferralEarningRequest): Promise<IReferralEarning | null> {
+  async createReferralEarning(data: CreateReferralEarningRequest & { referrerId: string }) {
     try {
-      // Find the referred user's referrer
-      const referredUser = await User.findById(request.referredUserId);
-      if (!referredUser?.referredBy) {
-        logger.info('User has no referrer', { userId: request.referredUserId });
-        return null;
-      }
+      const { referrerId, referredUserId, transactionId, transactionType, grossAmount, currency } = data;
 
-      const referrerId = referredUser.referredBy;
-
-      // Get referrer's commission settings
+      // Get commission settings for referrer
       const commissionSettings = await ReferralCommissionSettings.findOne({ 
         userId: referrerId, 
         isActive: true 
       });
 
       if (!commissionSettings) {
-        logger.warn('No active commission settings found for referrer', { referrerId });
-        return null;
+        throw new Error('No active commission settings found for referrer');
       }
 
-      // Determine if this is initial or recurring commission
-      const existingEarnings = await ReferralEarning.find({ 
-        referrerId, 
-        referredUserId: request.referredUserId 
-      });
-      
-      const earningType = existingEarnings.length === 0 ? 'initial' : 'recurring';
-      
-      // Skip recurring if payment model is one-time only
-      if (earningType === 'recurring' && commissionSettings.paymentModel === 'one-time') {
-        logger.info('Skipping recurring commission for one-time payment model', { referrerId });
-        return null;
-      }
-
-      // Calculate commission
+      // Determine earning type and rate
+      const isInitialPurchase = await this.isInitialPurchaseForUser(referredUserId);
+      const earningType = isInitialPurchase ? 'initial' : 'recurring';
       const commissionRate = earningType === 'initial' 
         ? commissionSettings.initialCommissionRate 
         : commissionSettings.recurringCommissionRate;
-      
-      const earningAmount = (request.grossAmount * commissionRate) / 100;
+
+      // Calculate earning amount
+      const earningAmount = (grossAmount * commissionRate) / 100;
 
       // Create earning record
       const earning = new ReferralEarning({
         referrerId,
-        referredUserId: request.referredUserId,
-        transactionId: request.transactionId,
-        transactionType: request.transactionType,
+        referredUserId,
+        transactionId,
+        transactionType,
         earningType,
-        grossAmount: request.grossAmount,
+        grossAmount,
         commissionRate,
         earningAmount,
-        currency: request.currency,
+        currency,
         status: 'pending'
       });
 
       await earning.save();
 
       logger.info('Referral earning created', {
+        earningId: earning._id,
         referrerId,
-        referredUserId: request.referredUserId,
         earningAmount,
-        earningType
+        commissionRate
       });
 
       return earning;
     } catch (error) {
-      logger.error('Failed to create referral earning', { request, error });
+      logger.error('Failed to create referral earning', { data, error });
       throw error;
     }
   }
 
   /**
-   * Get user's referral stats
+   * Check if this is the first purchase for a referred user
+   */
+  private async isInitialPurchaseForUser(referredUserId: string): Promise<boolean> {
+    const existingEarnings = await ReferralEarning.countDocuments({ referredUserId });
+    return existingEarnings === 0;
+  }
+
+  /**
+   * Get user's referral link
+   */
+  async getUserReferralLink(userId: string): Promise<IReferralLink | null> {
+    try {
+      let referralLink = await ReferralLink.findOne({ userId });
+      
+      if (!referralLink) {
+        // Auto-initialize if not exists
+        const initResult = await this.initializeUserReferral(userId);
+        referralLink = await ReferralLink.findOne({ userId });
+      }
+
+      return referralLink;
+    } catch (error) {
+      logger.error('Failed to get user referral link', { userId, error });
+      throw error;
+    }
+  }
+
+  /**
+   * Get user's referral statistics
    */
   async getUserReferralStats(userId: string): Promise<ReferralStats> {
     try {
-      const [
-        totalReferrals,
-        activeReferrals,
-        earnings,
-        thisMonthData
-      ] = await Promise.all([
-        // Total referrals
-        User.countDocuments({ referredBy: userId }),
-        
-        // Active referrals (users who made at least one purchase)
-        ReferralEarning.distinct('referredUserId', { referrerId: userId }).then(ids => ids.length),
-        
-        // Earnings aggregation
-        ReferralEarning.aggregate([
-          { $match: { referrerId: userId } },
-          {
-            $group: {
-              _id: '$status',
-              totalAmount: { $sum: '$earningAmount' },
-              count: { $sum: 1 }
-            }
-          }
-        ]),
-        
-        // This month's data
-        this.getThisMonthStats(userId)
-      ]);
+      // Get all referred users
+      const referredUsers = await User.find({ referrerId: userId }).select('_id isActive createdAt');
+      const totalReferrals = referredUsers.length;
+      const activeReferrals = referredUsers.filter(user => user.isActive !== false).length;
 
-      // Process earnings data
-      let totalEarnings = 0;
-      let pendingEarnings = 0;
-      let paidEarnings = 0;
+      // Get all earnings for this user
+      const earnings = await ReferralEarning.find({ referrerId: userId });
+      const totalEarnings = earnings.reduce((sum, earning) => sum + earning.earningAmount, 0);
+      const pendingEarnings = earnings
+        .filter(earning => earning.status === 'pending' || earning.status === 'approved')
+        .reduce((sum, earning) => sum + earning.earningAmount, 0);
+      const paidEarnings = earnings
+        .filter(earning => earning.status === 'paid')
+        .reduce((sum, earning) => sum + earning.earningAmount, 0);
 
-      earnings.forEach(earning => {
-        totalEarnings += earning.totalAmount;
-        if (earning._id === 'pending' || earning._id === 'approved') {
-          pendingEarnings += earning.totalAmount;
-        } else if (earning._id === 'paid') {
-          paidEarnings += earning.totalAmount;
-        }
-      });
+      // Calculate conversion rate (users who made a purchase)
+      const usersWithPurchases = new Set(earnings.map(earning => earning.referredUserId));
+      const conversionRate = totalReferrals > 0 ? (usersWithPurchases.size / totalReferrals) * 100 : 0;
 
-      const conversionRate = totalReferrals > 0 ? (activeReferrals / totalReferrals) * 100 : 0;
+      // This month stats
+      const thisMonthStart = new Date();
+      thisMonthStart.setDate(1);
+      thisMonthStart.setHours(0, 0, 0, 0);
+
+      const thisMonthReferrals = referredUsers.filter(user => 
+        new Date(user.createdAt) >= thisMonthStart
+      ).length;
+
+      const thisMonthEarnings = earnings
+        .filter(earning => new Date(earning.createdAt) >= thisMonthStart)
+        .reduce((sum, earning) => sum + earning.earningAmount, 0);
 
       return {
         totalReferrals,
@@ -252,8 +258,8 @@ export class ReferralService {
         pendingEarnings,
         paidEarnings,
         conversionRate,
-        thisMonthReferrals: thisMonthData.referrals,
-        thisMonthEarnings: thisMonthData.earnings
+        thisMonthReferrals,
+        thisMonthEarnings
       };
     } catch (error) {
       logger.error('Failed to get user referral stats', { userId, error });
@@ -262,63 +268,16 @@ export class ReferralService {
   }
 
   /**
-   * Get this month's referral statistics
-   */
-  private async getThisMonthStats(userId: string) {
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
-
-    const [referrals, earnings] = await Promise.all([
-      User.countDocuments({ 
-        referredBy: userId,
-        referralDate: { $gte: startOfMonth }
-      }),
-      ReferralEarning.aggregate([
-        {
-          $match: {
-            referrerId: userId,
-            createdAt: { $gte: startOfMonth }
-          }
-        },
-        {
-          $group: {
-            _id: null,
-            totalEarnings: { $sum: '$earningAmount' }
-          }
-        }
-      ])
-    ]);
-
-    return {
-      referrals,
-      earnings: earnings[0]?.totalEarnings || 0
-    };
-  }
-
-  /**
-   * Get user's referral link
-   */
-  async getUserReferralLink(userId: string): Promise<IReferralLink | null> {
-    try {
-      return await ReferralLink.findOne({ userId });
-    } catch (error) {
-      logger.error('Failed to get user referral link', { userId, error });
-      throw error;
-    }
-  }
-
-  /**
-   * Get eligible earnings for payout
+   * Get earnings eligible for payout
    */
   async getEligibleEarnings(userId: string): Promise<IReferralEarning[]> {
     try {
       const now = new Date();
       return await ReferralEarning.find({
         referrerId: userId,
-        status: 'pending',
+        status: 'approved',
         eligibleForPayoutAt: { $lte: now }
-      }).sort({ createdAt: -1 });
+      }).sort({ createdAt: 1 });
     } catch (error) {
       logger.error('Failed to get eligible earnings', { userId, error });
       throw error;
@@ -326,9 +285,61 @@ export class ReferralService {
   }
 
   /**
+   * Get user's referral earnings with filtering
+   */
+  async getUserReferralEarnings(
+    userId: string, 
+    filters: EarningFilters & { page: number; limit: number }
+  ) {
+    try {
+      const { status, earningType, dateFrom, dateTo, page, limit } = filters;
+      
+      // Build query
+      const query: any = { referrerId: userId };
+      
+      if (status) {
+        query.status = status;
+      }
+      
+      if (earningType) {
+        query.earningType = earningType;
+      }
+      
+      if (dateFrom || dateTo) {
+        query.createdAt = {};
+        if (dateFrom) query.createdAt.$gte = new Date(dateFrom);
+        if (dateTo) query.createdAt.$lte = new Date(dateTo);
+      }
+
+      // Execute queries
+      const [earnings, total] = await Promise.all([
+        ReferralEarning.find(query)
+          .sort({ createdAt: -1 })
+          .skip((page - 1) * limit)
+          .limit(limit)
+          .lean(),
+        ReferralEarning.countDocuments(query)
+      ]);
+
+      return {
+        earnings,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit)
+        }
+      };
+    } catch (error) {
+      logger.error('Failed to get user referral earnings', { userId, filters, error });
+      throw error;
+    }
+  }
+
+  /**
    * Create payout request
    */
-  async createPayoutRequest(userId: string, payoutData: PayoutRequestData): Promise<IReferralPayoutRequest> {
+  async createPayoutRequest(userId: string, payoutData: PayoutRequestData) {
     try {
       // Get eligible earnings
       const eligibleEarnings = await this.getEligibleEarnings(userId);
@@ -364,16 +375,16 @@ export class ReferralService {
 
       await payoutRequest.save();
 
-      // Update earnings status to approved (reserved for this payout)
+      // Update earning status to prevent double payouts
       await ReferralEarning.updateMany(
         { _id: { $in: selectedEarnings } },
         { status: 'approved' }
       );
 
-      logger.info('Payout request created', { 
-        userId, 
-        requestedAmount: payoutData.requestedAmount,
-        earningsCount: selectedEarnings.length
+      logger.info('Payout request created', {
+        payoutId: payoutRequest._id,
+        userId,
+        requestedAmount: payoutData.requestedAmount
       });
 
       return payoutRequest;
@@ -384,127 +395,18 @@ export class ReferralService {
   }
 
   /**
-   * Admin: Get referral overview
-   */
-  async getAdminReferralOverview(): Promise<AdminReferralOverview> {
-    try {
-      const startOfMonth = new Date();
-      startOfMonth.setDate(1);
-      startOfMonth.setHours(0, 0, 0, 0);
-
-      const [
-        totalReferrers,
-        activeReferrers,
-        totalEarnings,
-        pendingPayouts,
-        thisMonthStats
-      ] = await Promise.all([
-        ReferralCommissionSettings.countDocuments({ isActive: true }),
-        ReferralEarning.distinct('referrerId').then(ids => ids.length),
-        ReferralEarning.aggregate([
-          { $group: { _id: null, total: { $sum: '$earningAmount' } } }
-        ]).then(result => result[0]?.total || 0),
-        ReferralPayoutRequest.aggregate([
-          { $match: { status: 'pending' } },
-          { $group: { _id: null, total: { $sum: '$requestedAmount' } } }
-        ]).then(result => result[0]?.total || 0),
-        this.getAdminThisMonthStats(startOfMonth)
-      ]);
-
-      return {
-        totalReferrers,
-        activeReferrers,
-        totalEarnings,
-        pendingPayouts,
-        thisMonthStats
-      };
-    } catch (error) {
-      logger.error('Failed to get admin referral overview', { error });
-      throw error;
-    }
-  }
-
-  /**
-   * Admin: Get this month's stats
-   */
-  private async getAdminThisMonthStats(startOfMonth: Date) {
-    const [newReferrers, totalEarnings, conversions] = await Promise.all([
-      ReferralCommissionSettings.countDocuments({ 
-        createdAt: { $gte: startOfMonth } 
-      }),
-      ReferralEarning.aggregate([
-        { $match: { createdAt: { $gte: startOfMonth } } },
-        { $group: { _id: null, total: { $sum: '$earningAmount' } } }
-      ]).then(result => result[0]?.total || 0),
-      ReferralEarning.countDocuments({ 
-        createdAt: { $gte: startOfMonth } 
-      })
-    ]);
-
-    return { newReferrers, totalEarnings, conversions };
-  }
-
-  /**
-   * Admin: Update commission settings
-   */
-  async updateCommissionSettings(
-    userId: string, 
-    updates: Partial<IReferralCommissionSettings>
-  ): Promise<IReferralCommissionSettings> {
-    try {
-      const settings = await ReferralCommissionSettings.findOneAndUpdate(
-        { userId },
-        { ...updates, customRates: true },
-        { new: true, upsert: true }
-      );
-
-      logger.info('Commission settings updated', { userId, updates });
-      return settings!;
-    } catch (error) {
-      logger.error('Failed to update commission settings', { userId, updates, error });
-      throw error;
-    }
-  }
-
-  /**
-   * Get user's referral earnings with pagination
-   */
-  async getUserReferralEarnings(query: any, skip: number, limit: number): Promise<IReferralEarning[]> {
-    try {
-      return await ReferralEarning.find(query)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean();
-    } catch (error) {
-      logger.error('Failed to get user referral earnings', { query, error });
-      throw error;
-    }
-  }
-
-  /**
-   * Get count of user's referral earnings
-   */
-  async getUserReferralEarningsCount(query: any): Promise<number> {
-    try {
-      return await ReferralEarning.countDocuments(query);
-    } catch (error) {
-      logger.error('Failed to get user referral earnings count', { query, error });
-      throw error;
-    }
-  }
-
-  /**
    * Get user's payout requests
    */
-  async getUserPayoutRequests(userId: string, page: number, limit: number): Promise<any> {
+  async getUserPayoutRequests(
+    userId: string, 
+    page: number = 1, 
+    limit: number = 20
+  ) {
     try {
-      const skip = (page - 1) * limit;
-      
       const [payouts, total] = await Promise.all([
         ReferralPayoutRequest.find({ referrerId: userId })
           .sort({ createdAt: -1 })
-          .skip(skip)
+          .skip((page - 1) * limit)
           .limit(limit)
           .lean(),
         ReferralPayoutRequest.countDocuments({ referrerId: userId })
@@ -526,37 +428,195 @@ export class ReferralService {
   }
 
   /**
+   * Admin: Get referral overview
+   */
+  async getAdminReferralOverview(): Promise<AdminReferralOverview> {
+    try {
+      // Get all users with referral links
+      const totalReferrers = await ReferralLink.countDocuments();
+      
+      // Active referrers (those who have at least one earning or recent activity)
+      const activeReferrersQuery = await ReferralEarning.distinct('referrerId');
+      const activeReferrers = activeReferrersQuery.length;
+
+      // Total earnings across platform
+      const allEarnings = await ReferralEarning.find().lean();
+      const totalEarnings = allEarnings.reduce((sum, earning) => sum + earning.earningAmount, 0);
+
+      // Pending payouts
+      const pendingPayouts = await ReferralPayoutRequest.find({ 
+        status: { $in: ['pending', 'approved'] } 
+      }).lean();
+      const pendingPayoutAmount = pendingPayouts.reduce((sum, payout) => sum + payout.requestedAmount, 0);
+
+      // This month stats
+      const thisMonthStart = new Date();
+      thisMonthStart.setDate(1);
+      thisMonthStart.setHours(0, 0, 0, 0);
+
+      const newReferrers = await ReferralLink.countDocuments({
+        createdAt: { $gte: thisMonthStart }
+      });
+
+      const thisMonthEarnings = allEarnings
+        .filter(earning => new Date(earning.createdAt) >= thisMonthStart)
+        .reduce((sum, earning) => sum + earning.earningAmount, 0);
+
+      const conversions = await ReferralEarning.countDocuments({
+        createdAt: { $gte: thisMonthStart }
+      });
+
+      return {
+        totalReferrers,
+        activeReferrers,
+        totalEarnings,
+        pendingPayouts: pendingPayoutAmount,
+        thisMonthStats: {
+          newReferrers,
+          totalEarnings: thisMonthEarnings,
+          conversions
+        }
+      };
+    } catch (error) {
+      logger.error('Failed to get admin referral overview', { error });
+      throw error;
+    }
+  }
+
+  /**
    * Admin: Get all referrers with performance data
    */
-  async getAdminReferrers(filters: ReferralFilters & { page: number; limit: number }): Promise<any> {
+  async getAdminReferrers(
+    filters: ReferralFilters & { page: number; limit: number }
+  ) {
     try {
       const { userType, status, sortBy = 'recent_activity', sortOrder = 'desc', page, limit } = filters;
-      const skip = (page - 1) * limit;
 
-      // Build match query
-      const matchQuery: any = {};
-      if (userType) matchQuery.userType = userType;
-      if (status === 'active') matchQuery.isActive = true;
-      if (status === 'inactive') matchQuery.isActive = false;
+      // Build aggregation pipeline
+      const pipeline: any[] = [
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'userId',
+            foreignField: '_id',
+            as: 'user'
+          }
+        },
+        {
+          $unwind: '$user'
+        }
+      ];
 
-      // Build sort query
-      let sortQuery: any = { createdAt: -1 }; // default
-      switch (sortBy) {
-        case 'earnings':
-          sortQuery = { totalEarnings: sortOrder === 'asc' ? 1 : -1 };
-          break;
-        case 'referrals':
-          sortQuery = { totalReferrals: sortOrder === 'asc' ? 1 : -1 };
-          break;
-        case 'conversion_rate':
-          sortQuery = { conversionRate: sortOrder === 'asc' ? 1 : -1 };
-          break;
+      // Add filters
+      const matchConditions: any = {};
+      if (userType) {
+        matchConditions['user.subscriptionTier'] = userType === 'subscribed' ? { $ne: 'free' } : 'free';
+      }
+      if (status) {
+        matchConditions['user.isActive'] = status === 'active';
       }
 
-      const [referrers, total] = await Promise.all([
-        this.getAggregatedReferrers(matchQuery, sortQuery, skip, limit),
-        ReferralCommissionSettings.countDocuments(matchQuery)
+      if (Object.keys(matchConditions).length > 0) {
+        pipeline.push({ $match: matchConditions });
+      }
+
+      // Add earnings data
+      pipeline.push(
+        {
+          $lookup: {
+            from: 'referral_earnings',
+            localField: 'userId',
+            foreignField: 'referrerId',
+            as: 'earnings'
+          }
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'userId',
+            foreignField: 'referrerId',
+            as: 'referredUsers'
+          }
+        }
+      );
+
+      // Project final shape
+      pipeline.push({
+        $project: {
+          userId: '$userId',
+          userName: '$user.name',
+          userEmail: '$user.email',
+          userType: {
+            $cond: {
+              if: { $ne: ['$user.subscriptionTier', 'free'] },
+              then: 'subscribed',
+              else: 'normal'
+            }
+          },
+          totalReferrals: { $size: '$referredUsers' },
+          activeReferrals: {
+            $size: {
+              $filter: {
+                input: '$referredUsers',
+                cond: { $ne: ['$$this.isActive', false] }
+              }
+            }
+          },
+          totalEarnings: { $sum: '$earnings.earningAmount' },
+          pendingEarnings: {
+            $sum: {
+              $map: {
+                input: {
+                  $filter: {
+                    input: '$earnings',
+                    cond: { $in: ['$$this.status', ['pending', 'approved']] }
+                  }
+                },
+                in: '$$this.earningAmount'
+              }
+            }
+          },
+          conversionRate: {
+            $cond: {
+              if: { $gt: [{ $size: '$referredUsers' }, 0] },
+              then: {
+                $multiply: [
+                  {
+                    $divide: [
+                      { $size: { $setUnion: ['$earnings.referredUserId', []] } },
+                      { $size: '$referredUsers' }
+                    ]
+                  },
+                  100
+                ]
+              },
+              else: 0
+            }
+          },
+          lastActivity: '$lastUsed',
+          joinedAt: '$createdAt'
+        }
+      });
+
+      // Add sorting
+      const sortField = this.mapSortField(sortBy);
+      const sortDirection = sortOrder === 'desc' ? -1 : 1;
+      pipeline.push({ $sort: { [sortField]: sortDirection } });
+
+      // Execute aggregation with pagination
+      const [referrers, totalCount] = await Promise.all([
+        ReferralLink.aggregate([
+          ...pipeline,
+          { $skip: (page - 1) * limit },
+          { $limit: limit }
+        ]),
+        ReferralLink.aggregate([
+          ...pipeline,
+          { $count: 'total' }
+        ])
       ]);
+
+      const total = totalCount[0]?.total || 0;
 
       return {
         referrers,
@@ -574,121 +634,40 @@ export class ReferralService {
   }
 
   /**
-   * Get aggregated referrer performance data
+   * Map sort field names
    */
-  private async getAggregatedReferrers(matchQuery: any, sortQuery: any, skip: number, limit: number) {
-    return await ReferralCommissionSettings.aggregate([
-      { $match: matchQuery },
-      {
-        $lookup: {
-          from: 'users',
-          localField: 'userId',
-          foreignField: '_id',
-          as: 'user'
-        }
-      },
-      { $unwind: '$user' },
-      {
-        $lookup: {
-          from: 'referral_earnings',
-          localField: 'userId',
-          foreignField: 'referrerId',
-          as: 'earnings'
-        }
-      },
-      {
-        $addFields: {
-          totalEarnings: { $sum: '$earnings.earningAmount' },
-          pendingEarnings: {
-            $sum: {
-              $filter: {
-                input: '$earnings',
-                cond: { $eq: ['$$this.status', 'pending'] }
-              }
-            }
-          },
-          totalReferrals: { $size: '$earnings' },
-          activeReferrals: {
-            $size: {
-              $setUnion: ['$earnings.referredUserId', []]
-            }
-          }
-        }
-      },
-      {
-        $addFields: {
-          conversionRate: {
-            $cond: {
-              if: { $gt: ['$totalReferrals', 0] },
-              then: { $multiply: [{ $divide: ['$activeReferrals', '$totalReferrals'] }, 100] },
-              else: 0
-            }
-          }
-        }
-      },
-      {
-        $project: {
-          userId: '$userId',
-          userName: '$user.name',
-          userEmail: '$user.email',
-          userType: '$userType',
-          totalReferrals: 1,
-          activeReferrals: 1,
-          totalEarnings: 1,
-          pendingEarnings: 1,
-          conversionRate: 1,
-          lastActivity: '$updatedAt',
-          joinedAt: '$createdAt'
-        }
-      },
-      { $sort: sortQuery },
-      { $skip: skip },
-      { $limit: limit }
-    ]);
+  private mapSortField(sortBy: string): string {
+    const fieldMap: Record<string, string> = {
+      'earnings': 'totalEarnings',
+      'referrals': 'totalReferrals',
+      'conversion_rate': 'conversionRate',
+      'recent_activity': 'lastActivity'
+    };
+    return fieldMap[sortBy] || 'lastActivity';
   }
 
   /**
    * Admin: Get payout requests
    */
-  async getAdminPayoutRequests(filters: { status?: string; page: number; limit: number }): Promise<any> {
+  async getAdminPayoutRequests(
+    status?: string,
+    page: number = 1,
+    limit: number = 20
+  ) {
     try {
-      const { status, page, limit } = filters;
-      const skip = (page - 1) * limit;
-
-      const matchQuery: any = {};
-      if (status) matchQuery.status = status;
+      const query: any = {};
+      if (status && status !== 'all') {
+        query.status = status;
+      }
 
       const [payouts, total] = await Promise.all([
-        ReferralPayoutRequest.aggregate([
-          { $match: matchQuery },
-          {
-            $lookup: {
-              from: 'users',
-              localField: 'referrerId',
-              foreignField: '_id',
-              as: 'referrer'
-            }
-          },
-          { $unwind: '$referrer' },
-          {
-            $project: {
-              referrerId: 1,
-              referrerName: '$referrer.name',
-              referrerEmail: '$referrer.email',
-              requestedAmount: 1,
-              currency: 1,
-              status: 1,
-              paymentMethod: 1,
-              adminNote: 1,
-              processedAt: 1,
-              createdAt: 1
-            }
-          },
-          { $sort: { createdAt: -1 } },
-          { $skip: skip },
-          { $limit: limit }
-        ]),
-        ReferralPayoutRequest.countDocuments(matchQuery)
+        ReferralPayoutRequest.find(query)
+          .sort({ createdAt: -1 })
+          .skip((page - 1) * limit)
+          .limit(limit)
+          .populate('referrerId', 'name email')
+          .lean(),
+        ReferralPayoutRequest.countDocuments(query)
       ]);
 
       return {
@@ -701,56 +680,106 @@ export class ReferralService {
         }
       };
     } catch (error) {
-      logger.error('Failed to get admin payout requests', { filters, error });
+      logger.error('Failed to get admin payout requests', { status, error });
       throw error;
     }
   }
 
   /**
-   * Admin: Process payout request
+   * Admin: Update payout request
    */
-  async processPayoutRequest(
-    payoutId: string, 
+  async updatePayoutRequest(
+    payoutId: string,
     updates: UpdatePayoutRequest,
     adminUserId: string
-  ): Promise<IReferralPayoutRequest> {
+  ) {
     try {
-      const payout = await ReferralPayoutRequest.findByIdAndUpdate(
-        payoutId,
-        {
-          ...updates,
-          processedAt: new Date(),
-          processedBy: adminUserId
-        },
-        { new: true }
-      );
-
+      const payout = await ReferralPayoutRequest.findById(payoutId);
       if (!payout) {
         throw new Error('Payout request not found');
       }
 
-      // Update earnings status based on payout decision
-      let earningStatus: string;
-      if (updates.status === 'approved' || updates.status === 'paid') {
-        earningStatus = updates.status;
-      } else {
-        earningStatus = 'pending'; // Reset to pending if rejected/cancelled
+      // Update payout request
+      payout.status = updates.status;
+      if (updates.adminNote) {
+        payout.adminNote = updates.adminNote;
+      }
+      payout.processedAt = new Date();
+      payout.processedBy = adminUserId;
+
+      await payout.save();
+
+      // If approved, mark earnings as paid
+      if (updates.status === 'paid') {
+        await ReferralEarning.updateMany(
+          { _id: { $in: payout.earningIds } },
+          { status: 'paid' }
+        );
+      } else if (updates.status === 'rejected' || updates.status === 'cancelled') {
+        // If rejected/cancelled, revert earnings status
+        await ReferralEarning.updateMany(
+          { _id: { $in: payout.earningIds } },
+          { status: 'approved' }
+        );
       }
 
-      await ReferralEarning.updateMany(
-        { _id: { $in: payout.earningIds } },
-        { status: earningStatus }
-      );
-
-      logger.info('Payout request processed', { 
-        payoutId, 
+      logger.info('Payout request updated', {
+        payoutId,
         status: updates.status,
-        adminUserId 
+        adminUserId
       });
 
       return payout;
     } catch (error) {
-      logger.error('Failed to process payout request', { payoutId, updates, error });
+      logger.error('Failed to update payout request', { payoutId, updates, error });
+      throw error;
+    }
+  }
+
+  /**
+   * Admin: Update user commission settings
+   */
+  async updateCommissionSettings(
+    userId: string,
+    updates: {
+      initialCommissionRate?: number;
+      recurringCommissionRate?: number;
+      paymentModel?: 'recurring' | 'one-time';
+      isActive?: boolean;
+    }
+  ) {
+    try {
+      const settings = await ReferralCommissionSettings.findOne({ userId });
+      if (!settings) {
+        throw new Error('Commission settings not found for user');
+      }
+
+      // Update fields
+      if (updates.initialCommissionRate !== undefined) {
+        settings.initialCommissionRate = updates.initialCommissionRate;
+        settings.customRates = true;
+      }
+      if (updates.recurringCommissionRate !== undefined) {
+        settings.recurringCommissionRate = updates.recurringCommissionRate;
+        settings.customRates = true;
+      }
+      if (updates.paymentModel !== undefined) {
+        settings.paymentModel = updates.paymentModel;
+      }
+      if (updates.isActive !== undefined) {
+        settings.isActive = updates.isActive;
+      }
+
+      await settings.save();
+
+      logger.info('Commission settings updated', {
+        userId,
+        updates
+      });
+
+      return settings;
+    } catch (error) {
+      logger.error('Failed to update commission settings', { userId, updates, error });
       throw error;
     }
   }
