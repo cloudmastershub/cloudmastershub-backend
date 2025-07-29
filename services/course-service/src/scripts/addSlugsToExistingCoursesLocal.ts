@@ -38,7 +38,7 @@ async function addSlugsToExistingCourses() {
 
     // Get all existing slugs to ensure uniqueness
     const existingSlugs = await Course.find({ 
-      slug: { $exists: true, $ne: null, $ne: '' } 
+      slug: { $exists: true, $nin: [null, ''] } 
     }).select('slug').lean();
     
     const slugSet = new Set(existingSlugs.map(course => (course as any).slug));
