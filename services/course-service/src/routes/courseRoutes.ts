@@ -6,6 +6,7 @@ import {
   updateCourse,
   deleteCourse,
   enrollInCourse,
+  getUserCourses,
 } from '../controllers/courseController';
 import { authenticate } from '@cloudmastershub/middleware';
 import { 
@@ -39,5 +40,8 @@ router.get('/:id/content', authenticate, (req, res, next) => {
     courseId: req.params.id
   });
 });
+
+// User's enrolled courses (internal service endpoint)
+router.get('/user/:userId/courses', getUserCourses);
 
 export default router;

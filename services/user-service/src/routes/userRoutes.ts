@@ -5,6 +5,7 @@ import {
   updateProfile,
   getProgress,
   updateSubscription,
+  getUserCourses,
 } from '../controllers/userController';
 import { authenticate } from '../middleware/authenticate';
 import { validateRequest } from '../middleware/validateRequest';
@@ -29,5 +30,7 @@ router.put(
 router.get('/progress', getProgress);
 
 router.post('/subscription', updateSubscription);
+
+router.get('/courses', getUserCourses);
 
 export default router;
