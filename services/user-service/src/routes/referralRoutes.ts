@@ -21,10 +21,12 @@ import { authenticate, authorize } from '@cloudmastershub/middleware';
 
 const router = Router();
 
-// Public routes
+// Public routes (no authentication required)
+// IMPORTANT: These must be defined BEFORE the authenticate middleware
 router.get('/track/:referralCode', validateReferralCode, trackReferralClick);
 router.post('/signup', validateReferralSignup, recordReferralSignup);
 
+// Apply authentication middleware for all routes below this line
 // User routes (authenticated)
 router.use(authenticate);
 

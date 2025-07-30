@@ -14,13 +14,29 @@ export interface AuthRequest extends Request {
 
 export const authenticate = (req: AuthRequest, res: Response, next: NextFunction): void => {
   try {
+    // Debug logging for authentication flow
+    console.log('🔐 Auth middleware - Request URL:', req.originalUrl || req.url);
+    console.log('🔐 Auth middleware - Authorization header:', req.headers.authorization ? 'Present' : 'Missing');
+    
     const token = req.headers.authorization?.split(' ')[1];
 
     if (!token) {
+      console.log('🔐 Auth middleware - No token found in Authorization header');
       throw new UnauthorizedError('Authentication required');
     }
 
+    console.log('🔐 Auth middleware - Token found, length:', token.length);
+    console.log('🔐 Auth middleware - JWT_SECRET configured:', !!process.env.JWT_SECRET);
+    
     const decoded = verifyToken(token, process.env.JWT_SECRET || 'secret');
+    
+    console.log('🔐 Auth middleware - Token verified successfully:', {
+      userId: decoded.userId,
+      email: decoded.email,
+      roles: decoded.roles,
+      hasSubscriptionTier: !!(decoded as any).subscriptionTier
+    });
+    
     req.userId = decoded.userId;
     req.userEmail = decoded.email;
     req.userRoles = decoded.roles;
@@ -34,6 +50,10 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
 
     next();
   } catch (error) {
+    console.error('🔐 Auth middleware - Error:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      type: error instanceof Error ? error.constructor.name : typeof error
+    });
     next(new UnauthorizedError('Invalid or expired token'));
   }
 };

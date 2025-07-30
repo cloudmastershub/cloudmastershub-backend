@@ -13,6 +13,13 @@ export const getUserReferralDashboard = async (
   next: NextFunction
 ): Promise<void> => {
   try {
+    console.log('📊 Referral Dashboard - Request received:', {
+      userId: req.user?.id,
+      userEmail: req.user?.email,
+      userRoles: req.user?.roles,
+      hasUser: !!req.user
+    });
+    
     const userId = req.user!.id;
 
     const [stats, referralLink, eligibleEarnings] = await Promise.all([
@@ -164,6 +171,13 @@ export const trackReferralClick = async (
   next: NextFunction
 ): Promise<void> => {
   try {
+    console.log('🔗 Referral Click Tracking - PUBLIC endpoint called:', {
+      referralCode: req.params.referralCode,
+      hasAuthHeader: !!req.headers.authorization,
+      method: req.method,
+      url: req.originalUrl || req.url
+    });
+    
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       res.status(400).json({
