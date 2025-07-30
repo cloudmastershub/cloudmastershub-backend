@@ -168,7 +168,16 @@ export interface IReferralLink extends Document {
 
 const ReferralLinkSchema = new Schema<IReferralLink>({
   userId: { type: String, required: true, unique: true },
-  referralCode: { type: String, required: true, unique: true },
+  referralCode: { 
+    type: String, 
+    unique: true,
+    validate: {
+      validator: function(v: string) {
+        return v && v.length > 0;
+      },
+      message: 'Referral code must be generated and cannot be empty'
+    }
+  },
   clicks: { type: Number, default: 0 },
   conversions: { type: Number, default: 0 },
   lastUsed: { type: Date }
@@ -184,10 +193,32 @@ ReferralLinkSchema.index({ referralCode: 1 });
 // Pre-save middleware to generate unique referral code
 ReferralLinkSchema.pre('save', async function(next) {
   if (this.isNew && !this.referralCode) {
-    // Generate a unique referral code based on user ID and timestamp
-    const timestamp = Date.now().toString(36);
-    const randomStr = Math.random().toString(36).substring(2, 8);
-    this.referralCode = `${this.userId.substring(0, 8)}-${timestamp}-${randomStr}`.toLowerCase();
+    try {
+      // Generate a unique referral code based on user ID and timestamp
+      const timestamp = Date.now().toString(36);
+      const randomStr = Math.random().toString(36).substring(2, 8);
+      
+      // Clean userId for referral code (remove @ and . characters, take first 8 chars)
+      const cleanUserId = this.userId.replace(/[@.]/g, '').substring(0, 8);
+      this.referralCode = `${cleanUserId}-${timestamp}-${randomStr}`.toLowerCase();
+      
+      // Ensure uniqueness by checking if code already exists
+      let attempts = 0;
+      while (attempts < 5) {
+        const existing = await mongoose.models.ReferralLink?.findOne({ referralCode: this.referralCode });
+        if (!existing) break;
+        
+        // Generate new code if collision
+        const newRandomStr = Math.random().toString(36).substring(2, 8);
+        this.referralCode = `${cleanUserId}-${timestamp}-${newRandomStr}`.toLowerCase();
+        attempts++;
+      }
+    } catch (error) {
+      console.error('Error generating referral code:', error);
+      // Fallback: simple timestamp-based code
+      const fallbackCode = `ref-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
+      this.referralCode = fallbackCode;
+    }
   }
   next();
 });
