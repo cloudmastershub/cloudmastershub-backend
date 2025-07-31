@@ -132,7 +132,7 @@ const serviceRoutes = {
     }
   },
   '/admin/stats': {
-    target: process.env.COURSE_SERVICE_URL || 'http://course-service:3002',
+    target: process.env.USER_SERVICE_URL || 'http://user-service:3001',
     changeOrigin: true,
     timeout: 30000,
     proxyTimeout: 30000,
