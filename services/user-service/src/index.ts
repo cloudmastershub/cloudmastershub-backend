@@ -6,6 +6,7 @@ import mongoose from 'mongoose';
 import userRoutes from './routes/userRoutes';
 import authRoutes from './routes/authRoutes';
 import referralRoutes from './routes/referralRoutes';
+import instructorRoutes from './routes/instructorRoutes';
 import { errorHandler } from './middleware/errorHandler';
 import { initializePaymentEventSubscriber } from './events/paymentEventSubscriber';
 import { initializeDatabase, getDatabaseHealth } from './services/userService';
@@ -43,6 +44,7 @@ app.get('/health', async (req, res) => {
 app.use('/auth', authRoutes);
 app.use('/users', userRoutes);
 app.use('/referrals', referralRoutes);
+app.use('/instructor', instructorRoutes);
 
 app.use(errorHandler);
 
