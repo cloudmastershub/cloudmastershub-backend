@@ -1,7 +1,12 @@
 import { Request, Response } from 'express';
-import { logger } from '../utils/logger';
+import logger from '../utils/logger';
 import User, { UserRole } from '../models/User';
 import { ReferralLink } from '../models/Referral';
+
+// Extend Request interface to include userId (from authentication middleware)
+interface AuthenticatedRequest extends Request {
+  userId?: string;
+}
 
 /**
  * Admin Controller
@@ -47,7 +52,7 @@ export interface AdminStatsResponse {
  * Get comprehensive admin dashboard statistics
  * Aggregates data from multiple services for admin overview
  */
-export const getAdminStats = async (req: Request, res: Response): Promise<void> => {
+export const getAdminStats = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     logger.info('Fetching admin dashboard statistics', { userId: req.userId });
     

@@ -1,8 +1,6 @@
 import { Request, Response } from 'express';
-import User from '../models/User';
-import { AppError } from '../../../shared/middleware/errorHandler';
-import { logger } from '../../../shared/utils/logger';
-import { UserRole } from '../../../shared/types';
+import User, { UserRole } from '../models/User';
+import logger from '../utils/logger';
 
 // Extend Request to include authenticated user
 interface AuthRequest extends Request {
@@ -19,12 +17,18 @@ export const getInstructorStats = async (req: AuthRequest, res: Response) => {
     const instructorId = req.userId;
     
     if (!instructorId) {
-      throw new AppError('Instructor ID not found', 401);
+      return res.status(401).json({
+        success: false,
+        message: 'Instructor ID not found'
+      });
     }
 
     // Check if user is an instructor
     if (!req.userRoles?.includes(UserRole.INSTRUCTOR)) {
-      throw new AppError('Access denied. Instructor role required.', 403);
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Instructor role required.'
+      });
     }
 
     // Use MongoDB aggregation pipeline for efficient counting
@@ -67,17 +71,14 @@ export const getInstructorStats = async (req: AuthRequest, res: Response) => {
     });
   } catch (error) {
     logger.error('Error fetching instructor stats:', error);
-    if (error instanceof AppError) {
-      res.status(error.statusCode).json({
-        success: false,
-        message: error.message
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        message: 'Failed to fetch instructor statistics'
-      });
-    }
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch instructor statistics',
+      error: {
+        code: 'INSTRUCTOR_STATS_ERROR',
+        details: process.env.NODE_ENV === 'development' ? error : undefined
+      }
+    });
   }
 };
 
@@ -90,18 +91,27 @@ export const getInstructorProfile = async (req: AuthRequest, res: Response) => {
     const instructorId = req.userId;
     
     if (!instructorId) {
-      throw new AppError('Instructor ID not found', 401);
+      return res.status(401).json({
+        success: false,
+        message: 'Instructor ID not found'
+      });
     }
 
     // Check if user is an instructor
     if (!req.userRoles?.includes(UserRole.INSTRUCTOR)) {
-      throw new AppError('Access denied. Instructor role required.', 403);
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Instructor role required.'
+      });
     }
 
     const instructor = await User.findById(instructorId).select('-password');
     
     if (!instructor) {
-      throw new AppError('Instructor not found', 404);
+      return res.status(404).json({
+        success: false,
+        message: 'Instructor not found'
+      });
     }
 
     res.json({
@@ -110,16 +120,13 @@ export const getInstructorProfile = async (req: AuthRequest, res: Response) => {
     });
   } catch (error) {
     logger.error('Error fetching instructor profile:', error);
-    if (error instanceof AppError) {
-      res.status(error.statusCode).json({
-        success: false,
-        message: error.message
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        message: 'Failed to fetch instructor profile'
-      });
-    }
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch instructor profile',
+      error: {
+        code: 'INSTRUCTOR_PROFILE_ERROR',
+        details: process.env.NODE_ENV === 'development' ? error : undefined
+      }
+    });
   }
 };

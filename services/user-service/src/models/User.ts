@@ -1,6 +1,9 @@
 import mongoose, { Schema, Document } from 'mongoose';
 import { User as IUser, UserRole, SubscriptionPlanType } from '@cloudmastershub/types';
 
+// Re-export UserRole for use in other files
+export { UserRole } from '@cloudmastershub/types';
+
 export interface IUserDocument extends Omit<IUser, 'id'>, Document {
   _id: mongoose.Types.ObjectId;
   referredBy?: string; // ID of the user who referred this user
@@ -113,4 +116,7 @@ UserSchema.set('toJSON', {
   }
 });
 
-export const User = mongoose.model<IUserDocument>('User', UserSchema);
+const User = mongoose.model<IUserDocument>('User', UserSchema);
+
+export default User;
+export { User };

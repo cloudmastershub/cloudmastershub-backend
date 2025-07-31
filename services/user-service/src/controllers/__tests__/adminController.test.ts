@@ -2,16 +2,21 @@ import { Request, Response } from 'express';
 import { getAdminStats } from '../adminController';
 import User, { UserRole } from '../../models/User';
 import { ReferralLink } from '../../models/Referral';
-import { logger } from '../../utils/logger';
+import logger from '../../utils/logger';
 
 // Mock dependencies
 jest.mock('../../models/User');
 jest.mock('../../models/Referral');
-jest.mock('../../utils/logger');
+jest.mock('../../utils/logger', () => ({
+  default: {
+    info: jest.fn(),
+    error: jest.fn(),
+  }
+}));
 
 const mockUser = User as jest.Mocked<typeof User>;
 const mockReferralLink = ReferralLink as jest.Mocked<typeof ReferralLink>;
-const mockLogger = logger as jest.Mocked<typeof logger>;
+const mockLogger = logger as jest.MockedObject<typeof logger>;
 
 describe('AdminController', () => {
   let req: Partial<Request>;

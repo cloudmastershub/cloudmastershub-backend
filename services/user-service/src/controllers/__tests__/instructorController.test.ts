@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { getInstructorStats } from '../instructorController';
 import User from '../../models/User';
-import { UserRole } from '../../../../shared/types';
+import { UserRole } from '../../models/User';
 
 // Mock the User model
 jest.mock('../../models/User');
@@ -9,7 +9,7 @@ const MockedUser = jest.mocked(User);
 
 // Mock logger
 jest.mock('../../utils/logger', () => ({
-  logger: {
+  default: {
     info: jest.fn(),
     error: jest.fn(),
   }

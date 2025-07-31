@@ -5,7 +5,7 @@ import {
 } from '../controllers/instructorController';
 import { authenticate } from '../middleware/authenticate';
 import { authorize } from '../middleware/authorize';
-import { UserRole } from '../../../shared/types';
+import { UserRole } from '../models/User';
 
 const router = Router();
 

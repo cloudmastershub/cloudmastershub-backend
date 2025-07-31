@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { AppError } from '../../../shared/middleware/errorHandler';
-import { UserRole } from '../../../shared/types';
+import { UserRole } from '../models/User';
 
 interface AuthRequest extends Request {
   userId?: string;
