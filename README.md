@@ -182,7 +182,7 @@ docker-compose up -d
 
 ```bash
 # Run all tests
-npm test
+npm test  #RUN ALL TEST HERE
 
 # Run tests for specific service
 npm test --workspace=@cloudmastershub/user-service
