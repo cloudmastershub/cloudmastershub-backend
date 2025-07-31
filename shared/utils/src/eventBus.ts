@@ -32,13 +32,28 @@ export class EventBus implements EventPublisher, EventSubscriber {
 
   private async initialize(): Promise<void> {
     try {
-      // Setup error handlers
+      // Setup error handlers with reconnection
       this.publishClient.on('error', (err) => {
         logger.error('Event bus publish client error:', err);
+        this.handleConnectionError('publish', err);
       });
 
       this.subscribeClient.on('error', (err) => {
         logger.error('Event bus subscribe client error:', err);
+        this.handleConnectionError('subscribe', err);
+      });
+
+      // Handle disconnection
+      this.publishClient.on('disconnect', () => {
+        logger.warn('Event bus publish client disconnected');
+        this.isConnected = false;
+        this.scheduleReconnection();
+      });
+
+      this.subscribeClient.on('disconnect', () => {
+        logger.warn('Event bus subscribe client disconnected');
+        this.isConnected = false;
+        this.scheduleReconnection();
       });
 
       // Connect clients
@@ -75,7 +90,13 @@ export class EventBus implements EventPublisher, EventSubscriber {
     }
   ): Promise<void> {
     if (!this.isConnected) {
-      throw new Error('Event bus is not connected');
+      // Log warning but don't throw error - graceful degradation
+      logger.warn('Event bus not connected, skipping event publication', {
+        eventType: event.type,
+        eventId: event.id,
+        service: event.service
+      });
+      return;
     }
 
     try {
@@ -451,6 +472,57 @@ export class EventBus implements EventPublisher, EventSubscriber {
       logger.info('Event bus disconnected');
     } catch (error) {
       logger.error('Error disconnecting event bus:', error);
+    }
+  }
+
+  private handleConnectionError(clientType: 'publish' | 'subscribe', error: any): void {
+    logger.error(`Event bus ${clientType} client error:`, error);
+    this.isConnected = false;
+    this.scheduleReconnection();
+  }
+
+  private reconnectionTimeout: NodeJS.Timeout | null = null;
+  private reconnectionAttempts = 0;
+  private maxReconnectionAttempts = 10;
+
+  private scheduleReconnection(): void {
+    if (this.reconnectionTimeout) {
+      return; // Already scheduled
+    }
+
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectionAttempts), 30000); // Max 30s
+    this.reconnectionTimeout = setTimeout(() => {
+      this.attemptReconnection();
+    }, delay);
+
+    logger.info(`Scheduling reconnection attempt ${this.reconnectionAttempts + 1} in ${delay}ms`);
+  }
+
+  private async attemptReconnection(): Promise<void> {
+    this.reconnectionTimeout = null;
+    this.reconnectionAttempts++;
+
+    if (this.reconnectionAttempts > this.maxReconnectionAttempts) {
+      logger.error('Max reconnection attempts reached, giving up');
+      return;
+    }
+
+    try {
+      logger.info(`Attempting to reconnect event bus (attempt ${this.reconnectionAttempts})`);
+      
+      // Try to reconnect both clients
+      await Promise.all([
+        this.publishClient.connect(),
+        this.subscribeClient.connect()
+      ]);
+
+      this.isConnected = true;
+      this.reconnectionAttempts = 0; // Reset on success
+      
+      logger.info('Event bus reconnected successfully');
+    } catch (error) {
+      logger.error('Reconnection attempt failed:', error);
+      this.scheduleReconnection(); // Try again
     }
   }
 

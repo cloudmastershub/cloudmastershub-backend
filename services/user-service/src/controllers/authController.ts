@@ -74,13 +74,21 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
       expiresIn: REFRESH_TOKEN_EXPIRES_IN,
     });
 
-    // Publish login event
+    // Publish login event (non-blocking to prevent auth failures)
     const eventPublisher = getUserEventPublisher();
-    await eventPublisher.publishUserLogin(user.id, {
+    eventPublisher.publishUserLogin(user.id, {
       email: user.email,
       loginMethod: 'email_password',
       ipAddress: req.ip || req.connection.remoteAddress,
       userAgent: req.get('User-Agent')
+    }).catch(error => {
+      // Log error but don't fail authentication
+      logger.warn('Failed to publish login event', { 
+        error: error.message, 
+        userId: user.id,
+        email: user.email,
+        loginMethod: 'email_password'
+      });
     });
 
     res.json({
@@ -109,10 +117,16 @@ export const logout = async (req: Request, res: Response, next: NextFunction): P
       try {
         const decoded = jwt.verify(token, JWT_SECRET) as any;
         
-        // Publish logout event
+        // Publish logout event (non-blocking)
         const eventPublisher = getUserEventPublisher();
-        await eventPublisher.publishUserLogout(decoded.userId, {
+        eventPublisher.publishUserLogout(decoded.userId, {
           email: decoded.email
+        }).catch(error => {
+          logger.warn('Failed to publish logout event', { 
+            error: error.message, 
+            userId: decoded.userId,
+            email: decoded.email
+          });
         });
         
         logger.info('User logged out', { userId: decoded.userId, email: decoded.email });
@@ -215,13 +229,21 @@ export const googleAuth = async (req: Request, res: Response, next: NextFunction
       { expiresIn: REFRESH_TOKEN_EXPIRES_IN }
     );
 
-    // Publish login event
+    // Publish login event (non-blocking to prevent auth failures)
     const eventPublisher = getUserEventPublisher();
-    await eventPublisher.publishUserLogin(user.id, {
+    eventPublisher.publishUserLogin(user.id, {
       email: user.email,
       loginMethod: 'google_oauth',
       ipAddress: req.ip || req.connection.remoteAddress,
       userAgent: req.get('User-Agent')
+    }).catch(error => {
+      // Log error but don't fail authentication
+      logger.warn('Failed to publish login event', { 
+        error: error.message, 
+        userId: user.id,
+        email: user.email,
+        loginMethod: 'google_oauth'
+      });
     });
 
     logger.info('Google OAuth login successful', { 
