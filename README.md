@@ -40,6 +40,7 @@ Microservices-based backend with modern DevOps practices:
 - 🔄 **CI/CD Ready** - Complete Jenkins pipeline with automated deployment
 - 🐳 **Single Image, Multiple Services** - Efficient deployment model
 - 🔧 **Developer Experience** - Hot reload, database UIs, comprehensive tooling
+- 📈 **Admin Dashboard** - Real-time metrics with MongoDB aggregation pipelines
 
 ## Getting Started
 
