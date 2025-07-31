@@ -94,7 +94,7 @@ export class EventBus implements EventPublisher, EventSubscriber {
       logger.warn('Event bus not connected, skipping event publication', {
         eventType: event.type,
         eventId: event.id,
-        service: event.service
+        source: event.source
       });
       return;
     }
