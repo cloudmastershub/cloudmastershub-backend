@@ -123,7 +123,7 @@ const serviceRoutes = {
     }
   },
   '/admin/instructors': {
-    target: process.env.COURSE_SERVICE_URL || 'http://course-service:3002',
+    target: process.env.ADMIN_SERVICE_URL || 'http://admin-service:3005',
     changeOrigin: true,
     timeout: 30000,
     proxyTimeout: 30000,

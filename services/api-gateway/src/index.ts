@@ -28,13 +28,21 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(origin => ori
 
 app.use(cors({
   origin: (origin, callback) => {
+    console.log(`🌐 CORS: Request from origin: ${origin || 'NO_ORIGIN'}`);
+    console.log(`🌐 CORS: Allowed origins: ${allowedOrigins.join(', ')}`);
+    
     // Allow requests with no origin (like mobile apps or Postman)
-    if (!origin) return callback(null, true);
+    if (!origin) {
+      console.log('🌐 CORS: Allowing request with no origin');
+      return callback(null, true);
+    }
     
     if (allowedOrigins.includes(origin)) {
+      console.log(`🌐 CORS: Allowing request from ${origin}`);
       callback(null, true);
     } else {
-      console.warn(`CORS: Blocked request from origin: ${origin}`);
+      console.warn(`🌐 CORS: BLOCKED request from origin: ${origin}`);
+      console.warn(`🌐 CORS: Available origins: ${allowedOrigins.join(', ')}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -42,7 +50,8 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Request-ID'],
   exposedHeaders: ['X-Total-Count', 'X-Page-Count'],
-  maxAge: 86400 // 24 hours
+  maxAge: 86400, // 24 hours
+  optionsSuccessStatus: 200 // For legacy browser support
 }));
 
 // Health check endpoint (exclude from rate limiting)
