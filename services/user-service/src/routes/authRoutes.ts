@@ -36,6 +36,7 @@ router.post(
     body('firstName').optional().trim(),
     body('lastName').optional().trim(),
     body('avatar').optional().isURL().withMessage('Avatar must be a valid URL'),
+    body('referralCode').optional().isLength({ min: 5 }).withMessage('Invalid referral code'),
   ],
   validateRequest,
   googleAuth

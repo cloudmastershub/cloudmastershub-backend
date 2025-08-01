@@ -737,6 +737,55 @@ export class ReferralService {
   }
 
   /**
+   * Check if referral ID is available
+   */
+  async checkReferralIdAvailability(referralId: string): Promise<boolean> {
+    try {
+      const existing = await ReferralLink.findOne({ referralCode: referralId });
+      return !existing;
+    } catch (error) {
+      logger.error('Failed to check referral ID availability', { referralId, error });
+      throw error;
+    }
+  }
+
+  /**
+   * Update user's referral ID
+   */
+  async updateUserReferralId(userId: string, newReferralId: string): Promise<{ referralUrl: string }> {
+    try {
+      // Check if referral ID is available
+      const isAvailable = await this.checkReferralIdAvailability(newReferralId);
+      if (!isAvailable) {
+        throw new Error('Referral ID is already taken');
+      }
+
+      // Find user's existing referral link
+      const referralLink = await ReferralLink.findOne({ userId });
+      if (!referralLink) {
+        throw new Error('Referral link not found for user');
+      }
+
+      // Update the referral code
+      referralLink.referralCode = newReferralId;
+      await referralLink.save();
+
+      const referralUrl = `${process.env.FRONTEND_URL}?ref=${newReferralId}`;
+
+      logger.info('Referral ID updated', {
+        userId,
+        oldCode: referralLink.referralCode,
+        newCode: newReferralId
+      });
+
+      return { referralUrl };
+    } catch (error) {
+      logger.error('Failed to update referral ID', { userId, newReferralId, error });
+      throw error;
+    }
+  }
+
+  /**
    * Admin: Update user commission settings
    */
   async updateCommissionSettings(

@@ -5,6 +5,7 @@ import axios from 'axios';
 import logger from '../utils/logger';
 import { getUserEventPublisher } from '../events/userEventPublisher';
 import * as userService from '../services/userService';
+import { referralService } from '../services/referralService';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 const JWT_EXPIRES_IN = '15m';
@@ -148,7 +149,7 @@ export const logout = async (req: Request, res: Response, next: NextFunction): P
 // Google OAuth authentication
 export const googleAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { googleToken, email, firstName, lastName, avatar } = req.body;
+    const { googleToken, email, firstName, lastName, avatar, referralCode } = req.body;
 
     if (!googleToken || !email) {
       res.status(400).json({
@@ -185,29 +186,70 @@ export const googleAuth = async (req: Request, res: Response, next: NextFunction
       logger.debug('Google token verification skipped (development mode or network restrictions)');
     }
 
-    // TEMPORARY: Hardcode admin user until database is properly connected
     // Check if this is the admin user
     const isAdminUser = email === 'mbuaku@gmail.com';
     
-    const user = {
-      id: `google_${email.replace(/[^a-zA-Z0-9]/g, '_')}`,
-      email,
-      firstName: firstName || (isAdminUser ? 'Admin' : 'User'),
-      lastName: lastName || (isAdminUser ? 'User' : ''),
-      avatar,
-      roles: isAdminUser ? ['admin', 'student'] : ['student'],
-      subscriptionTier: isAdminUser ? 'enterprise' : 'free',
-      subscriptionStatus: isAdminUser ? 'active' : 'free',
-      authProvider: 'google',
-      emailVerified: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+    // Try to get existing user or create new one
+    let user = await userService.getUserByEmail(email);
+    
+    if (!user) {
+      // Create new user with referral initialization
+      logger.info('Creating new user via Google OAuth', { email, firstName, lastName });
+      
+      user = await userService.createUser({
+        email,
+        firstName: firstName || (isAdminUser ? 'Admin' : 'User'),
+        lastName: lastName || (isAdminUser ? 'User' : ''),
+        profilePicture: avatar,
+        roles: isAdminUser ? ['admin', 'student'] : ['student'],
+        subscriptionType: isAdminUser ? 'enterprise' : 'free',
+        emailVerified: true,
+      });
+      
+      logger.info('New user created successfully with referral system', { 
+        userId: user.id, 
+        email: user.email 
+      });
+      
+      // Handle referral signup if referral code was provided
+      if (referralCode) {
+        try {
+          await referralService.recordReferralSignup(user.id, referralCode);
+          logger.info('Referral signup recorded for new user', { 
+            userId: user.id, 
+            email: user.email,
+            referralCode 
+          });
+        } catch (referralError) {
+          logger.error('Failed to record referral signup for new user', { 
+            userId: user.id, 
+            referralCode, 
+            error: referralError 
+          });
+          // Don't fail authentication if referral tracking fails
+        }
+      }
+    } else {
+      // Update existing user's profile if needed
+      const updates: any = {};
+      if (avatar && user.profilePicture !== avatar) {
+        updates.profilePicture = avatar;
+      }
+      if (Object.keys(updates).length > 0) {
+        user = await userService.updateUser(user.id, updates) || user;
+        logger.info('Updated existing user profile', { userId: user.id, updates });
+      }
+      
+      logger.info('Existing user signed in via Google OAuth', { 
+        userId: user.id, 
+        email: user.email 
+      });
+    }
     
     logger.info(`Google OAuth user ${isAdminUser ? '(ADMIN)' : '(STUDENT)'}`, { 
       email, 
       roles: user.roles, 
-      subscriptionTier: user.subscriptionTier 
+      subscriptionTier: user.subscriptionPlan || user.subscriptionStatus
     });
 
     const accessToken = jwt.sign(
@@ -215,8 +257,8 @@ export const googleAuth = async (req: Request, res: Response, next: NextFunction
         userId: user.id, 
         email: user.email, 
         roles: user.roles,
-        subscriptionTier: user.subscriptionTier,
-        subscriptionStatus: user.subscriptionStatus,
+        subscriptionTier: user.subscriptionPlan || user.subscriptionStatus || 'free',
+        subscriptionStatus: user.subscriptionStatus || 'active',
         authProvider: 'google'
       }, 
       JWT_SECRET, 

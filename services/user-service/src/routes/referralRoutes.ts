@@ -6,6 +6,8 @@ import {
   getUserPayoutRequests,
   trackReferralClick,
   recordReferralSignup,
+  checkReferralIdAvailability,
+  updateUserReferralId,
   getAdminReferralOverview,
   getAdminReferrers,
   getAdminPayoutRequests,
@@ -15,7 +17,9 @@ import {
   validateReferralCode,
   validateReferralSignup,
   validateProcessPayout,
-  validateCommissionUpdate
+  validateCommissionUpdate,
+  validateReferralIdUpdate,
+  validateReferralIdAvailability
 } from '../controllers/referralController';
 import { authenticate, authorize } from '@cloudmastershub/middleware';
 
@@ -37,6 +41,10 @@ router.get('/earnings', getUserReferralEarnings);
 // Payout management
 router.post('/payouts', validatePayoutRequest, createPayoutRequest);
 router.get('/payouts', getUserPayoutRequests);
+
+// Referral ID management
+router.get('/check-availability/:referralId', validateReferralIdAvailability, checkReferralIdAvailability);
+router.patch('/update-id', validateReferralIdUpdate, updateUserReferralId);
 
 // Admin routes
 router.use(authorize('admin', 'super_admin'));

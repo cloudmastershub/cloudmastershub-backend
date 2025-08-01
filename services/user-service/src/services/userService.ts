@@ -2,6 +2,7 @@ import logger from '../utils/logger';
 import { getUserEventPublisher } from '../events/userEventPublisher';
 import { userRepository, UserRecord, CreateUserInput, UpdateUserInput } from '../database/userRepository';
 import { db } from '../database/connection';
+import { referralService } from './referralService';
 
 // Service layer types (API-facing)
 export interface User {
@@ -132,6 +133,16 @@ export const createUser = async (userData: {
       userId: user.id,
       email: user.email
     });
+
+    // Initialize referral system for new user
+    try {
+      const userType = userData.subscriptionType && userData.subscriptionType !== 'free' ? 'subscribed' : 'normal';
+      await referralService.initializeUserReferral(user.id, userType);
+      logger.info('Referral system initialized for new user', { userId: user.id, userType });
+    } catch (error) {
+      logger.error('Failed to initialize referral system for new user', { userId: user.id, error });
+      // Don't fail user creation if referral initialization fails
+    }
 
     // Publish user created event
     const eventPublisher = getUserEventPublisher();

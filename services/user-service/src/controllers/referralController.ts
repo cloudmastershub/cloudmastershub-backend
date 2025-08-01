@@ -360,6 +360,132 @@ export const processPayoutRequest = async (
 };
 
 /**
+ * Check if a referral ID is available
+ */
+export const checkReferralIdAvailability = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { referralId } = req.params;
+    
+    // Validate referral ID format
+    if (!referralId || referralId.length < 3 || referralId.length > 30) {
+      res.status(400).json({
+        success: false,
+        data: {
+          available: false,
+          message: 'Referral ID must be 3-30 characters long'
+        }
+      });
+      return;
+    }
+
+    if (!/^[a-zA-Z0-9_-]+$/.test(referralId)) {
+      res.status(400).json({
+        success: false,
+        data: {
+          available: false,
+          message: 'Referral ID can only contain letters, numbers, underscores, and hyphens'
+        }
+      });
+      return;
+    }
+
+    const available = await referralService.checkReferralIdAvailability(referralId);
+    
+    res.json({
+      success: true,
+      data: {
+        available,
+        message: available ? 'Referral ID is available' : 'Referral ID is already taken'
+      }
+    });
+  } catch (error) {
+    logger.error('Failed to check referral ID availability', { referralId: req.params.referralId, error });
+    next(error);
+  }
+};
+
+/**
+ * Update user's custom referral ID
+ */
+export const updateUserReferralId = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors.array()
+      });
+      return;
+    }
+
+    const userId = req.user!.id;
+    const { newReferralId } = req.body;
+
+    // Validate referral ID
+    if (!newReferralId || typeof newReferralId !== 'string') {
+      res.status(400).json({
+        success: false,
+        message: 'New referral ID is required'
+      });
+      return;
+    }
+
+    const trimmedId = newReferralId.trim();
+    
+    if (trimmedId.length < 3 || trimmedId.length > 30) {
+      res.status(400).json({
+        success: false,
+        message: 'Referral ID must be 3-30 characters long'
+      });
+      return;
+    }
+
+    if (!/^[a-zA-Z0-9_-]+$/.test(trimmedId)) {
+      res.status(400).json({
+        success: false,
+        message: 'Referral ID can only contain letters, numbers, underscores, and hyphens'
+      });
+      return;
+    }
+
+    const result = await referralService.updateUserReferralId(userId, trimmedId);
+    
+    res.json({
+      success: true,
+      data: {
+        success: true,
+        referralUrl: result.referralUrl,
+        message: 'Referral ID updated successfully'
+      }
+    });
+  } catch (error) {
+    logger.error('Failed to update referral ID', { userId: req.user?.id, error });
+    
+    if (error instanceof Error && error.message.includes('already taken')) {
+      res.status(400).json({
+        success: false,
+        data: {
+          success: false,
+          message: 'This referral ID is already taken'
+        }
+      });
+      return;
+    }
+    
+    next(error);
+  }
+};
+
+/**
  * Admin: Update user commission settings
  */
 export const updateUserCommissionSettings = async (
@@ -427,4 +553,14 @@ export const validateCommissionUpdate = [
   body('recurringCommissionRate').optional().isNumeric().isFloat({ min: 0, max: 100 }).withMessage('Recurring rate must be 0-100'),
   body('paymentModel').optional().isIn(['recurring', 'one-time']).withMessage('Invalid payment model'),
   body('isActive').optional().isBoolean().withMessage('isActive must be boolean')
+];
+
+export const validateReferralIdUpdate = [
+  body('newReferralId').isLength({ min: 3, max: 30 }).withMessage('Referral ID must be 3-30 characters long'),
+  body('newReferralId').matches(/^[a-zA-Z0-9_-]+$/).withMessage('Referral ID can only contain letters, numbers, underscores, and hyphens')
+];
+
+export const validateReferralIdAvailability = [
+  param('referralId').isLength({ min: 3, max: 30 }).withMessage('Referral ID must be 3-30 characters long'),
+  param('referralId').matches(/^[a-zA-Z0-9_-]+$/).withMessage('Referral ID can only contain letters, numbers, underscores, and hyphens')
 ];
