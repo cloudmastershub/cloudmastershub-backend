@@ -217,22 +217,46 @@ export const createCourse = async (
     }
 
     const courseData = req.body;
-    const instructorId = req.headers['x-user-id'] || courseData.instructorId || 'instructor-123';
+    // Get instructor ID from authenticated user (set by authentication middleware)
+    const authReq = req as any; // AuthRequest interface
+    const instructorId = authReq.userId || courseData.instructorId;
+    const instructorEmail = authReq.userEmail || 'instructor@example.com';
 
-    // Create new course
-    const course = new Course({
+    if (!instructorId) {
+      res.status(400).json({
+        success: false,
+        message: 'Instructor ID is required',
+        error: {
+          code: 'INSTRUCTOR_ID_REQUIRED',
+          details: 'Unable to identify instructor from authentication token'
+        }
+      });
+      return;
+    }
+
+    // Prepare course data with defaults
+    const processedCourseData = {
       ...courseData,
       instructor: {
         id: instructorId,
-        name: courseData.instructor?.name || 'Unknown Instructor',
+        name: courseData.instructor?.name || instructorEmail.split('@')[0] || 'Instructor',
         avatar: courseData.instructor?.avatar || 'https://via.placeholder.com/150',
         bio: courseData.instructor?.bio || '',
         expertise: courseData.instructor?.expertise || [],
         rating: courseData.instructor?.rating || 0
       },
       status: CourseStatus.DRAFT,
-      curriculum: courseData.curriculum || []
-    });
+      curriculum: courseData.curriculum || [],
+      // Ensure required fields have defaults
+      thumbnail: courseData.thumbnail || 'https://via.placeholder.com/1280x720',
+      price: courseData.price?.amount || courseData.price || 0,
+      tags: courseData.tags || [],
+      requirements: courseData.requirements || [],
+      objectives: courseData.objectives || []
+    };
+
+    // Create new course
+    const course = new Course(processedCourseData);
 
     const savedCourse = await course.save();
 
@@ -288,7 +312,9 @@ export const updateCourse = async (
   try {
     const { id } = req.params;
     const updates = req.body;
-    const instructorId = req.headers['x-user-id'] || 'instructor-123';
+    // Get instructor ID from authenticated user (set by authentication middleware)
+    const authReq = req as any; // AuthRequest interface
+    const instructorId = authReq.userId;
 
     // Check validation errors
     const errors = validationResult(req);

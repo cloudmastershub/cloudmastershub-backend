@@ -56,8 +56,6 @@ router.get('/courses/:id', async (req: AuthRequest, res: Response, next: NextFun
 // Create new course (requires premium subscription for instructors)
 router.post('/courses', requirePremiumSubscription(), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    // Ensure the instructor field is set to the authenticated user
-    req.body.instructor = req.userId;
     await createCourse(req, res, next);
   } catch (error: any) {
     res.status(500).json({
