@@ -7,7 +7,7 @@ import { getUserEventPublisher } from '../events/userEventPublisher';
 import * as userService from '../services/userService';
 import { referralService } from '../services/referralService';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'secret';
+const JWT_SECRET = process.env.JWT_SECRET || 'cloudmastershub-jwt-secret-2024-production-key';
 const JWT_EXPIRES_IN = '15m';
 const REFRESH_TOKEN_EXPIRES_IN = '30d';
 

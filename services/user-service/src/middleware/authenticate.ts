@@ -28,7 +28,7 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
   console.log('🔐 Auth middleware - Token found, length:', token.length);
 
   try {
-    const jwtSecret = process.env.JWT_SECRET || 'secret';
+    const jwtSecret = process.env.JWT_SECRET || 'cloudmastershub-jwt-secret-2024-production-key';
     console.log('🔐 Auth middleware - JWT_SECRET configured:', !!process.env.JWT_SECRET);
     
     const decoded = jwt.verify(token, jwtSecret) as any;
