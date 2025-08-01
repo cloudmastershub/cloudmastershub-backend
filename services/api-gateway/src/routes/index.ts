@@ -104,15 +104,13 @@ const serviceRoutes = {
       '^/api/instructor': '/instructor'
     }
   },
-  // IMPORTANT: Specific admin routes must come BEFORE general /admin route
-  // to avoid Express.js route precedence issues
-  '/admin/stats': {
-    target: process.env.USER_SERVICE_URL || 'http://user-service:3001',
+  '/admin': {
+    target: process.env.ADMIN_SERVICE_URL || 'http://admin-service:3005',
     changeOrigin: true,
     timeout: 30000,
     proxyTimeout: 30000,
     pathRewrite: {
-      '^/api/admin/stats': '/admin/stats'
+      '^/api/admin': '/admin'
     }
   },
   '/admin/courses': {
@@ -133,19 +131,61 @@ const serviceRoutes = {
       '^/api/admin/instructors': '/admin/instructors'
     }
   },
-  // General admin route (catches remaining admin requests)
-  '/admin': {
-    target: process.env.ADMIN_SERVICE_URL || 'http://admin-service:3005',
+  '/admin/stats': {
+    target: process.env.USER_SERVICE_URL || 'http://user-service:3001',
     changeOrigin: true,
     timeout: 30000,
     proxyTimeout: 30000,
     pathRewrite: {
-      '^/api/admin': '/admin'
+      '^/api/admin/stats': '/admin/stats'
     }
   },
 };
 
+// Handle specific routes first with exact path matching
+// Admin stats route - must go to user-service
+router.use('/admin/stats', createProxyMiddleware({
+  target: process.env.USER_SERVICE_URL || 'http://user-service:3001',
+  changeOrigin: true,
+  timeout: 30000,
+  proxyTimeout: 30000,
+  pathRewrite: {
+    '^/api/admin/stats': '/admin/stats'
+  },
+  secure: false,
+  ws: true,
+  logLevel: 'debug',
+  onError: (err, req, res) => {
+    logger.error(`Proxy error for /admin/stats:`, err);
+    if (!res.headersSent) {
+      res.status(502).json({
+        success: false,
+        error: {
+          message: 'Service temporarily unavailable',
+          service: 'user-service',
+        },
+      });
+    }
+  },
+  onProxyReq: (proxyReq, req, res) => {
+    logger.debug(`Proxying EXACT ${req.method} ${req.originalUrl} to user-service:3001${req.path}`);
+    if (req.body && Object.keys(req.body).length > 0) {
+      const bodyData = JSON.stringify(req.body);
+      proxyReq.setHeader('Content-Type', 'application/json');
+      proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+      proxyReq.write(bodyData);
+    }
+  },
+  onProxyRes: (proxyRes, req, res) => {
+    logger.debug(`Received response ${proxyRes.statusCode} for EXACT ${req.method} ${req.originalUrl}`);
+  },
+}));
+
+// Handle general routes with prefix matching
 Object.entries(serviceRoutes).forEach(([path, config]) => {
+  // Skip admin/stats as it's handled above
+  if (path === '/admin/stats') return;
+  
   router.use(
     path,
     createProxyMiddleware({
