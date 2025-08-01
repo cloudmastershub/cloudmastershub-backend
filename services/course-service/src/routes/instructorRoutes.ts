@@ -8,6 +8,7 @@ import {
 } from '../controllers/courseController';
 import { authenticate, AuthRequest } from '@cloudmastershub/middleware';
 import { requirePremiumSubscription } from '@cloudmastershub/middleware';
+import logger from '../utils/logger';
 
 const router = Router();
 
@@ -54,8 +55,33 @@ router.get('/courses/:id', async (req: AuthRequest, res: Response, next: NextFun
 });
 
 // Create new course (requires premium subscription for instructors)
-router.post('/courses', requirePremiumSubscription(), async (req: AuthRequest, res: Response, next: NextFunction) => {
+// Temporarily modify to bypass subscription check for admin/instructor roles
+router.post('/courses', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
+    // Check if user has admin or instructor role
+    const userRoles = req.userRoles || req.user?.roles || [];
+    const isAdminOrInstructor = userRoles.includes('admin') || userRoles.includes('instructor');
+    
+    logger.info('🎓 Course creation request:', {
+      userId: req.userId,
+      userEmail: req.userEmail,
+      userRoles: userRoles,
+      isAdminOrInstructor,
+      hasUserObject: !!req.user,
+      userObjectRoles: req.user?.roles
+    });
+    
+    // If not admin/instructor, check subscription
+    if (!isAdminOrInstructor) {
+      logger.info('📊 User is not admin/instructor, checking subscription...');
+      // Apply subscription middleware manually
+      return requirePremiumSubscription()(req, res, async () => {
+        await createCourse(req, res, next);
+      });
+    }
+    
+    logger.info('✅ Admin/instructor detected, bypassing subscription check');
+    // Admin/instructor can create courses without subscription check
     await createCourse(req, res, next);
   } catch (error: any) {
     res.status(500).json({
