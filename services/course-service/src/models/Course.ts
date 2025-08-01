@@ -266,7 +266,7 @@ CourseSchema.pre('save', async function(next) {
     next();
   } catch (error) {
     console.error('Error in Course pre-save middleware:', error);
-    next(error);
+    next(error as Error);
   }
 });
 
