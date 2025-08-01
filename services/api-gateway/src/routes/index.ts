@@ -104,13 +104,15 @@ const serviceRoutes = {
       '^/api/instructor': '/instructor'
     }
   },
-  '/admin': {
-    target: process.env.ADMIN_SERVICE_URL || 'http://admin-service:3005',
+  // IMPORTANT: Specific admin routes must come BEFORE general /admin route
+  // to avoid Express.js route precedence issues
+  '/admin/stats': {
+    target: process.env.USER_SERVICE_URL || 'http://user-service:3001',
     changeOrigin: true,
     timeout: 30000,
     proxyTimeout: 30000,
     pathRewrite: {
-      '^/api/admin': '/admin'
+      '^/api/admin/stats': '/admin/stats'
     }
   },
   '/admin/courses': {
@@ -131,13 +133,14 @@ const serviceRoutes = {
       '^/api/admin/instructors': '/admin/instructors'
     }
   },
-  '/admin/stats': {
-    target: process.env.USER_SERVICE_URL || 'http://user-service:3001',
+  // General admin route (catches remaining admin requests)
+  '/admin': {
+    target: process.env.ADMIN_SERVICE_URL || 'http://admin-service:3005',
     changeOrigin: true,
     timeout: 30000,
     proxyTimeout: 30000,
     pathRewrite: {
-      '^/api/admin/stats': '/admin/stats'
+      '^/api/admin': '/admin'
     }
   },
 };
