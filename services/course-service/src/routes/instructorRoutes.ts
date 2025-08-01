@@ -84,13 +84,24 @@ router.post('/courses', async (req: AuthRequest, res: Response, next: NextFuncti
     // Admin/instructor can create courses without subscription check
     await createCourse(req, res, next);
   } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Failed to create course',
-        details: error.message
-      }
+    logger.error('Error in instructor course creation route:', {
+      error: error.message,
+      stack: error.stack,
+      userId: req.userId,
+      body: req.body
     });
+    
+    // Don't override createCourse controller's error response
+    // The createCourse controller handles its own error responses
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to create course',
+          details: error.message
+        }
+      });
+    }
   }
 });
 

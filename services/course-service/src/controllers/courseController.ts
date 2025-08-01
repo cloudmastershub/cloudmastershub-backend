@@ -234,9 +234,15 @@ export const createCourse = async (
       return;
     }
 
-    // Prepare course data with defaults
+    // Prepare course data with defaults and proper structure
     const processedCourseData = {
-      ...courseData,
+      title: courseData.title,
+      description: courseData.description,
+      category: courseData.category,
+      level: courseData.level || DifficultyLevel.BEGINNER,
+      duration: courseData.duration || 0,
+      thumbnail: courseData.thumbnail || 'https://via.placeholder.com/1280x720',
+      preview: courseData.preview || courseData.previewVideo || '',
       instructor: {
         id: instructorId,
         name: courseData.instructor?.name || instructorEmail.split('@')[0] || 'Instructor',
@@ -245,14 +251,14 @@ export const createCourse = async (
         expertise: courseData.instructor?.expertise || [],
         rating: courseData.instructor?.rating || 0
       },
-      status: CourseStatus.DRAFT,
-      curriculum: courseData.curriculum || [],
-      // Ensure required fields have defaults
-      thumbnail: courseData.thumbnail || 'https://via.placeholder.com/1280x720',
       price: courseData.price?.amount || courseData.price || 0,
+      rating: 0,
+      enrollmentCount: 0,
       tags: courseData.tags || [],
       requirements: courseData.requirements || [],
-      objectives: courseData.objectives || []
+      objectives: courseData.objectives || [],
+      curriculum: courseData.curriculum || [],
+      status: CourseStatus.DRAFT
     };
 
     // Create new course
@@ -289,18 +295,77 @@ export const createCourse = async (
     // Handle MongoDB validation errors
     const err = error as any;
     if (err?.name === 'ValidationError') {
+      const validationErrors = err?.errors ? Object.values(err.errors).map((e: any) => e.message) : ['Validation failed'];
+      logger.error('Course validation errors:', validationErrors);
+      
       res.status(400).json({
         success: false,
         message: 'Course validation failed',
         error: {
           code: 'VALIDATION_ERROR',
-          details: err?.errors ? Object.values(err.errors).map((e: any) => e.message) : ['Validation failed']
+          details: validationErrors
         }
       });
       return;
     }
     
-    next(error);
+    // Handle MongoDB duplicate key errors (e.g., duplicate slug)
+    if (err?.code === 11000) {
+      logger.error('Duplicate key error:', err);
+      res.status(400).json({
+        success: false,
+        message: 'Course with this title already exists',
+        error: {
+          code: 'DUPLICATE_COURSE',
+          details: 'A course with a similar title already exists. Please choose a different title.'
+        }
+      });
+      return;
+    }
+    
+    // Handle other database errors
+    if (err?.name === 'MongoServerError' || err?.name === 'MongoError') {
+      logger.error('MongoDB error:', err);
+      res.status(500).json({
+        success: false,
+        message: 'Database error occurred',
+        error: {
+          code: 'DATABASE_ERROR',
+          details: 'Unable to save course to database. Please try again.'
+        }
+      });
+      return;
+    }
+    
+    // Handle connection errors
+    if (err?.name === 'MongooseError' || err?.message?.includes('connection')) {
+      logger.error('Database connection error:', err);
+      res.status(503).json({
+        success: false,
+        message: 'Database connection error',
+        error: {
+          code: 'CONNECTION_ERROR',
+          details: 'Unable to connect to database. Please try again later.'
+        }
+      });
+      return;
+    }
+    
+    // Generic error handling
+    logger.error('Unexpected error creating course:', {
+      message: err?.message,
+      name: err?.name,
+      stack: err?.stack
+    });
+    
+    res.status(500).json({
+      success: false,
+      message: 'An unexpected error occurred while creating the course',
+      error: {
+        code: 'INTERNAL_ERROR',
+        details: process.env.NODE_ENV === 'development' ? err?.message : 'Internal server error'
+      }
+    });
   }
 };
 

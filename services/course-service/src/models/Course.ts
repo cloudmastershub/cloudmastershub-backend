@@ -11,8 +11,8 @@ export interface ICourse extends Omit<Course, 'id'>, Document {
 const InstructorSchema = new Schema({
   id: { type: String, required: true },
   name: { type: String, required: true },
-  avatar: { type: String, required: true },
-  bio: { type: String, required: true },
+  avatar: { type: String, required: false, default: 'https://via.placeholder.com/150' },
+  bio: { type: String, required: false, default: '' },
   expertise: [{ type: String }],
   rating: { type: Number, default: 0, min: 0, max: 5 }
 }, { _id: false });
@@ -233,33 +233,41 @@ CourseSchema.statics.searchCourses = function(searchTerm: string) {
 
 // Pre-save middleware
 CourseSchema.pre('save', async function(next) {
-  // Generate slug from title if not provided
-  if (this.isNew || this.isModified('title')) {
-    const baseSlug = generateSlug(this.title);
+  try {
+    // Generate slug from title if not provided
+    if (this.isNew || this.isModified('title')) {
+      const baseSlug = generateSlug(this.title);
+      
+      // Use mongoose.model to avoid circular reference
+      const CourseModel = mongoose.model<ICourse>('Course');
+      
+      // Check for existing slugs to ensure uniqueness
+      const existingCourses = await CourseModel.find({ 
+        slug: { $regex: `^${baseSlug}(-\\d+)?$` } 
+      }).select('slug');
+      
+      const existingSlugs = existingCourses
+        .filter(course => course._id.toString() !== this._id.toString())
+        .map(course => course.slug);
+      
+      this.slug = generateUniqueSlug(baseSlug, existingSlugs);
+    }
     
-    // Check for existing slugs to ensure uniqueness
-    const existingCourses = await CourseModel.find({ 
-      slug: { $regex: `^${baseSlug}(-\d+)?$` } 
-    }).select('slug');
+    // Auto-publish if status changes to published and no publishedAt date
+    if (this.status === CourseStatus.PUBLISHED && !this.publishedAt) {
+      this.publishedAt = new Date();
+    }
     
-    const existingSlugs = existingCourses
-      .filter(course => course._id.toString() !== this._id.toString())
-      .map(course => course.slug);
+    // Clear publishedAt if status is not published
+    if (this.status !== CourseStatus.PUBLISHED) {
+      this.publishedAt = undefined;
+    }
     
-    this.slug = generateUniqueSlug(baseSlug, existingSlugs);
+    next();
+  } catch (error) {
+    console.error('Error in Course pre-save middleware:', error);
+    next(error);
   }
-  
-  // Auto-publish if status changes to published and no publishedAt date
-  if (this.status === CourseStatus.PUBLISHED && !this.publishedAt) {
-    this.publishedAt = new Date();
-  }
-  
-  // Clear publishedAt if status is not published
-  if (this.status !== CourseStatus.PUBLISHED) {
-    this.publishedAt = undefined;
-  }
-  
-  next();
 });
 
 const CourseModel = mongoose.model<ICourse>('Course', CourseSchema);
