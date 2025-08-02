@@ -18,14 +18,12 @@ export interface AdminUserResponse {
   firstName: string;
   lastName: string;
   roles: string[];
-  subscriptionTier: string;
-  subscriptionStatus: string;
-  authProvider: string;
+  subscription: string;
   emailVerified: boolean;
   avatar?: string;
   createdAt: string;
   updatedAt: string;
-  lastLoginAt?: string;
+  lastLogin?: string;
   isActive: boolean;
 }
 
@@ -43,7 +41,7 @@ export interface AdminCreateUserRequest {
   lastName: string;
   password?: string;
   roles: string[];
-  subscriptionTier: string;
+  subscription: string;
   emailVerified?: boolean;
 }
 
@@ -51,8 +49,7 @@ export interface AdminUpdateUserRequest {
   firstName?: string;
   lastName?: string;
   roles?: string[];
-  subscriptionTier?: string;
-  subscriptionStatus?: string;
+  subscription?: string;
   isActive?: boolean;
   emailVerified?: boolean;
 }
@@ -125,7 +122,7 @@ export const getAdminStats = async (req: AuthenticatedRequest, res: Response): P
             activeUsers: [
               {
                 $match: {
-                  lastLoginAt: {
+                  lastLogin: {
                     $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // Last 30 days
                   }
                 }
@@ -147,7 +144,7 @@ export const getAdminStats = async (req: AuthenticatedRequest, res: Response): P
       User.aggregate([
         {
           $group: {
-            _id: '$subscriptionTier',
+            _id: '$subscription',
             count: { $sum: 1 }
           }
         }
@@ -360,7 +357,7 @@ export const getAdminUsers = async (req: AuthenticatedRequest, res: Response): P
     }
     
     if (subscriptionTier) {
-      filter.subscriptionTier = subscriptionTier;
+      filter.subscription = subscriptionTier;
     }
     
     if (isActive !== '') {
@@ -391,15 +388,13 @@ export const getAdminUsers = async (req: AuthenticatedRequest, res: Response): P
         firstName: user.firstName,
         lastName: user.lastName,
         roles: user.roles,
-        subscriptionTier: user.subscriptionTier,
-        subscriptionStatus: user.subscriptionStatus,
-        authProvider: user.authProvider,
-        emailVerified: user.emailVerified,
+        subscription: user.subscription,
+        emailVerified: user.emailVerified || false,
         avatar: user.avatar,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
-        lastLoginAt: user.lastLoginAt?.toISOString(),
-        isActive: user.isActive
+        lastLogin: user.lastLogin?.toISOString(),
+        isActive: user.isActive ?? true
       })),
       total,
       page: Number(page),
@@ -463,15 +458,13 @@ export const getAdminUser = async (req: AuthenticatedRequest, res: Response): Pr
       firstName: user.firstName,
       lastName: user.lastName,
       roles: user.roles,
-      subscriptionTier: user.subscriptionTier,
-      subscriptionStatus: user.subscriptionStatus,
-      authProvider: user.authProvider,
-      emailVerified: user.emailVerified,
+      subscription: user.subscription,
+      emailVerified: user.emailVerified || false,
       avatar: user.avatar,
       createdAt: user.createdAt.toISOString(),
       updatedAt: user.updatedAt.toISOString(),
-      lastLoginAt: user.lastLoginAt?.toISOString(),
-      isActive: user.isActive
+      lastLogin: user.lastLogin?.toISOString(),
+      isActive: user.isActive ?? true
     };
 
     logger.info('Admin user fetched', {
@@ -535,13 +528,9 @@ export const createAdminUser = async (req: AuthenticatedRequest, res: Response):
       lastName: userData.lastName,
       password: hashedPassword,
       roles: userData.roles || [UserRole.STUDENT],
-      subscriptionTier: userData.subscriptionTier || 'free',
-      subscriptionStatus: 'active',
-      authProvider: hashedPassword ? 'email' : 'admin_created',
+      subscription: userData.subscription || 'free',
       emailVerified: userData.emailVerified || false,
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
+      isActive: true
     });
 
     await user.save();
@@ -552,15 +541,13 @@ export const createAdminUser = async (req: AuthenticatedRequest, res: Response):
       firstName: user.firstName,
       lastName: user.lastName,
       roles: user.roles,
-      subscriptionTier: user.subscriptionTier,
-      subscriptionStatus: user.subscriptionStatus,
-      authProvider: user.authProvider,
-      emailVerified: user.emailVerified,
+      subscription: user.subscription,
+      emailVerified: user.emailVerified || false,
       avatar: user.avatar,
       createdAt: user.createdAt.toISOString(),
       updatedAt: user.updatedAt.toISOString(),
-      lastLoginAt: user.lastLoginAt?.toISOString(),
-      isActive: user.isActive
+      lastLogin: user.lastLogin?.toISOString(),
+      isActive: user.isActive ?? true
     };
 
     logger.info('Admin created new user', {
@@ -609,8 +596,7 @@ export const updateAdminUser = async (req: AuthenticatedRequest, res: Response):
     if (updateData.firstName !== undefined) updateFields.firstName = updateData.firstName;
     if (updateData.lastName !== undefined) updateFields.lastName = updateData.lastName;
     if (updateData.roles !== undefined) updateFields.roles = updateData.roles;
-    if (updateData.subscriptionTier !== undefined) updateFields.subscriptionTier = updateData.subscriptionTier;
-    if (updateData.subscriptionStatus !== undefined) updateFields.subscriptionStatus = updateData.subscriptionStatus;
+    if (updateData.subscription !== undefined) updateFields.subscription = updateData.subscription;
     if (updateData.isActive !== undefined) updateFields.isActive = updateData.isActive;
     if (updateData.emailVerified !== undefined) updateFields.emailVerified = updateData.emailVerified;
     
@@ -636,15 +622,13 @@ export const updateAdminUser = async (req: AuthenticatedRequest, res: Response):
       firstName: user.firstName,
       lastName: user.lastName,
       roles: user.roles,
-      subscriptionTier: user.subscriptionTier,
-      subscriptionStatus: user.subscriptionStatus,
-      authProvider: user.authProvider,
-      emailVerified: user.emailVerified,
+      subscription: user.subscription,
+      emailVerified: user.emailVerified || false,
       avatar: user.avatar,
       createdAt: user.createdAt.toISOString(),
       updatedAt: user.updatedAt.toISOString(),
-      lastLoginAt: user.lastLoginAt?.toISOString(),
-      isActive: user.isActive
+      lastLogin: user.lastLogin?.toISOString(),
+      isActive: user.isActive ?? true
     };
 
     logger.info('Admin updated user', {
