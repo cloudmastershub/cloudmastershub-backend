@@ -58,6 +58,18 @@ router.get('/courses/:id', async (req: AuthRequest, res: Response, next: NextFun
 // Temporarily modify to bypass subscription check for admin/instructor roles
 router.post('/courses', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
+    // Log the incoming request
+    logger.info('📨 Instructor course creation request received:', {
+      method: req.method,
+      url: req.url,
+      headers: {
+        authorization: req.headers.authorization ? 'Bearer ***' : 'none',
+        contentType: req.headers['content-type']
+      },
+      bodyKeys: Object.keys(req.body || {}),
+      body: req.body
+    });
+    
     // Check if user has admin or instructor role
     const userRoles = req.userRoles || req.user?.roles || [];
     const isAdminOrInstructor = userRoles.includes('admin') || userRoles.includes('instructor');

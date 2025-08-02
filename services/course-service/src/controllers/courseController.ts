@@ -307,15 +307,23 @@ export const createCourse = async (
     // Handle MongoDB validation errors
     const err = error as any;
     if (err?.name === 'ValidationError') {
-      const validationErrors = err?.errors ? Object.values(err.errors).map((e: any) => e.message) : ['Validation failed'];
-      logger.error('Course validation errors:', validationErrors);
+      const validationErrors = err?.errors ? Object.values(err.errors).map((e: any) => ({
+        field: e.path,
+        message: e.message,
+        value: e.value
+      })) : ['Validation failed'];
+      
+      logger.error('Course validation errors:', {
+        errors: validationErrors,
+        fullError: err.message
+      });
       
       res.status(400).json({
         success: false,
         message: 'Course validation failed',
         error: {
           code: 'VALIDATION_ERROR',
-          details: validationErrors
+          details: err?.errors ? Object.values(err.errors).map((e: any) => e.message) : [err.message || 'Validation failed']
         }
       });
       return;

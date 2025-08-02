@@ -150,6 +150,7 @@ const CourseSchema = new Schema<ICourse>({
   }
 }, {
   timestamps: true, // This automatically adds createdAt and updatedAt
+  strict: false, // Allow fields not in schema to be saved
   toJSON: { 
     transform: function(doc, ret) {
       ret.id = ret._id;
