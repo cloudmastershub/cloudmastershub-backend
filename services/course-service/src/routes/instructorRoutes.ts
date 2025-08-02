@@ -8,6 +8,7 @@ import {
 } from '../controllers/courseController';
 import { authenticate, AuthRequest } from '@cloudmastershub/middleware';
 import { requirePremiumSubscription } from '@cloudmastershub/middleware';
+import { Course } from '../models';
 import logger from '../utils/logger';
 
 const router = Router();
@@ -42,8 +43,78 @@ router.get('/courses', async (req: AuthRequest, res: Response, next: NextFunctio
 // Get specific course details (instructor must own the course)
 router.get('/courses/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    await getCourseById(req, res, next);
+    const { id } = req.params;
+    const instructorId = req.userId;
+    
+    logger.info('Instructor requesting course details', { 
+      courseId: id, 
+      instructorId: instructorId 
+    });
+    
+    // First check if course exists
+    const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+    let course = null;
+    
+    if (isValidObjectId) {
+      course = await Course.findById(id).select('-__v').lean().maxTimeMS(5000);
+    }
+    
+    if (!course) {
+      course = await Course.findOne({ slug: id }).select('-__v').lean().maxTimeMS(5000);
+    }
+    
+    if (!course) {
+      logger.warn('Course not found for instructor request', { 
+        searchId: id, 
+        instructorId,
+        isValidObjectId 
+      });
+      res.status(404).json({
+        success: false,
+        message: 'Course not found',
+        error: {
+          code: 'COURSE_NOT_FOUND',
+          details: `No course found with ID or slug: ${id}`
+        }
+      });
+      return;
+    }
+    
+    // Check if instructor owns this course
+    if (course.instructor.id !== instructorId) {
+      logger.warn('Instructor attempted to access course they do not own', {
+        courseId: id,
+        courseInstructor: course.instructor.id,
+        requestingInstructor: instructorId
+      });
+      res.status(403).json({
+        success: false,
+        message: 'Access denied',
+        error: {
+          code: 'COURSE_ACCESS_DENIED',
+          details: 'You can only access courses that you have created'
+        }
+      });
+      return;
+    }
+    
+    logger.info('Retrieved instructor course from MongoDB', { 
+      courseId: course._id, 
+      title: course.title,
+      instructorId: course.instructor.id
+    });
+    
+    res.json({
+      success: true,
+      data: course,
+    });
+    
   } catch (error: any) {
+    logger.error('Error fetching instructor course:', {
+      error: error.message,
+      courseId: req.params.id,
+      instructorId: req.userId
+    });
     res.status(500).json({
       success: false,
       error: {
@@ -185,17 +256,29 @@ router.post('/courses/:id/unpublish', async (req: AuthRequest, res: Response, ne
 // Get instructor statistics/analytics (placeholder for now)
 router.get('/stats', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    // This would fetch instructor-specific statistics
-    // For now, return mock data
+    const instructorId = req.userId;
+    
+    // Get real instructor statistics
+    const instructorCourses = await Course.find({ 'instructor.id': instructorId }).lean();
+    const publishedCourses = instructorCourses.filter(c => c.status === 'published');
+    const draftCourses = instructorCourses.filter(c => c.status === 'draft');
+    
     const stats = {
-      totalCourses: 0,
-      totalStudents: 0,
-      totalRevenue: 0,
-      averageRating: 0,
-      coursesPublished: 0,
-      coursesDraft: 0,
-      deploymentVersion: 'v2-with-debugging',
-      timestamp: new Date().toISOString()
+      totalCourses: instructorCourses.length,
+      totalStudents: instructorCourses.reduce((sum, course) => sum + (course.enrollmentCount || 0), 0),
+      totalRevenue: 0, // Would need payment integration
+      averageRating: instructorCourses.length > 0 
+        ? instructorCourses.reduce((sum, course) => sum + (course.rating || 0), 0) / instructorCourses.length
+        : 0,
+      coursesPublished: publishedCourses.length,
+      coursesDraft: draftCourses.length,
+      deploymentVersion: 'v3-with-instructor-validation',
+      timestamp: new Date().toISOString(),
+      // Debug info for troubleshooting
+      debug: {
+        instructorId,
+        sampleCourseIds: instructorCourses.slice(0, 3).map(c => ({ id: c._id, title: c.title }))
+      }
     };
     
     res.json({
@@ -203,6 +286,10 @@ router.get('/stats', async (req: AuthRequest, res: Response, next: NextFunction)
       data: stats
     });
   } catch (error: any) {
+    logger.error('Error fetching instructor stats:', {
+      error: error.message,
+      instructorId: req.userId
+    });
     res.status(500).json({
       success: false,
       error: {
