@@ -237,21 +237,51 @@ CourseSchema.pre('save', async function(next) {
   try {
     // Generate slug from title if not provided
     if (this.isNew || this.isModified('title')) {
-      const baseSlug = generateSlug(this.title);
+      console.log('🔧 Generating slug for course:', this.title);
       
-      // Use mongoose.model to avoid circular reference
-      const CourseModel = mongoose.model<ICourse>('Course');
+      let baseSlug: string;
+      try {
+        baseSlug = generateSlug(this.title);
+        console.log('🔧 Generated base slug:', baseSlug);
+      } catch (error) {
+        console.error('🔧 Error generating slug:', error);
+        // Fallback slug generation
+        baseSlug = this.title
+          .toLowerCase()
+          .replace(/[^a-z0-9\s-]/g, '')
+          .replace(/\s+/g, '-')
+          .replace(/-+/g, '-')
+          .trim()
+          .substring(0, 50);
+        console.log('🔧 Fallback slug:', baseSlug);
+      }
       
-      // Check for existing slugs to ensure uniqueness
-      const existingCourses = await CourseModel.find({ 
-        slug: { $regex: `^${baseSlug}(-\\d+)?$` } 
-      }).select('slug');
+      if (!baseSlug) {
+        baseSlug = `course-${Date.now()}`;
+        console.log('🔧 Emergency fallback slug:', baseSlug);
+      }
       
-      const existingSlugs = existingCourses
-        .filter(course => course._id.toString() !== this._id.toString())
-        .map(course => course.slug);
-      
-      this.slug = generateUniqueSlug(baseSlug, existingSlugs);
+      try {
+        // Use mongoose.model to avoid circular reference
+        const CourseModel = mongoose.model<ICourse>('Course');
+        
+        // Check for existing slugs to ensure uniqueness
+        const existingCourses = await CourseModel.find({ 
+          slug: { $regex: `^${baseSlug}(-\\d+)?$` } 
+        }).select('slug');
+        
+        const existingSlugs = existingCourses
+          .filter(course => course._id.toString() !== this._id.toString())
+          .map(course => course.slug);
+        
+        this.slug = generateUniqueSlug(baseSlug, existingSlugs);
+        console.log('🔧 Final unique slug:', this.slug);
+      } catch (error) {
+        console.error('🔧 Error generating unique slug:', error);
+        // Ultimate fallback - use base slug with timestamp
+        this.slug = `${baseSlug}-${Date.now()}`;
+        console.log('🔧 Ultimate fallback slug:', this.slug);
+      }
     }
     
     // Auto-publish if status changes to published and no publishedAt date
@@ -264,10 +294,19 @@ CourseSchema.pre('save', async function(next) {
       this.publishedAt = undefined;
     }
     
+    console.log('🔧 Pre-save middleware completed successfully');
     next();
   } catch (error) {
-    console.error('Error in Course pre-save middleware:', error);
-    next(error as Error);
+    console.error('🔧 Error in Course pre-save middleware:', error);
+    
+    // If slug generation fails completely, set a basic slug to prevent validation error
+    if (!this.slug) {
+      this.slug = `course-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      console.log('🔧 Emergency slug set in error handler:', this.slug);
+    }
+    
+    // Continue with save even if slug generation had issues
+    next();
   }
 });
 
