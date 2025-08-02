@@ -27,6 +27,14 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
 
     console.log('🔐 Auth middleware - Token found, length:', token.length);
     console.log('🔐 Auth middleware - JWT_SECRET configured:', !!process.env.JWT_SECRET);
+    console.log('🔐 Auth middleware - JWT_SECRET value:', process.env.JWT_SECRET ? 'custom' : 'using fallback');
+    
+    try {
+      // Log first 50 chars of token for debugging
+      console.log('🔐 Auth middleware - Token preview:', token.substring(0, 50) + '...');
+    } catch (e) {
+      // Ignore
+    }
     
     const decoded = verifyToken(token, process.env.JWT_SECRET || 'cloudmastershub-jwt-secret-2024-production-key');
     
@@ -52,9 +60,25 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
   } catch (error) {
     console.error('🔐 Auth middleware - Error:', {
       message: error instanceof Error ? error.message : 'Unknown error',
-      type: error instanceof Error ? error.constructor.name : typeof error
+      type: error instanceof Error ? error.constructor.name : typeof error,
+      url: req.originalUrl || req.url,
+      method: req.method
     });
-    next(new UnauthorizedError('Invalid or expired token'));
+    
+    // More specific error messages
+    if (error instanceof Error) {
+      if (error.message.includes('jwt expired')) {
+        next(new UnauthorizedError('Token has expired'));
+      } else if (error.message.includes('invalid signature')) {
+        next(new UnauthorizedError('Invalid token signature - JWT secret mismatch'));
+      } else if (error.message.includes('jwt malformed')) {
+        next(new UnauthorizedError('Malformed token'));
+      } else {
+        next(new UnauthorizedError(`Invalid token: ${error.message}`));
+      }
+    } else {
+      next(new UnauthorizedError('Invalid or expired token'));
+    }
   }
 };
 
