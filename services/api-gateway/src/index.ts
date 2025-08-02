@@ -26,7 +26,8 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(origin => ori
   'https://www.cloudmastershub.com'
 ];
 
-app.use(cors({
+// Skip CORS for proxied routes, let backend services handle CORS
+const corsMiddleware = cors({
   origin: (origin, callback) => {
     console.log(`🌐 CORS: Request from origin: ${origin || 'NO_ORIGIN'}`);
     console.log(`🌐 CORS: Allowed origins: ${allowedOrigins.join(', ')}`);
@@ -52,7 +53,22 @@ app.use(cors({
   exposedHeaders: ['X-Total-Count', 'X-Page-Count'],
   maxAge: 86400, // 24 hours
   optionsSuccessStatus: 200 // For legacy browser support
-}));
+});
+
+// Apply CORS only to non-proxied routes
+app.use((req, res, next) => {
+  // Skip CORS for proxied routes - let backend services handle CORS
+  const proxiedPaths = ['/api/instructor', '/api/courses', '/api/users', '/api/referrals', '/api/auth', '/api/admin'];
+  const isProxiedRoute = proxiedPaths.some(path => req.path.startsWith(path));
+  
+  if (isProxiedRoute) {
+    console.log(`🌐 CORS: Skipping gateway CORS for proxied route: ${req.path}`);
+    return next();
+  }
+  
+  // Apply CORS for non-proxied routes
+  corsMiddleware(req, res, next);
+});
 
 // Health check endpoint (exclude from rate limiting)
 app.get('/health', (req, res) => {
