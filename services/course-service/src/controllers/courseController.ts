@@ -205,18 +205,20 @@ export const createCourse = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    // Check validation errors
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
+    const courseData = req.body;
+    
+    // Basic validation for required fields
+    if (!courseData.title || !courseData.description || !courseData.category) {
       res.status(400).json({
         success: false,
         message: 'Validation failed',
-        errors: errors.array()
+        error: {
+          code: 'MISSING_REQUIRED_FIELDS',
+          details: 'Title, description, and category are required'
+        }
       });
       return;
     }
-
-    const courseData = req.body;
     // Get instructor ID from authenticated user (set by authentication middleware)
     const authReq = req as any; // AuthRequest interface
     const instructorId = authReq.userId || courseData.instructorId;
@@ -235,7 +237,8 @@ export const createCourse = async (
     }
 
     // Prepare course data with defaults and proper structure
-    const processedCourseData = {
+    // Only include fields that exist in the Course schema
+    const processedCourseData: any = {
       title: courseData.title,
       description: courseData.description,
       category: courseData.category,
@@ -251,15 +254,24 @@ export const createCourse = async (
         expertise: courseData.instructor?.expertise || [],
         rating: courseData.instructor?.rating || 0
       },
-      price: courseData.price?.amount || courseData.price || 0,
+      price: typeof courseData.price === 'object' ? (courseData.price?.amount || 0) : (courseData.price || 0),
       rating: 0,
       enrollmentCount: 0,
       tags: courseData.tags || [],
       requirements: courseData.requirements || [],
       objectives: courseData.objectives || [],
       curriculum: courseData.curriculum || [],
-      status: CourseStatus.DRAFT
+      status: courseData.status || CourseStatus.DRAFT
     };
+    
+    // Log the data being sent to help debug validation issues
+    logger.info('Processing course creation with data:', {
+      originalData: Object.keys(courseData),
+      processedData: Object.keys(processedCourseData),
+      instructorId,
+      title: processedCourseData.title,
+      category: processedCourseData.category
+    });
 
     // Create new course
     const course = new Course(processedCourseData);
@@ -381,16 +393,6 @@ export const updateCourse = async (
     const authReq = req as any; // AuthRequest interface
     const instructorId = authReq.userId;
 
-    // Check validation errors
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: errors.array()
-      });
-      return;
-    }
 
     const course = await Course.findById(id);
 
