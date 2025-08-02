@@ -2,10 +2,59 @@ import { Request, Response } from 'express';
 import logger from '../utils/logger';
 import User, { UserRole } from '../models/User';
 import { ReferralLink } from '../models/Referral';
+import bcrypt from 'bcryptjs';
+import mongoose from 'mongoose';
 
 // Extend Request interface to include userId (from authentication middleware)
 interface AuthenticatedRequest extends Request {
   userId?: string;
+  userRoles?: string[];
+}
+
+// Admin interfaces
+export interface AdminUserResponse {
+  _id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  roles: string[];
+  subscriptionTier: string;
+  subscriptionStatus: string;
+  authProvider: string;
+  emailVerified: boolean;
+  avatar?: string;
+  createdAt: string;
+  updatedAt: string;
+  lastLoginAt?: string;
+  isActive: boolean;
+}
+
+export interface AdminUserListResponse {
+  users: AdminUserResponse[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface AdminCreateUserRequest {
+  email: string;
+  firstName: string;
+  lastName: string;
+  password?: string;
+  roles: string[];
+  subscriptionTier: string;
+  emailVerified?: boolean;
+}
+
+export interface AdminUpdateUserRequest {
+  firstName?: string;
+  lastName?: string;
+  roles?: string[];
+  subscriptionTier?: string;
+  subscriptionStatus?: string;
+  isActive?: boolean;
+  emailVerified?: boolean;
 }
 
 /**
@@ -274,3 +323,414 @@ async function fetchSupportStats(): Promise<{ openSupportTickets: number }> {
     openSupportTickets: 0
   };
 }
+
+// ============================================================================
+// USER MANAGEMENT ENDPOINTS
+// ============================================================================
+
+/**
+ * Get all users with pagination and filtering
+ */
+export const getAdminUsers = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const {
+      page = 1,
+      limit = 20,
+      search = '',
+      role = '',
+      subscriptionTier = '',
+      isActive = '',
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+
+    // Build filter query
+    const filter: any = {};
+    
+    if (search) {
+      filter.$or = [
+        { email: { $regex: search, $options: 'i' } },
+        { firstName: { $regex: search, $options: 'i' } },
+        { lastName: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    if (role) {
+      filter.roles = { $in: [role] };
+    }
+    
+    if (subscriptionTier) {
+      filter.subscriptionTier = subscriptionTier;
+    }
+    
+    if (isActive !== '') {
+      filter.isActive = isActive === 'true';
+    }
+
+    // Build sort object
+    const sort: any = {};
+    sort[sortBy as string] = sortOrder === 'desc' ? -1 : 1;
+
+    // Execute query with pagination
+    const skip = (Number(page) - 1) * Number(limit);
+    
+    const [users, total] = await Promise.all([
+      User.find(filter)
+        .select('-password -__v')
+        .sort(sort)
+        .skip(skip)
+        .limit(Number(limit))
+        .lean(),
+      User.countDocuments(filter)
+    ]);
+
+    const response: AdminUserListResponse = {
+      users: users.map(user => ({
+        _id: user._id.toString(),
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        roles: user.roles,
+        subscriptionTier: user.subscriptionTier,
+        subscriptionStatus: user.subscriptionStatus,
+        authProvider: user.authProvider,
+        emailVerified: user.emailVerified,
+        avatar: user.avatar,
+        createdAt: user.createdAt.toISOString(),
+        updatedAt: user.updatedAt.toISOString(),
+        lastLoginAt: user.lastLoginAt?.toISOString(),
+        isActive: user.isActive
+      })),
+      total,
+      page: Number(page),
+      limit: Number(limit),
+      totalPages: Math.ceil(total / Number(limit))
+    };
+
+    logger.info('Admin users list fetched', {
+      adminId: req.userId,
+      total,
+      page,
+      limit,
+      filters: { role, subscriptionTier, isActive, search }
+    });
+
+    res.json({
+      success: true,
+      data: response
+    });
+  } catch (error) {
+    logger.error('Failed to fetch admin users:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch users',
+      error: {
+        code: 'ADMIN_USERS_FETCH_ERROR',
+        details: process.env.NODE_ENV === 'development' ? error : undefined
+      }
+    });
+  }
+};
+
+/**
+ * Get single user by ID
+ */
+export const getAdminUser = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { userId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid user ID format'
+      });
+      return;
+    }
+
+    const user = await User.findById(userId).select('-password -__v').lean();
+
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+      return;
+    }
+
+    const userResponse: AdminUserResponse = {
+      _id: user._id.toString(),
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      roles: user.roles,
+      subscriptionTier: user.subscriptionTier,
+      subscriptionStatus: user.subscriptionStatus,
+      authProvider: user.authProvider,
+      emailVerified: user.emailVerified,
+      avatar: user.avatar,
+      createdAt: user.createdAt.toISOString(),
+      updatedAt: user.updatedAt.toISOString(),
+      lastLoginAt: user.lastLoginAt?.toISOString(),
+      isActive: user.isActive
+    };
+
+    logger.info('Admin user fetched', {
+      adminId: req.userId,
+      targetUserId: userId
+    });
+
+    res.json({
+      success: true,
+      data: userResponse
+    });
+  } catch (error) {
+    logger.error('Failed to fetch admin user:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch user',
+      error: {
+        code: 'ADMIN_USER_FETCH_ERROR',
+        details: process.env.NODE_ENV === 'development' ? error : undefined
+      }
+    });
+  }
+};
+
+/**
+ * Create new user
+ */
+export const createAdminUser = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userData: AdminCreateUserRequest = req.body;
+
+    // Validate required fields
+    if (!userData.email || !userData.firstName || !userData.lastName) {
+      res.status(400).json({
+        success: false,
+        message: 'Email, first name, and last name are required'
+      });
+      return;
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ email: userData.email });
+    if (existingUser) {
+      res.status(409).json({
+        success: false,
+        message: 'User with this email already exists'
+      });
+      return;
+    }
+
+    // Hash password if provided
+    let hashedPassword;
+    if (userData.password) {
+      hashedPassword = await bcrypt.hash(userData.password, 12);
+    }
+
+    // Create user
+    const user = new User({
+      email: userData.email,
+      firstName: userData.firstName,
+      lastName: userData.lastName,
+      password: hashedPassword,
+      roles: userData.roles || [UserRole.STUDENT],
+      subscriptionTier: userData.subscriptionTier || 'free',
+      subscriptionStatus: 'active',
+      authProvider: hashedPassword ? 'email' : 'admin_created',
+      emailVerified: userData.emailVerified || false,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+
+    await user.save();
+
+    const userResponse: AdminUserResponse = {
+      _id: user._id.toString(),
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      roles: user.roles,
+      subscriptionTier: user.subscriptionTier,
+      subscriptionStatus: user.subscriptionStatus,
+      authProvider: user.authProvider,
+      emailVerified: user.emailVerified,
+      avatar: user.avatar,
+      createdAt: user.createdAt.toISOString(),
+      updatedAt: user.updatedAt.toISOString(),
+      lastLoginAt: user.lastLoginAt?.toISOString(),
+      isActive: user.isActive
+    };
+
+    logger.info('Admin created new user', {
+      adminId: req.userId,
+      newUserId: user._id,
+      email: user.email,
+      roles: user.roles
+    });
+
+    res.status(201).json({
+      success: true,
+      data: userResponse,
+      message: 'User created successfully'
+    });
+  } catch (error) {
+    logger.error('Failed to create admin user:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create user',
+      error: {
+        code: 'ADMIN_USER_CREATE_ERROR',
+        details: process.env.NODE_ENV === 'development' ? error : undefined
+      }
+    });
+  }
+};
+
+/**
+ * Update user
+ */
+export const updateAdminUser = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { userId } = req.params;
+    const updateData: AdminUpdateUserRequest = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid user ID format'
+      });
+      return;
+    }
+
+    // Build update object
+    const updateFields: any = {};
+    if (updateData.firstName !== undefined) updateFields.firstName = updateData.firstName;
+    if (updateData.lastName !== undefined) updateFields.lastName = updateData.lastName;
+    if (updateData.roles !== undefined) updateFields.roles = updateData.roles;
+    if (updateData.subscriptionTier !== undefined) updateFields.subscriptionTier = updateData.subscriptionTier;
+    if (updateData.subscriptionStatus !== undefined) updateFields.subscriptionStatus = updateData.subscriptionStatus;
+    if (updateData.isActive !== undefined) updateFields.isActive = updateData.isActive;
+    if (updateData.emailVerified !== undefined) updateFields.emailVerified = updateData.emailVerified;
+    
+    updateFields.updatedAt = new Date();
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      updateFields,
+      { new: true, runValidators: true }
+    ).select('-password -__v').lean();
+
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+      return;
+    }
+
+    const userResponse: AdminUserResponse = {
+      _id: user._id.toString(),
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      roles: user.roles,
+      subscriptionTier: user.subscriptionTier,
+      subscriptionStatus: user.subscriptionStatus,
+      authProvider: user.authProvider,
+      emailVerified: user.emailVerified,
+      avatar: user.avatar,
+      createdAt: user.createdAt.toISOString(),
+      updatedAt: user.updatedAt.toISOString(),
+      lastLoginAt: user.lastLoginAt?.toISOString(),
+      isActive: user.isActive
+    };
+
+    logger.info('Admin updated user', {
+      adminId: req.userId,
+      targetUserId: userId,
+      updatedFields: Object.keys(updateFields)
+    });
+
+    res.json({
+      success: true,
+      data: userResponse,
+      message: 'User updated successfully'
+    });
+  } catch (error) {
+    logger.error('Failed to update admin user:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update user',
+      error: {
+        code: 'ADMIN_USER_UPDATE_ERROR',
+        details: process.env.NODE_ENV === 'development' ? error : undefined
+      }
+    });
+  }
+};
+
+/**
+ * Delete user (soft delete)
+ */
+export const deleteAdminUser = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { userId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid user ID format'
+      });
+      return;
+    }
+
+    // Prevent self-deletion
+    if (userId === req.userId) {
+      res.status(400).json({
+        success: false,
+        message: 'Cannot delete your own account'
+      });
+      return;
+    }
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { 
+        isActive: false,
+        updatedAt: new Date()
+      },
+      { new: true }
+    ).select('-password -__v');
+
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+      return;
+    }
+
+    logger.info('Admin deleted user', {
+      adminId: req.userId,
+      deletedUserId: userId,
+      deletedUserEmail: user.email
+    });
+
+    res.json({
+      success: true,
+      message: 'User deleted successfully'
+    });
+  } catch (error) {
+    logger.error('Failed to delete admin user:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete user',
+      error: {
+        code: 'ADMIN_USER_DELETE_ERROR',
+        details: process.env.NODE_ENV === 'development' ? error : undefined
+      }
+    });
+  }
+};

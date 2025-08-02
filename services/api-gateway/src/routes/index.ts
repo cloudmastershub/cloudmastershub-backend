@@ -113,15 +113,7 @@ const serviceRoutes = {
       '^/api/instructor': '/instructor'
     }
   },
-  '/admin': {
-    target: process.env.ADMIN_SERVICE_URL || 'http://admin-service:3005',
-    changeOrigin: true,
-    timeout: 30000,
-    proxyTimeout: 30000,
-    pathRewrite: {
-      '^/api/admin': '/admin'
-    }
-  },
+  // Admin routes - order matters (most specific first)
   '/admin/courses': {
     target: process.env.COURSE_SERVICE_URL || 'http://course-service:3002',
     changeOrigin: true,
@@ -131,13 +123,13 @@ const serviceRoutes = {
       '^/api/admin/courses': '/admin/courses'
     }
   },
-  '/admin/instructors': {
-    target: process.env.ADMIN_SERVICE_URL || 'http://admin-service:3005',
+  '/admin/users': {
+    target: process.env.USER_SERVICE_URL || 'http://user-service:3001',
     changeOrigin: true,
     timeout: 30000,
     proxyTimeout: 30000,
     pathRewrite: {
-      '^/api/admin/instructors': '/admin/instructors'
+      '^/api/admin/users': '/admin/users'
     }
   },
   '/admin/stats': {
@@ -147,6 +139,42 @@ const serviceRoutes = {
     proxyTimeout: 30000,
     pathRewrite: {
       '^/api/admin/stats': '/admin/stats'
+    }
+  },
+  '/admin/analytics': {
+    target: process.env.ADMIN_SERVICE_URL || 'http://admin-service:3005',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/admin/analytics': '/admin/analytics'
+    }
+  },
+  '/admin/settings': {
+    target: process.env.ADMIN_SERVICE_URL || 'http://admin-service:3005',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/admin/settings': '/admin/settings'
+    }
+  },
+  '/admin/security': {
+    target: process.env.ADMIN_SERVICE_URL || 'http://admin-service:3005',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/admin/security': '/admin/security'
+    }
+  },
+  '/admin': {
+    target: process.env.ADMIN_SERVICE_URL || 'http://admin-service:3005',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/admin': '/admin'
     }
   },
 };
@@ -190,10 +218,86 @@ router.use('/admin/stats', createProxyMiddleware({
   },
 }));
 
+// Admin users route - must go to user-service
+router.use('/admin/users', createProxyMiddleware({
+  target: process.env.USER_SERVICE_URL || 'http://user-service:3001',
+  changeOrigin: true,
+  timeout: 30000,
+  proxyTimeout: 30000,
+  pathRewrite: {
+    '^/api/admin/users': '/admin/users'
+  },
+  secure: false,
+  ws: true,
+  logLevel: 'debug',
+  onError: (err, req, res) => {
+    logger.error(`Proxy error for /admin/users:`, err);
+    if (!res.headersSent) {
+      res.status(502).json({
+        success: false,
+        error: {
+          message: 'Service temporarily unavailable',
+          service: 'user-service',
+        },
+      });
+    }
+  },
+  onProxyReq: (proxyReq, req, res) => {
+    logger.debug(`Proxying EXACT ${req.method} ${req.originalUrl} to user-service:3001${req.path}`);
+    if (req.body && Object.keys(req.body).length > 0) {
+      const bodyData = JSON.stringify(req.body);
+      proxyReq.setHeader('Content-Type', 'application/json');
+      proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+      proxyReq.write(bodyData);
+    }
+  },
+  onProxyRes: (proxyRes, req, res) => {
+    logger.debug(`Received response ${proxyRes.statusCode} for EXACT ${req.method} ${req.originalUrl}`);
+  },
+}));
+
+// Admin courses route - must go to course-service
+router.use('/admin/courses', createProxyMiddleware({
+  target: process.env.COURSE_SERVICE_URL || 'http://course-service:3002',
+  changeOrigin: true,
+  timeout: 30000,
+  proxyTimeout: 30000,
+  pathRewrite: {
+    '^/api/admin/courses': '/admin/courses'
+  },
+  secure: false,
+  ws: true,
+  logLevel: 'debug',
+  onError: (err, req, res) => {
+    logger.error(`Proxy error for /admin/courses:`, err);
+    if (!res.headersSent) {
+      res.status(502).json({
+        success: false,
+        error: {
+          message: 'Service temporarily unavailable',
+          service: 'course-service',
+        },
+      });
+    }
+  },
+  onProxyReq: (proxyReq, req, res) => {
+    logger.debug(`Proxying EXACT ${req.method} ${req.originalUrl} to course-service:3002${req.path}`);
+    if (req.body && Object.keys(req.body).length > 0) {
+      const bodyData = JSON.stringify(req.body);
+      proxyReq.setHeader('Content-Type', 'application/json');
+      proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+      proxyReq.write(bodyData);
+    }
+  },
+  onProxyRes: (proxyRes, req, res) => {
+    logger.debug(`Received response ${proxyRes.statusCode} for EXACT ${req.method} ${req.originalUrl}`);
+  },
+}));
+
 // Handle general routes with prefix matching
 Object.entries(serviceRoutes).forEach(([path, config]) => {
-  // Skip admin/stats as it's handled above
-  if (path === '/admin/stats') return;
+  // Skip specific admin routes as they're handled above
+  if (['/admin/stats', '/admin/users', '/admin/courses'].includes(path)) return;
   
   router.use(
     path,
