@@ -193,7 +193,9 @@ router.get('/stats', async (req: AuthRequest, res: Response, next: NextFunction)
       totalRevenue: 0,
       averageRating: 0,
       coursesPublished: 0,
-      coursesDraft: 0
+      coursesDraft: 0,
+      deploymentVersion: 'v2-with-debugging',
+      timestamp: new Date().toISOString()
     };
     
     res.json({
