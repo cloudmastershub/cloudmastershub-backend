@@ -108,6 +108,25 @@ const courseEventSchemas: Record<string, EventSchema> = {
       },
     },
   },
+  'course.updated': {
+    type: 'course.updated',
+    requiredFields: [...baseEventSchema.requiredFields, 'courseId'],
+    optionalFields: [...(baseEventSchema.optionalFields || []), 'instructorId'],
+    dataSchema: {
+      requiredFields: [],
+      optionalFields: ['title', 'description', 'category', 'difficulty', 'duration', 'price', 'status', 'previousStatus'],
+      fieldTypes: {
+        title: 'string',
+        description: 'string',
+        category: 'string',
+        difficulty: 'string',
+        duration: 'number',
+        price: 'number',
+        status: 'string',
+        previousStatus: 'string',
+      },
+    },
+  },
   'course.enrolled': {
     type: 'course.enrolled',
     requiredFields: [...baseEventSchema.requiredFields, 'courseId', 'userId'],
