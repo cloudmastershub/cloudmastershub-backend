@@ -8,6 +8,7 @@ import adminRoutes from './routes/adminRoutes';
 import lessonRoutes from './routes/lessonRoutes';
 import progressRoutes from './routes/progressRoutes';
 import learningPathRoutes from './routes/learningPathRoutes';
+import curriculumRoutes from './routes/curriculumRoutes';
 import { errorHandler } from './middleware/errorHandler';
 import { initializeCoursePaymentEventSubscriber } from './events/paymentEventSubscriber';
 import DatabaseConnection from './database/connection';
@@ -74,6 +75,7 @@ app.use('/admin', adminRoutes);
 app.use('/courses/:courseId/lessons', lessonRoutes);
 app.use('/progress', progressRoutes);
 app.use('/paths', learningPathRoutes);
+app.use('/curriculum', curriculumRoutes);
 
 app.use(errorHandler);
 
