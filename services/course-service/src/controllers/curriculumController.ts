@@ -704,7 +704,7 @@ export const updateCurriculum = async (
     const eventPublisher = getCourseEventPublisher();
     await eventPublisher.publishCourseUpdated(
       courseId, 
-      { curriculum: course.curriculum }, 
+      { duration: course.duration }, 
       instructorId.toString()
     );
 

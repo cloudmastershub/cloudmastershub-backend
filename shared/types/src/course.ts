@@ -60,6 +60,7 @@ export interface Section {
   description?: string;
   order: number;
   lessons: Lesson[];
+  duration: number; // minutes - calculated from lessons
 }
 
 export interface Lesson {
