@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { validationResult } from 'express-validator';
+import { isValidObjectId } from 'mongoose';
 import logger from '../utils/logger';
 import { getCourseEventPublisher } from '../events/courseEventPublisher';
 import { Course, CourseProgress } from '../models';
@@ -188,7 +189,7 @@ export const getCourseById = async (
         courseId: course._id, 
         title: course.title,
         slug: course.slug || 'no-slug',
-        searchedBy: isValidObjectId ? 'ObjectId' : 'slug'
+        searchedBy: isValidObjectId(slug) ? 'ObjectId' : 'slug'
       });
 
       res.json({
@@ -198,7 +199,7 @@ export const getCourseById = async (
     } catch (dbError: any) {
       logger.error('MongoDB query error:', { 
         error: dbError.message, 
-        searchId: id,
+        searchId: slug,
         stack: dbError.stack 
       });
       
@@ -511,21 +512,21 @@ export const updateCourse = async (
     const updatedCourse = await course.save();
 
     logger.info(`Updated course: ${updatedCourse.title}`, {
-      courseId: id,
+      courseId: updatedCourse._id,
       instructorId,
       changes: Object.keys(updates)
     });
 
     // Publish course updated event
     const eventPublisher = getCourseEventPublisher();
-    await eventPublisher.publishCourseUpdated(id, updates, instructorId.toString());
+    await eventPublisher.publishCourseUpdated(updatedCourse._id.toString(), updates, instructorId.toString());
 
     // Check if status was changed
     if (oldStatus !== updatedCourse.status) {
       if (updatedCourse.status === CourseStatus.PUBLISHED) {
-        await eventPublisher.publishCoursePublished(id, instructorId.toString());
+        await eventPublisher.publishCoursePublished(updatedCourse._id.toString(), instructorId.toString());
       } else if (oldStatus === CourseStatus.PUBLISHED) {
-        await eventPublisher.publishCourseUnpublished(id, instructorId.toString(), updates.reason || 'Course unpublished');
+        await eventPublisher.publishCourseUnpublished(updatedCourse._id.toString(), instructorId.toString(), updates.reason || 'Course unpublished');
       }
     }
 
@@ -742,7 +743,7 @@ export const enrollInCourse = async (
     // Check if user is already enrolled
     const existingProgress = await CourseProgress.findOne({ 
       userId, 
-      courseId: id 
+      courseId: course._id.toString() 
     });
 
     if (existingProgress) {
@@ -760,7 +761,7 @@ export const enrollInCourse = async (
     // Create course progress record
     const courseProgress = new CourseProgress({
       userId,
-      courseId: id,
+      courseId: course._id.toString(),
       enrolledAt: new Date(),
       progress: 0,
       lastAccessedAt: new Date(),
@@ -775,19 +776,19 @@ export const enrollInCourse = async (
     await course.save();
 
     logger.info(`User ${userId} enrolled in course: ${course.title}`, {
-      courseId: id,
+      courseId: course._id.toString(),
       enrollmentType
     });
 
     // Publish course enrolled event
     const eventPublisher = getCourseEventPublisher();
-    await eventPublisher.publishCourseEnrolled(id, userId, enrollmentType);
+    await eventPublisher.publishCourseEnrolled(course._id.toString(), userId, enrollmentType);
 
     res.json({
       success: true,
       data: {
         enrollmentId: courseProgress._id,
-        courseId: id,
+        courseId: course._id.toString(),
         userId,
         enrollmentType,
         enrolledAt: courseProgress.enrolledAt,
