@@ -9,13 +9,13 @@ import {
   getSecurityAnalytics,
   runSecurityScan
 } from '../controllers/securityController';
-import { adminAuth } from '../middleware/adminAuth';
-import { validateRequest } from '../middleware/validation';
+import { requireAdmin } from '../middleware/adminAuth';
+import { handleValidationErrors } from '../middleware/validation';
 
 const router = Router();
 
 // Apply admin authentication to all security routes
-router.use(adminAuth);
+router.use(requireAdmin);
 
 /**
  * @route   GET /admin/security/overview
