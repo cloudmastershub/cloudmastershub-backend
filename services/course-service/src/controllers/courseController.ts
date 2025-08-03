@@ -4,6 +4,7 @@ import logger from '../utils/logger';
 import { getCourseEventPublisher } from '../events/courseEventPublisher';
 import { Course, CourseProgress } from '../models';
 import { CourseCategory, DifficultyLevel, CourseStatus } from '@cloudmastershub/types';
+import { isValidSlug, isLegacyId } from '../utils/slugValidation';
 
 export const getAllCourses = async (
   req: Request,
@@ -132,34 +133,52 @@ export const getCourseById = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { id } = req.params;
+    const { id: slug } = req.params;
 
-    logger.info('Fetching course by ID/slug from MongoDB', { id });
+    // Validate slug format before proceeding
+    if (!isValidSlug(slug)) {
+      if (isLegacyId(slug)) {
+        logger.warn('Legacy ID usage detected in getCourseById', { legacyId: slug });
+        res.status(410).json({
+          success: false,
+          message: 'Legacy course identifiers are no longer supported',
+          error: {
+            code: 'LEGACY_ID_NOT_SUPPORTED',
+            details: 'Please use the course slug (e.g., "aws-fundamentals") instead of legacy IDs',
+            legacyId: slug,
+            migrationRequired: true
+          }
+        });
+        return;
+      }
+      
+      res.status(400).json({
+        success: false,
+        message: 'Invalid course identifier format',
+        error: {
+          code: 'INVALID_SLUG_FORMAT',
+          details: 'Course identifiers must be lowercase, alphanumeric with hyphens (e.g., "aws-fundamentals")',
+          provided: slug,
+          expectedFormat: 'lowercase-slug-format'
+        }
+      });
+      return;
+    }
+
+    logger.info('Fetching course by slug from MongoDB', { slug });
 
     try {
-      let course = null;
-      
-      // First, check if it's a valid MongoDB ObjectId
-      const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(id);
-      
-      if (isValidObjectId) {
-        // Try to find by MongoDB ObjectId first
-        course = await Course.findById(id).select('-__v').lean().maxTimeMS(5000);
-      }
+      // Only look up by slug - no legacy ID support
+      const course = await Course.findOne({ slug }).select('-__v').lean().maxTimeMS(5000);
       
       if (!course) {
-        // If not found by ID or not a valid ObjectId, try by slug
-        course = await Course.findOne({ slug: id }).select('-__v').lean().maxTimeMS(5000);
-      }
-      
-      if (!course) {
-        logger.warn('Course not found', { searchId: id, isValidObjectId });
+        logger.warn('Course not found', { slug });
         res.status(404).json({
           success: false,
           message: 'Course not found',
           error: {
             code: 'COURSE_NOT_FOUND',
-            details: `No course found with ID or slug: ${id}`
+            details: `No course found with slug: ${slug}`
           }
         });
         return;
@@ -421,14 +440,39 @@ export const updateCourse = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { id } = req.params;
+    const { id: slug } = req.params;
     const updates = req.body;
+    
+    // Validate slug format
+    if (!isValidSlug(slug)) {
+      if (isLegacyId(slug)) {
+        res.status(410).json({
+          success: false,
+          message: 'Legacy course identifiers are no longer supported',
+          error: {
+            code: 'LEGACY_ID_NOT_SUPPORTED',
+            details: 'Please use the course slug instead of legacy IDs'
+          }
+        });
+        return;
+      }
+      
+      res.status(400).json({
+        success: false,
+        message: 'Invalid course identifier format',
+        error: {
+          code: 'INVALID_SLUG_FORMAT',
+          details: 'Course identifiers must be lowercase, alphanumeric with hyphens'
+        }
+      });
+      return;
+    }
+    
     // Get instructor ID from authenticated user (set by authentication middleware)
     const authReq = req as any; // AuthRequest interface
     const instructorId = authReq.userId;
 
-
-    const course = await Course.findById(id);
+    const course = await Course.findOne({ slug });
 
     if (!course) {
       res.status(404).json({
@@ -436,7 +480,7 @@ export const updateCourse = async (
         message: 'Course not found',
         error: {
           code: 'COURSE_NOT_FOUND',
-          details: `No course found with ID: ${id}`
+          details: `No course found with slug: ${slug}`
         }
       });
       return;
@@ -528,11 +572,34 @@ export const deleteCourse = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { id } = req.params;
+    const { id: slug } = req.params;
     const instructorId = req.headers['x-user-id'] || 'instructor-123';
     const reason = req.body.reason || 'Course deletion requested';
 
-    const course = await Course.findById(id);
+    // Validate slug format
+    if (!isValidSlug(slug)) {
+      if (isLegacyId(slug)) {
+        res.status(410).json({
+          success: false,
+          message: 'Legacy course identifiers are no longer supported',
+          error: {
+            code: 'LEGACY_ID_NOT_SUPPORTED'
+          }
+        });
+        return;
+      }
+      
+      res.status(400).json({
+        success: false,
+        message: 'Invalid course identifier format',
+        error: {
+          code: 'INVALID_SLUG_FORMAT'
+        }
+      });
+      return;
+    }
+
+    const course = await Course.findOne({ slug });
 
     if (!course) {
       res.status(404).json({
@@ -540,7 +607,7 @@ export const deleteCourse = async (
         message: 'Course not found',
         error: {
           code: 'COURSE_NOT_FOUND',
-          details: `No course found with ID: ${id}`
+          details: `No course found with slug: ${slug}`
         }
       });
       return;
@@ -560,20 +627,21 @@ export const deleteCourse = async (
     }
 
     // Delete associated progress records
-    await CourseProgress.deleteMany({ courseId: id });
+    await CourseProgress.deleteMany({ courseId: slug });
 
     // Delete the course
-    await Course.findByIdAndDelete(id);
+    await Course.findOneAndDelete({ slug });
 
     logger.info(`Deleted course: ${course.title}`, {
-      courseId: id,
+      courseSlug: slug,
+      courseId: course._id.toString(),
       instructorId,
       reason
     });
 
     // Publish course deleted event
     const eventPublisher = getCourseEventPublisher();
-    await eventPublisher.publishCourseDeleted(id, instructorId.toString(), reason);
+    await eventPublisher.publishCourseDeleted(course._id.toString(), instructorId.toString(), reason);
 
     res.json({
       success: true,
@@ -605,9 +673,32 @@ export const enrollInCourse = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { id } = req.params;
+    const { id: slug } = req.params;
     const userId = req.headers['x-user-id'] || req.body.userId;
     const { enrollmentType = 'free' } = req.body;
+
+    // Validate slug format
+    if (!isValidSlug(slug)) {
+      if (isLegacyId(slug)) {
+        res.status(410).json({
+          success: false,
+          message: 'Legacy course identifiers are no longer supported',
+          error: {
+            code: 'LEGACY_ID_NOT_SUPPORTED'
+          }
+        });
+        return;
+      }
+      
+      res.status(400).json({
+        success: false,
+        message: 'Invalid course identifier format',
+        error: {
+          code: 'INVALID_SLUG_FORMAT'
+        }
+      });
+      return;
+    }
 
     if (!userId) {
       res.status(400).json({
@@ -622,14 +713,14 @@ export const enrollInCourse = async (
     }
 
     // Check if course exists
-    const course = await Course.findById(id);
+    const course = await Course.findOne({ slug });
     if (!course) {
       res.status(404).json({
         success: false,
         message: 'Course not found',
         error: {
           code: 'COURSE_NOT_FOUND',
-          details: `No course found with ID: ${id}`
+          details: `No course found with slug: ${slug}`
         }
       });
       return;

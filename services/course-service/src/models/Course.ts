@@ -153,7 +153,9 @@ const CourseSchema = new Schema<ICourse>({
   strict: false, // Allow fields not in schema to be saved
   toJSON: { 
     transform: function(doc, ret) {
-      ret.id = ret._id;
+      // Use slug as the public ID instead of MongoDB ObjectId
+      ret.id = ret.slug;
+      ret.courseId = ret.slug; // For backward compatibility with existing APIs
       delete ret._id;
       delete ret.__v;
       return ret;
@@ -161,7 +163,9 @@ const CourseSchema = new Schema<ICourse>({
   },
   toObject: { 
     transform: function(doc, ret) {
-      ret.id = ret._id;
+      // Use slug as the public ID instead of MongoDB ObjectId
+      ret.id = ret.slug;
+      ret.courseId = ret.slug; // For backward compatibility with existing APIs
       delete ret._id;
       delete ret.__v;
       return ret;
