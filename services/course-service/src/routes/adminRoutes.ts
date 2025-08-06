@@ -86,7 +86,17 @@ router.put('/courses/:id/instructor', async (req: AuthRequest, res: Response, ne
       return;
     }
 
-    const course = await Course.findById(id);
+    // Support both ObjectId and slug lookup like main course controller
+    let course = null;
+    const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+    
+    if (isValidObjectId) {
+      course = await Course.findById(id);
+    }
+    
+    if (!course) {
+      course = await Course.findOne({ slug: id });
+    }
 
     if (!course) {
       res.status(404).json({
@@ -94,7 +104,7 @@ router.put('/courses/:id/instructor', async (req: AuthRequest, res: Response, ne
         message: 'Course not found',
         error: {
           code: 'COURSE_NOT_FOUND',
-          details: `No course found with ID: ${id}`
+          details: `No course found with ID or slug: ${id}`
         }
       });
       return;
