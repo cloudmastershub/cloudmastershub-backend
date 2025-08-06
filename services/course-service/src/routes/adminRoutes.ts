@@ -16,49 +16,85 @@ router.use(authenticate);
 router.use(authorize('admin', 'super_admin'));
 
 /**
- * Get all courses in the system (admin view)
- * Admins can see all courses regardless of instructor or status
+ * Clean up seeded courses (admin only)
+ * Removes courses created by seed scripts to comply with no mock data policy
+ * MOST SPECIFIC ROUTE - Must come before /courses/:id
  */
-router.get('/courses', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.delete('/courses/cleanup-seeded', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    // Remove instructor filter and status filter for admin view
-    const originalQuery = { ...req.query };
-    
-    // Allow admins to see all courses including drafts
-    // Set status to 'all' to override the default PUBLISHED filter
-    if (!req.query.status) {
-      req.query.status = 'all'; // Override default PUBLISHED filter
-    }
-    
-    // Don't filter by instructor - show all courses
-    delete req.query.instructor;
-    
-    await getAllCourses(req, res, next);
-  } catch (error: any) {
-    logger.error('Admin: Failed to fetch all courses', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Failed to fetch courses',
-        details: error.message
-      }
-    });
-  }
-});
+    logger.info('Admin requesting seeded course cleanup', { adminId: req.userId });
 
-/**
- * Get course details (admin view)
- * Admins can view any course regardless of instructor
- */
-router.get('/courses/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    await getCourseById(req, res, next);
+    // Define patterns to identify seeded courses
+    const seededInstructorIds = [
+      'instructor-1', 'instructor-2', 'instructor-3', 'instructor-4', 'instructor-5',
+      'instructor-aws-101', 'instructor-azure-201', 'instructor-gcp-301',
+      'instructor-multicloud-401', 'instructor-k8s-301'
+    ];
+
+    const seededInstructorNames = [
+      'Jane Smith', 'John Doe', 'Sarah Wilson', 'Mike Chen', 'Dr. Emily Rodriguez'
+    ];
+
+    // Find seeded courses
+    const seededCourses = await Course.find({
+      $or: [
+        { 'instructor.id': { $in: seededInstructorIds } },
+        { 'instructor.name': { $in: seededInstructorNames } }
+      ]
+    });
+
+    if (seededCourses.length === 0) {
+      res.json({
+        success: true,
+        data: {
+          removedCourses: [],
+          totalRemoved: 0
+        },
+        message: 'No seeded courses found to clean up'
+      });
+      return;
+    }
+
+    // Log courses being removed
+    logger.info(`Removing ${seededCourses.length} seeded courses:`, {
+      courses: seededCourses.map(c => ({ id: c._id, title: c.title, instructor: c.instructor.id }))
+    });
+
+    // Remove seeded courses
+    const result = await Course.deleteMany({
+      $or: [
+        { 'instructor.id': { $in: seededInstructorIds } },
+        { 'instructor.name': { $in: seededInstructorNames } }
+      ]
+    });
+
+    const removedCourses = seededCourses.map(c => ({
+      id: c._id,
+      title: c.title,
+      instructor: c.instructor.name,
+      instructorId: c.instructor.id
+    }));
+
+    logger.info(`Successfully removed ${result.deletedCount} seeded courses`, {
+      adminId: req.userId,
+      removedCount: result.deletedCount
+    });
+
+    res.json({
+      success: true,
+      data: {
+        removedCourses,
+        totalRemoved: result.deletedCount
+      },
+      message: `Successfully removed ${result.deletedCount} seeded courses`
+    });
+
   } catch (error: any) {
-    logger.error('Admin: Failed to fetch course details', error);
+    logger.error('Failed to cleanup seeded courses:', error);
     res.status(500).json({
       success: false,
       error: {
-        message: 'Failed to fetch course details',
+        message: 'Failed to cleanup seeded courses',
         details: error.message
       }
     });
@@ -68,9 +104,15 @@ router.get('/courses/:id', async (req: AuthRequest, res: Response, next: NextFun
 /**
  * Update course instructor assignment
  * Allows admins to assign/reassign instructors to any course
+ * SPECIFIC ROUTE - Must come before general /courses/:id
  */
 router.put('/courses/:id/instructor', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
+    logger.info(`Admin instructor assignment request for course: ${req.params.id}`, { 
+      adminId: req.userId,
+      body: req.body 
+    });
+
     const { id } = req.params;
     const { instructorId, instructorName, instructorAvatar, instructorBio, instructorExpertise } = req.body;
 
@@ -155,6 +197,64 @@ router.put('/courses/:id/instructor', async (req: AuthRequest, res: Response, ne
       success: false,
       error: {
         message: 'Failed to assign instructor',
+        details: error.message
+      }
+    });
+  }
+});
+
+/**
+ * Get all courses in the system (admin view)
+ * Admins can see all courses regardless of instructor or status
+ */
+router.get('/courses', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    logger.info('Admin requesting all courses', { 
+      adminId: req.userId,
+      queryParams: req.query 
+    });
+
+    // Remove instructor filter and status filter for admin view
+    const originalQuery = { ...req.query };
+    
+    // Force status to 'all' to show drafts, published, and archived courses
+    req.query.status = 'all';
+    
+    // Don't filter by instructor - show all courses
+    delete req.query.instructor;
+    
+    logger.info('Admin courses query processed', { 
+      originalQuery,
+      modifiedQuery: req.query,
+      statusOverride: 'all'
+    });
+    
+    await getAllCourses(req, res, next);
+  } catch (error: any) {
+    logger.error('Admin: Failed to fetch all courses', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to fetch courses',
+        details: error.message
+      }
+    });
+  }
+});
+
+/**
+ * Get course details (admin view)
+ * Admins can view any course regardless of instructor
+ */
+router.get('/courses/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    await getCourseById(req, res, next);
+  } catch (error: any) {
+    logger.error('Admin: Failed to fetch course details', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to fetch course details',
         details: error.message
       }
     });
@@ -993,89 +1093,5 @@ router.get('/stats', async (req: AuthRequest, res: Response, next: NextFunction)
   }
 });
 
-/**
- * Clean up seeded courses (admin only)
- * Removes courses created by seed scripts to comply with no mock data policy
- */
-router.delete('/courses/cleanup-seeded', async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    logger.info('Admin requesting seeded course cleanup', { adminId: req.userId });
-
-    // Define patterns to identify seeded courses
-    const seededInstructorIds = [
-      'instructor-1', 'instructor-2', 'instructor-3', 'instructor-4', 'instructor-5',
-      'instructor-aws-101', 'instructor-azure-201', 'instructor-gcp-301',
-      'instructor-multicloud-401', 'instructor-k8s-301'
-    ];
-
-    const seededInstructorNames = [
-      'Jane Smith', 'John Doe', 'Sarah Wilson', 'Mike Chen', 'Dr. Emily Rodriguez'
-    ];
-
-    // Find seeded courses
-    const seededCourses = await Course.find({
-      $or: [
-        { 'instructor.id': { $in: seededInstructorIds } },
-        { 'instructor.name': { $in: seededInstructorNames } }
-      ]
-    });
-
-    if (seededCourses.length === 0) {
-      res.json({
-        success: true,
-        data: {
-          removedCourses: [],
-          totalRemoved: 0
-        },
-        message: 'No seeded courses found to clean up'
-      });
-      return;
-    }
-
-    // Log courses being removed
-    logger.info(`Removing ${seededCourses.length} seeded courses:`, {
-      courses: seededCourses.map(c => ({ id: c._id, title: c.title, instructor: c.instructor.id }))
-    });
-
-    // Remove seeded courses
-    const result = await Course.deleteMany({
-      $or: [
-        { 'instructor.id': { $in: seededInstructorIds } },
-        { 'instructor.name': { $in: seededInstructorNames } }
-      ]
-    });
-
-    const removedCourses = seededCourses.map(c => ({
-      id: c._id,
-      title: c.title,
-      instructor: c.instructor.name,
-      instructorId: c.instructor.id
-    }));
-
-    logger.info(`Successfully removed ${result.deletedCount} seeded courses`, {
-      adminId: req.userId,
-      removedCount: result.deletedCount
-    });
-
-    res.json({
-      success: true,
-      data: {
-        removedCourses,
-        totalRemoved: result.deletedCount
-      },
-      message: `Successfully removed ${result.deletedCount} seeded courses`
-    });
-
-  } catch (error: any) {
-    logger.error('Failed to cleanup seeded courses:', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Failed to cleanup seeded courses',
-        details: error.message
-      }
-    });
-  }
-});
 
 export default router;
