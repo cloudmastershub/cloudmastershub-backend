@@ -615,13 +615,13 @@ export const deleteCourse = async (
     }
 
     // Delete associated progress records
-    await CourseProgress.deleteMany({ courseId: slug });
+    await CourseProgress.deleteMany({ courseId: course.slug });
 
     // Delete the course
-    await Course.findOneAndDelete({ slug });
+    await Course.findOneAndDelete({ _id: course._id });
 
     logger.info(`Deleted course: ${course.title}`, {
-      courseSlug: slug,
+      courseSlug: course.slug,
       courseId: course._id.toString(),
       instructorId,
       reason
