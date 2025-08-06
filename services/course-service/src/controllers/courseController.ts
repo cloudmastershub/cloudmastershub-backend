@@ -573,34 +573,21 @@ export const deleteCourse = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { id: slug } = req.params;
+    const { id } = req.params;
     const instructorId = req.headers['x-user-id'] || 'instructor-123';
     const reason = req.body.reason || 'Course deletion requested';
 
-    // Validate slug format
-    if (!isValidSlug(slug)) {
-      if (isLegacyId(slug)) {
-        res.status(410).json({
-          success: false,
-          message: 'Legacy course identifiers are no longer supported',
-          error: {
-            code: 'LEGACY_ID_NOT_SUPPORTED'
-          }
-        });
-        return;
-      }
-      
-      res.status(400).json({
-        success: false,
-        message: 'Invalid course identifier format',
-        error: {
-          code: 'INVALID_SLUG_FORMAT'
-        }
-      });
-      return;
+    // Support both ObjectId and slug lookup like admin instructor assignment endpoint
+    let course = null;
+    const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+    
+    if (isValidObjectId) {
+      course = await Course.findById(id);
     }
-
-    const course = await Course.findOne({ slug });
+    
+    if (!course) {
+      course = await Course.findOne({ slug: id });
+    }
 
     if (!course) {
       res.status(404).json({
@@ -608,7 +595,7 @@ export const deleteCourse = async (
         message: 'Course not found',
         error: {
           code: 'COURSE_NOT_FOUND',
-          details: `No course found with slug: ${slug}`
+          details: `No course found with ID or slug: ${id}`
         }
       });
       return;
