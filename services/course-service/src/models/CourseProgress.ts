@@ -3,7 +3,7 @@ import { CourseProgress } from '@cloudmastershub/types';
 
 export interface ICourseProgress extends Omit<CourseProgress, 'userId' | 'courseId'>, Document {
   userId: string;
-  courseId: mongoose.Types.ObjectId;
+  courseId: string; // Changed to string to support slug-based IDs
 }
 
 const CertificateSchema = new Schema({
@@ -21,9 +21,9 @@ const CourseProgressSchema = new Schema<ICourseProgress>({
     required: true 
   },
   courseId: { 
-    type: Schema.Types.ObjectId, 
-    ref: 'Course', 
-    required: true 
+    type: String, // Changed to String to support slug-based course IDs
+    required: true,
+    index: true
   },
   enrolledAt: { 
     type: Date, 
