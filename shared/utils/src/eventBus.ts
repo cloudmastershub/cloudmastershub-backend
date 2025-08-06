@@ -72,7 +72,7 @@ export class EventBus implements EventPublisher, EventSubscriber {
 
       // Initialize event store if enabled
       if (this.config.enableEventStore) {
-        this.eventStore = new RedisEventStore(this.publishClient as any, 'cloudmasters:events');
+        this.eventStore = new RedisEventStore(this.publishClient, 'cloudmasters:events');
       }
     } catch (error) {
       logger.error('Failed to initialize event bus:', error);

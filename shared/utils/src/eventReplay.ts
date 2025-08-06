@@ -1,4 +1,4 @@
-import { Redis } from 'ioredis';
+import { RedisClientType } from 'redis';
 import { CloudMastersEvent } from '@cloudmastershub/types';
 import { getEventBus } from './eventBus';
 import logger from './logger';
@@ -67,10 +67,10 @@ export interface RecoveryCheckpoint {
 }
 
 export class RedisEventStore implements EventStore {
-  private redis: Redis;
+  private redis: RedisClientType;
   private keyPrefix: string;
 
-  constructor(redis: Redis, keyPrefix = 'cloudmasters:events') {
+  constructor(redis: RedisClientType, keyPrefix = 'cloudmasters:events') {
     this.redis = redis;
     this.keyPrefix = keyPrefix;
   }
@@ -87,46 +87,47 @@ export class RedisEventStore implements EventStore {
     const typeKey = `${this.keyPrefix}:by_type:${event.type}`;
     const sourceKey = `${this.keyPrefix}:by_source:${event.source}`;
 
-    const pipeline = this.redis.pipeline();
+    // Use multi() for transactions in the redis package (not pipeline)
+    const multi = this.redis.multi();
 
     // Store the event
-    pipeline.hset(eventKey, {
+    multi.hSet(eventKey, {
       event: JSON.stringify(event),
       storedAt: storedEvent.storedAt.toISOString(),
-      replayCount: 0,
+      replayCount: '0',
     });
 
     // Add to time-based sorted set
-    pipeline.zadd(timeKey, event.timestamp.getTime(), event.id);
+    multi.zAdd(timeKey, { score: event.timestamp.getTime(), value: event.id });
 
     // Add to type-based sorted set
-    pipeline.zadd(typeKey, event.timestamp.getTime(), event.id);
+    multi.zAdd(typeKey, { score: event.timestamp.getTime(), value: event.id });
 
     // Add to source-based sorted set
-    pipeline.zadd(sourceKey, event.timestamp.getTime(), event.id);
+    multi.zAdd(sourceKey, { score: event.timestamp.getTime(), value: event.id });
 
     // Add correlation ID index if present
     if (event.correlationId) {
       const corrKey = `${this.keyPrefix}:by_correlation:${event.correlationId}`;
-      pipeline.zadd(corrKey, event.timestamp.getTime(), event.id);
+      multi.zAdd(corrKey, { score: event.timestamp.getTime(), value: event.id });
     }
 
     // Add user/course/lab indexes if present
     const eventData = event as any;
     if (eventData.userId) {
       const userKey = `${this.keyPrefix}:by_user:${eventData.userId}`;
-      pipeline.zadd(userKey, event.timestamp.getTime(), event.id);
+      multi.zAdd(userKey, { score: event.timestamp.getTime(), value: event.id });
     }
     if (eventData.courseId) {
       const courseKey = `${this.keyPrefix}:by_course:${eventData.courseId}`;
-      pipeline.zadd(courseKey, event.timestamp.getTime(), event.id);
+      multi.zAdd(courseKey, { score: event.timestamp.getTime(), value: event.id });
     }
     if (eventData.labId) {
       const labKey = `${this.keyPrefix}:by_lab:${eventData.labId}`;
-      pipeline.zadd(labKey, event.timestamp.getTime(), event.id);
+      multi.zAdd(labKey, { score: event.timestamp.getTime(), value: event.id });
     }
 
-    await pipeline.exec();
+    await multi.exec();
   }
 
   async getEvents(filters: EventFilters): Promise<StoredEvent[]> {
@@ -134,32 +135,32 @@ export class RedisEventStore implements EventStore {
 
     if (filters.correlationId) {
       const corrKey = `${this.keyPrefix}:by_correlation:${filters.correlationId}`;
-      eventIds = await this.redis.zrange(corrKey, 0, -1);
+      eventIds = await this.redis.zRange(corrKey, 0, -1);
     } else if (filters.eventType) {
       const typeKey = `${this.keyPrefix}:by_type:${filters.eventType}`;
       const start = filters.startTime ? filters.startTime.getTime() : 0;
       const end = filters.endTime ? filters.endTime.getTime() : Date.now();
-      eventIds = await this.redis.zrangebyscore(typeKey, start, end);
+      eventIds = await this.redis.zRangeByScore(typeKey, start, end);
     } else if (filters.source) {
       const sourceKey = `${this.keyPrefix}:by_source:${filters.source}`;
       const start = filters.startTime ? filters.startTime.getTime() : 0;
       const end = filters.endTime ? filters.endTime.getTime() : Date.now();
-      eventIds = await this.redis.zrangebyscore(sourceKey, start, end);
+      eventIds = await this.redis.zRangeByScore(sourceKey, start, end);
     } else if (filters.userId) {
       const userKey = `${this.keyPrefix}:by_user:${filters.userId}`;
-      eventIds = await this.redis.zrange(userKey, 0, -1);
+      eventIds = await this.redis.zRange(userKey, 0, -1);
     } else if (filters.courseId) {
       const courseKey = `${this.keyPrefix}:by_course:${filters.courseId}`;
-      eventIds = await this.redis.zrange(courseKey, 0, -1);
+      eventIds = await this.redis.zRange(courseKey, 0, -1);
     } else if (filters.labId) {
       const labKey = `${this.keyPrefix}:by_lab:${filters.labId}`;
-      eventIds = await this.redis.zrange(labKey, 0, -1);
+      eventIds = await this.redis.zRange(labKey, 0, -1);
     } else {
       // Get by time range
       const timeKey = `${this.keyPrefix}:by_time`;
       const start = filters.startTime ? filters.startTime.getTime() : 0;
       const end = filters.endTime ? filters.endTime.getTime() : Date.now();
-      eventIds = await this.redis.zrangebyscore(timeKey, start, end);
+      eventIds = await this.redis.zRangeByScore(timeKey, start, end);
     }
 
     // Apply pagination
@@ -183,18 +184,18 @@ export class RedisEventStore implements EventStore {
   async getEventsById(eventIds: string[]): Promise<StoredEvent[]> {
     if (eventIds.length === 0) return [];
 
-    const pipeline = this.redis.pipeline();
+    const multi = this.redis.multi();
     eventIds.forEach((id) => {
       const eventKey = `${this.keyPrefix}:${id}`;
-      pipeline.hgetall(eventKey);
+      multi.hGetAll(eventKey);
     });
 
-    const results = await pipeline.exec();
+    const results = await multi.exec();
     const storedEvents: StoredEvent[] = [];
 
     results?.forEach((result, index) => {
-      if (result && result[1]) {
-        const eventData = result[1] as Record<string, string>;
+      if (result) {
+        const eventData = result as unknown as Record<string, string>;
         if (eventData.event) {
           try {
             const event = JSON.parse(eventData.event) as CloudMastersEvent;
@@ -218,8 +219,8 @@ export class RedisEventStore implements EventStore {
 
   async updateReplayCount(eventId: string): Promise<void> {
     const eventKey = `${this.keyPrefix}:${eventId}`;
-    await this.redis.hincrby(eventKey, 'replayCount', 1);
-    await this.redis.hset(eventKey, 'lastReplayAt', new Date().toISOString());
+    await this.redis.hIncrBy(eventKey, 'replayCount', 1);
+    await this.redis.hSet(eventKey, 'lastReplayAt', new Date().toISOString());
   }
 }
 
@@ -428,7 +429,7 @@ export class EventReplayManager {
 }
 
 // Factory function to create event replay manager
-export const createEventReplayManager = (redis: Redis): EventReplayManager => {
+export const createEventReplayManager = (redis: RedisClientType): EventReplayManager => {
   const eventStore = new RedisEventStore(redis);
   return new EventReplayManager(eventStore);
 };
@@ -439,10 +440,12 @@ let eventReplayManager: EventReplayManager | null = null;
 export const getEventReplayManager = (): EventReplayManager => {
   if (!eventReplayManager) {
     // Use the same Redis instance as the event bus
-    const redis = new Redis({
-      host: process.env.REDIS_HOST || 'localhost',
-      port: parseInt(process.env.REDIS_PORT || '6379'),
-      maxRetriesPerRequest: 3,
+    const { createClient } = require('redis');
+    const redis = createClient({
+      url: `redis://${process.env.REDIS_HOST || 'localhost'}:${process.env.REDIS_PORT || '6379'}`,
+      socket: {
+        reconnectStrategy: (retries: number) => Math.min(retries * 50, 500)
+      }
     });
 
     eventReplayManager = createEventReplayManager(redis);
