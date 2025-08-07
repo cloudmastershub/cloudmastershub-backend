@@ -102,46 +102,8 @@ class AnalyticsServiceClient {
 
   async getEngagementMetrics(timeframe: string): Promise<ServiceResponse> {
     try {
-      // This would typically aggregate from multiple services
-      // For now, we'll create mock data structure that could be populated
-      const mockEngagementData = {
-        timeframe,
-        averageSessionDuration: 45, // minutes
-        dailyActiveUsers: 1250,
-        weeklyActiveUsers: 3400,
-        monthlyActiveUsers: 12500,
-        courseCompletionRate: 72.5,
-        pathCompletionRate: 68.3,
-        userRetentionRate: 84.2,
-        bounceRate: 15.8,
-        engagementTrend: [
-          { date: '2024-12-19', value: 68.2 },
-          { date: '2024-12-20', value: 72.1 },
-          { date: '2024-12-21', value: 70.8 },
-          { date: '2024-12-22', value: 74.5 },
-          { date: '2024-12-23', value: 73.2 },
-          { date: '2024-12-24', value: 76.1 },
-          { date: '2024-12-25', value: 75.8 },
-        ],
-        topEngagingContent: [
-          {
-            id: 'course-1',
-            title: 'AWS Solutions Architect Fundamentals',
-            type: 'course',
-            engagementScore: 94.5,
-            completionRate: 87.2,
-          },
-          {
-            id: 'path-1',
-            title: 'Full Stack Cloud Developer',
-            type: 'learning_path',
-            engagementScore: 91.8,
-            completionRate: 83.4,
-          },
-        ],
-      };
-
-      return { success: true, data: mockEngagementData };
+      // TODO: Implement real engagement metrics aggregation from multiple services
+      throw new Error('Engagement metrics not implemented yet - requires integration with user activity tracking');
     } catch (error) {
       logger.error('Failed to fetch engagement metrics:', error);
       return {

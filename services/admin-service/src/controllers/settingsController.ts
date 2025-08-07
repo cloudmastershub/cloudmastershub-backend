@@ -3,8 +3,14 @@ import { AdminRequest } from '../middleware/adminAuth';
 import { PlatformSettings } from '@cloudmastershub/types';
 import logger from '../utils/logger';
 
-// Mock settings data - in real implementation, this would come from a database
-let mockSettings: PlatformSettings = {
+// TODO: Replace with database implementation - No Mock Data Policy enforcement
+// This controller requires database integration for platform settings
+const throwNotImplementedError = () => {
+  throw new Error('Platform settings API not implemented yet - requires database integration');
+};
+
+// Temporary default settings structure for reference only (not used in responses)
+const defaultSettingsStructure: PlatformSettings = {
   general: {
     siteName: 'CloudMastersHub',
     siteDescription: 'Premier cloud learning platform for AWS, Azure, and GCP',
@@ -92,11 +98,8 @@ export const getSettings = async (
       adminId: req.adminId,
     });
 
-    // In real implementation, fetch from database
-    res.status(200).json({
-      success: true,
-      data: mockSettings,
-    });
+    // No Mock Data Policy enforcement - return proper error
+    throwNotImplementedError();
   } catch (error) {
     logger.error('Error in getSettings controller:', error);
     next(error);

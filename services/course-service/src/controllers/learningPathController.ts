@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import logger from '../utils/logger';
+import { LearningPath } from '../models';
 import {
-  LearningPath,
+  LearningPath as LearningPathType,
   LearningPathQueryParams,
   LearningPathListResponse,
   LearningPathDetailsResponse,
@@ -16,217 +17,10 @@ import {
   CourseStatus,
 } from '@cloudmastershub/types';
 
-// Mock data for learning paths
-const mockLearningPaths: LearningPath[] = [
-  {
-    id: 'aws-solutions-architect-path',
-    title: 'AWS Solutions Architect Journey',
-    description:
-      'Complete learning path to become an AWS Solutions Architect. Master EC2, VPC, S3, RDS, and architectural best practices through hands-on projects.',
-    shortDescription: 'Master AWS architecture with hands-on projects and real-world scenarios.',
-    category: CourseCategory.AWS,
-    level: DifficultyLevel.INTERMEDIATE,
-    thumbnail: 'https://cloudmastershub.com/images/paths/aws-architect.jpg',
-    instructorId: 'instructor-aws-jane',
-    price: 199.99,
-    originalPrice: 299.99,
-    currency: 'USD',
-    isFree: false,
-    pathway: [],
-    totalSteps: 8,
-    totalCourses: 5,
-    totalLabs: 6,
-    estimatedDurationHours: 24,
-    objectives: [
-      'Design scalable AWS architectures',
-      'Implement security best practices',
-      'Optimize for cost and performance',
-      'Pass AWS Solutions Architect certification',
-    ],
-    skills: ['AWS Architecture', 'Cloud Security', 'Cost Optimization', 'Infrastructure Design'],
-    prerequisites: [
-      'Basic understanding of cloud computing',
-      'Familiarity with networking concepts',
-    ],
-    outcomes: [
-      'AWS Certified Solutions Architect',
-      'Real-world project portfolio',
-      'Production-ready skills',
-    ],
-    rating: 4.8,
-    reviewCount: 342,
-    enrollmentCount: 2150,
-    completionRate: 87.5,
-    tags: ['aws', 'architecture', 'certification', 'cloud'],
-    status: CourseStatus.PUBLISHED,
-    isPublished: true,
-    publishedAt: new Date('2024-01-15'),
-    createdAt: new Date('2023-12-01'),
-    updatedAt: new Date('2024-12-20'),
-    slug: 'aws-solutions-architect-journey',
-    metaDescription:
-      'Master AWS architecture with this comprehensive learning path. Hands-on labs, real projects, certification prep.',
-    keywords: ['aws', 'solutions architect', 'cloud architecture', 'certification'],
-    includesCertificate: true,
-    hasHandsOnLabs: true,
-    supportLevel: 'premium',
-  },
-  {
-    id: 'azure-devops-engineer-path',
-    title: 'Azure DevOps Engineer Professional',
-    description:
-      'Comprehensive path to master Azure DevOps, CI/CD pipelines, Infrastructure as Code, and modern deployment strategies.',
-    shortDescription: 'Master Azure DevOps and modern deployment practices.',
-    category: CourseCategory.AZURE,
-    level: DifficultyLevel.ADVANCED,
-    thumbnail: 'https://cloudmastershub.com/images/paths/azure-devops.jpg',
-    instructorId: 'instructor-azure-mike',
-    price: 249.99,
-    originalPrice: 349.99,
-    currency: 'USD',
-    isFree: false,
-    pathway: [],
-    totalSteps: 10,
-    totalCourses: 6,
-    totalLabs: 8,
-    estimatedDurationHours: 32,
-    objectives: [
-      'Build robust CI/CD pipelines',
-      'Implement Infrastructure as Code',
-      'Master Azure DevOps services',
-      'Design deployment strategies',
-    ],
-    skills: ['Azure DevOps', 'CI/CD', 'Infrastructure as Code', 'Monitoring', 'Security'],
-    prerequisites: [
-      'Experience with Azure',
-      'Understanding of DevOps principles',
-      'Basic scripting knowledge',
-    ],
-    outcomes: [
-      'Azure DevOps Expert certification',
-      'Production pipeline portfolio',
-      'Advanced deployment strategies',
-    ],
-    rating: 4.9,
-    reviewCount: 189,
-    enrollmentCount: 1340,
-    completionRate: 92.1,
-    tags: ['azure', 'devops', 'cicd', 'automation'],
-    status: CourseStatus.PUBLISHED,
-    isPublished: true,
-    publishedAt: new Date('2024-02-10'),
-    createdAt: new Date('2024-01-05'),
-    updatedAt: new Date('2024-12-18'),
-    slug: 'azure-devops-engineer-professional',
-    metaDescription:
-      'Become an Azure DevOps expert with advanced CI/CD, IaC, and deployment strategies.',
-    keywords: ['azure devops', 'cicd', 'infrastructure as code', 'deployment'],
-    includesCertificate: true,
-    hasHandsOnLabs: true,
-    supportLevel: 'premium',
-  },
-  {
-    id: 'multi-cloud-security-path',
-    title: 'Multi-Cloud Security Specialist',
-    description:
-      'Learn security best practices across AWS, Azure, and GCP. Master identity management, network security, and compliance frameworks.',
-    shortDescription: 'Master security across all major cloud platforms.',
-    category: CourseCategory.SECURITY,
-    level: DifficultyLevel.EXPERT,
-    thumbnail: 'https://cloudmastershub.com/images/paths/multi-cloud-security.jpg',
-    instructorId: 'instructor-security-sarah',
-    price: 299.99,
-    currency: 'USD',
-    isFree: false,
-    pathway: [],
-    totalSteps: 12,
-    totalCourses: 7,
-    totalLabs: 10,
-    estimatedDurationHours: 40,
-    objectives: [
-      'Implement multi-cloud security strategies',
-      'Master identity and access management',
-      'Design secure network architectures',
-      'Ensure compliance across platforms',
-    ],
-    skills: [
-      'Cloud Security',
-      'Identity Management',
-      'Compliance',
-      'Threat Detection',
-      'Incident Response',
-    ],
-    prerequisites: [
-      'Experience with AWS, Azure, or GCP',
-      'Understanding of security fundamentals',
-      'Network security knowledge',
-    ],
-    outcomes: [
-      'Multi-cloud security expertise',
-      'Security architecture certification',
-      'Incident response skills',
-    ],
-    rating: 4.7,
-    reviewCount: 125,
-    enrollmentCount: 890,
-    completionRate: 78.4,
-    tags: ['security', 'multi-cloud', 'compliance', 'identity'],
-    status: CourseStatus.PUBLISHED,
-    isPublished: true,
-    publishedAt: new Date('2024-03-05'),
-    createdAt: new Date('2024-02-01'),
-    updatedAt: new Date('2024-12-15'),
-    slug: 'multi-cloud-security-specialist',
-    metaDescription:
-      'Master security across AWS, Azure, and GCP with hands-on labs and real-world scenarios.',
-    keywords: ['multi-cloud security', 'cloud security', 'compliance', 'identity management'],
-    includesCertificate: true,
-    hasHandsOnLabs: true,
-    supportLevel: 'premium',
-  },
-];
+// Learning Path Controller - MongoDB Integration
+// All mock data removed - using real database queries only
 
-// Mock pathway steps
-const mockPathwaySteps: { [pathId: string]: PathwayStep[] } = {
-  'aws-solutions-architect-path': [
-    {
-      id: 'step-1',
-      pathId: 'aws-solutions-architect-path',
-      order: 1,
-      type: 'course',
-      title: 'AWS Fundamentals',
-      description: 'Learn the basics of AWS services and cloud computing concepts',
-      courseId: 'aws-fundamentals',
-      isRequired: true,
-      isLocked: false,
-      estimatedTimeMinutes: 180,
-      prerequisites: [],
-      unlocks: ['step-2'],
-      difficulty: DifficultyLevel.BEGINNER,
-      skills: ['AWS Basics', 'Cloud Computing'],
-      createdAt: new Date('2023-12-01'),
-      updatedAt: new Date('2024-12-01'),
-    },
-    {
-      id: 'step-2',
-      pathId: 'aws-solutions-architect-path',
-      order: 2,
-      type: 'lab',
-      title: 'Launch Your First EC2 Instance',
-      description: 'Hands-on lab to create and configure EC2 instances',
-      labId: 'aws-ec2-basics-lab',
-      isRequired: true,
-      isLocked: true,
-      estimatedTimeMinutes: 90,
-      prerequisites: ['step-1'],
-      unlocks: ['step-3'],
-      difficulty: DifficultyLevel.BEGINNER,
-      skills: ['EC2', 'Instance Management'],
-      createdAt: new Date('2023-12-01'),
-      updatedAt: new Date('2024-12-01'),
-    },
-  ],
-};
+// All mock data removed - using MongoDB queries only
 
 export const getAllLearningPaths = async (
   req: Request,
@@ -250,92 +44,99 @@ export const getAllLearningPaths = async (
       sortOrder = 'desc',
     } = req.query as LearningPathQueryParams;
 
-    logger.info('Fetching learning paths', {
+    logger.info('Fetching learning paths from database', {
       filters: { category, level, instructorId, isFree, search },
       pagination: { page, limit },
       sort: { sortBy, sortOrder },
     });
 
-    // TODO: Implement MongoDB queries with filters
-    let filteredPaths = [...mockLearningPaths];
+    // Build MongoDB query filters
+    const query: any = {};
 
-    // Apply filters
     if (category) {
-      filteredPaths = filteredPaths.filter((path) => path.category === category);
+      query.category = category;
     }
     if (level) {
-      filteredPaths = filteredPaths.filter((path) => path.level === level);
+      query.level = level;
     }
     if (instructorId) {
-      filteredPaths = filteredPaths.filter((path) => path.instructorId === instructorId);
+      query.instructorId = instructorId;
     }
     if (isFree !== undefined) {
-      const isFreeBoolean = String(isFree) === 'true';
-      filteredPaths = filteredPaths.filter((path) => path.isFree === isFreeBoolean);
+      query.isFree = String(isFree) === 'true';
     }
     if (minPrice) {
-      filteredPaths = filteredPaths.filter((path) => path.price >= Number(minPrice));
+      query.price = { ...query.price, $gte: Number(minPrice) };
     }
     if (maxPrice) {
-      filteredPaths = filteredPaths.filter((path) => path.price <= Number(maxPrice));
+      query.price = { ...query.price, $lte: Number(maxPrice) };
     }
     if (minRating) {
-      filteredPaths = filteredPaths.filter((path) => path.rating >= Number(minRating));
+      query.rating = { $gte: Number(minRating) };
     }
     if (search) {
-      const searchLower = search.toLowerCase();
-      filteredPaths = filteredPaths.filter(
-        (path) =>
-          path.title.toLowerCase().includes(searchLower) ||
-          path.description.toLowerCase().includes(searchLower) ||
-          path.tags.some((tag: string) => tag.toLowerCase().includes(searchLower))
-      );
+      query.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { tags: { $in: [new RegExp(search, 'i')] } }
+      ];
     }
     if (tags) {
-      const tagArray = tags.split(',');
-      filteredPaths = filteredPaths.filter((path) =>
-        tagArray.some((tag: string) => path.tags.includes(tag.trim()))
-      );
+      const tagArray = tags.split(',').map((tag: string) => tag.trim());
+      query.tags = { $in: tagArray };
     }
 
-    // Apply sorting
-    filteredPaths.sort((a, b) => {
-      let comparison = 0;
-      switch (sortBy) {
-        case 'newest':
-          comparison = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-          break;
-        case 'popular':
-          comparison = b.enrollmentCount - a.enrollmentCount;
-          break;
-        case 'rating':
-          comparison = b.rating - a.rating;
-          break;
-        case 'price':
-          comparison = a.price - b.price;
-          break;
-        case 'duration':
-          comparison = a.estimatedDurationHours - b.estimatedDurationHours;
-          break;
-        default:
-          comparison = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      }
-      return sortOrder === 'asc' ? -comparison : comparison;
-    });
+    // Build sort options
+    let sortOptions: any = {};
+    switch (sortBy) {
+      case 'newest':
+        sortOptions = { createdAt: sortOrder === 'asc' ? 1 : -1 };
+        break;
+      case 'popular':
+        sortOptions = { enrollmentCount: sortOrder === 'asc' ? 1 : -1 };
+        break;
+      case 'rating':
+        sortOptions = { rating: sortOrder === 'asc' ? 1 : -1 };
+        break;
+      case 'price':
+        sortOptions = { price: sortOrder === 'asc' ? 1 : -1 };
+        break;
+      case 'duration':
+        sortOptions = { estimatedDurationHours: sortOrder === 'asc' ? 1 : -1 };
+        break;
+      default:
+        sortOptions = { createdAt: -1 };
+    }
 
-    // Apply pagination
+    // Execute MongoDB query with pagination
     const pageNum = Number(page);
     const limitNum = Number(limit);
-    const startIndex = (pageNum - 1) * limitNum;
-    const endIndex = startIndex + limitNum;
-    const paginatedPaths = filteredPaths.slice(startIndex, endIndex);
+    const skip = (pageNum - 1) * limitNum;
+
+    const [paths, totalCount] = await Promise.all([
+      LearningPath.find(query)
+        .sort(sortOptions)
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
+      LearningPath.countDocuments(query)
+    ]);
+
+    // Transform paths to match frontend expectations
+    const transformedPaths = paths.map((path: any) => ({
+      ...path,
+      id: path._id.toString(),
+      totalSteps: path.pathway?.length || 0,
+      totalCourses: path.pathway?.filter((step: any) => step.type === 'course').length || 0,
+      totalLabs: path.pathway?.filter((step: any) => step.type === 'lab').length || 0
+    }));
 
     const response: LearningPathListResponse = {
-      paths: paginatedPaths,
-      total: filteredPaths.length,
+      paths: transformedPaths,
+      total: totalCount,
       page: pageNum,
       limit: limitNum,
-      totalPages: Math.ceil(filteredPaths.length / limitNum),
+      totalPages: Math.ceil(totalCount / limitNum),
     };
 
     res.status(200).json({
@@ -356,73 +157,46 @@ export const getLearningPathById = async (
   try {
     const { id } = req.params;
 
-    logger.info('Fetching learning path by ID', { pathId: id });
+    logger.info('Fetching learning path by ID from database', { pathId: id });
 
-    // TODO: Implement MongoDB query
-    const path = mockLearningPaths.find((p) => p.id === id);
+    // Query MongoDB for the learning path
+    const path = await LearningPath.findById(id).lean();
 
     if (!path) {
       res.status(404).json({
         success: false,
         message: 'Learning path not found',
+        error: {
+          code: 'PATH_NOT_FOUND',
+          details: `No learning path found with ID: ${id}`
+        }
       });
       return;
     }
 
-    // Mock additional data for detailed response
-    const pathwaySteps = mockPathwaySteps[id] || [];
-    const mockInstructor = {
-      id: path.instructorId,
-      name: 'Jane Smith',
-      bio: 'AWS Solutions Architect with 10+ years of experience',
-      avatar: 'https://cloudmastershub.com/images/instructors/jane.jpg',
-      expertise: ['AWS', 'Cloud Architecture', 'Security'],
-      rating: 4.9,
+    // Transform path data to match frontend expectations
+    const transformedPath = {
+      ...path,
+      id: path._id.toString(),
+      totalSteps: path.pathway?.length || 0,
+      totalCourses: path.pathway?.filter((step: any) => step.type === 'course').length || 0,
+      totalLabs: path.pathway?.filter((step: any) => step.type === 'lab').length || 0,
+      pathway: path.pathway || []
     };
 
     const response: LearningPathDetailsResponse = {
-      ...path,
-      pathway: pathwaySteps.map((step) => ({
-        ...step,
-        course: step.courseId
-          ? {
-              id: step.courseId,
-              title: 'AWS Fundamentals',
-              description: 'Learn the basics of AWS services',
-              thumbnail: 'https://cloudmastershub.com/images/courses/aws-fundamentals.jpg',
-              duration: 180,
-            }
-          : undefined,
-        lab: step.labId
-          ? {
-              id: step.labId,
-              title: 'EC2 Basics Lab',
-              description: 'Hands-on EC2 instance management',
-              provider: 'aws',
-              estimatedTime: 90,
-            }
-          : undefined,
-      })),
+      ...transformedPath,
+      instructor: {
+        id: path.instructorId || 'default-instructor',
+        name: 'Learning Path Instructor',
+        bio: 'Expert instructor for this learning path',
+        avatar: null,
+        expertise: [],
+        rating: 0
+      },
       prerequisites: [],
-      recommendations: mockLearningPaths
-        .filter((p) => p.id !== id && p.category === path.category)
-        .slice(0, 3),
-      reviews: [
-        {
-          id: 'review-1',
-          pathId: id,
-          userId: 'user-123',
-          rating: 5,
-          title: 'Excellent comprehensive path',
-          content:
-            'This learning path covers everything needed to become proficient in AWS architecture.',
-          helpful: 23,
-          verified: true,
-          createdAt: new Date('2024-11-15'),
-          updatedAt: new Date('2024-11-15'),
-        },
-      ],
-      instructor: mockInstructor,
+      recommendations: [], // Will be populated with actual data when needed
+      reviews: [] // Will be populated with actual review data when implemented
     };
 
     res.status(200).json({
@@ -447,11 +221,9 @@ export const createLearningPath = async (
     logger.info('Creating new learning path', { title: pathData.title, instructorId });
 
     // TODO: Validate instructor permissions
-    // TODO: Generate slug from title
-    // TODO: Save to MongoDB
-
-    const newPath: LearningPath = {
-      id: `path-${Date.now()}`,
+    
+    // Prepare learning path data
+    const pathDataToSave = {
       ...pathData,
       instructorId,
       pathway: [],
@@ -465,20 +237,24 @@ export const createLearningPath = async (
       completionRate: 0,
       status: CourseStatus.DRAFT,
       isPublished: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      slug: pathData.title
-        .toLowerCase()
-        .replace(/\s+/g, '-')
-        .replace(/[^a-z0-9-]/g, ''),
       isFree: pathData.price === 0,
       hasHandsOnLabs: false,
+    };
+
+    // Create and save to MongoDB
+    const newPath = new LearningPath(pathDataToSave);
+    const savedPath = await newPath.save();
+    
+    // Transform for response
+    const newPathResponse = {
+      ...savedPath.toObject(),
+      id: savedPath._id.toString()
     };
 
     res.status(201).json({
       success: true,
       message: 'Learning path created successfully',
-      data: newPath,
+      data: newPathResponse,
     });
   } catch (error) {
     logger.error('Error creating learning path:', error);
@@ -498,23 +274,31 @@ export const updateLearningPath = async (
 
     logger.info('Updating learning path', { pathId: id, userId });
 
-    // TODO: Verify ownership or admin permissions
-    // TODO: Update in MongoDB
+    // Query MongoDB for the learning path
+    const path = await LearningPath.findById(id);
 
-    const existingPath = mockLearningPaths.find((p) => p.id === id);
-    if (!existingPath) {
+    if (!path) {
       res.status(404).json({
         success: false,
         message: 'Learning path not found',
+        error: {
+          code: 'PATH_NOT_FOUND',
+          details: `No learning path found with ID: ${id}`
+        }
       });
       return;
     }
 
-    const updatedPath = {
-      ...existingPath,
-      ...updates,
-      updatedAt: new Date(),
-    };
+    // TODO: Verify ownership or admin permissions
+    // Update path fields
+    Object.keys(updates).forEach(key => {
+      if (key !== '_id' && key !== 'createdAt') {
+        (path as any)[key] = (updates as any)[key];
+      }
+    });
+
+    path.updatedAt = new Date();
+    const updatedPath = await path.save();
 
     res.status(200).json({
       success: true,
@@ -538,9 +322,31 @@ export const deleteLearningPath = async (
 
     logger.info('Deleting learning path', { pathId: id, userId });
 
+    // Query MongoDB for the learning path
+    const path = await LearningPath.findById(id);
+
+    if (!path) {
+      res.status(404).json({
+        success: false,
+        message: 'Learning path not found',
+        error: {
+          code: 'PATH_NOT_FOUND',
+          details: `No learning path found with ID: ${id}`
+        }
+      });
+      return;
+    }
+
     // TODO: Verify admin permissions only
     // TODO: Check if path has enrollments
-    // TODO: Delete from MongoDB
+    
+    // Delete from MongoDB
+    await LearningPath.findByIdAndDelete(id);
+    
+    logger.info(`Deleted learning path: ${path.title}`, {
+      pathId: id,
+      userId
+    });
 
     res.status(200).json({
       success: true,
@@ -564,21 +370,40 @@ export const addPathwayStep = async (
 
     logger.info('Adding pathway step', { pathId: id, stepType: stepData.type, userId });
 
+    // Query MongoDB for the learning path
+    const path = await LearningPath.findById(id);
+
+    if (!path) {
+      res.status(404).json({
+        success: false,
+        message: 'Learning path not found',
+        error: {
+          code: 'PATH_NOT_FOUND',
+          details: `No learning path found with ID: ${id}`
+        }
+      });
+      return;
+    }
+
     // TODO: Verify ownership
     // TODO: Validate course/lab IDs exist
-    // TODO: Save to MongoDB
-
-    const newStep: PathwayStep = {
+    
+    // Create new step
+    const newStep = {
       id: `step-${Date.now()}`,
       pathId: id,
-      order: 999, // TODO: Calculate proper order
+      order: (stepData as any).order || path.pathway.length,
       ...stepData,
       isLocked: false,
-      prerequisites: stepData.prerequisites || [],
+      prerequisites: (stepData as any).prerequisites || [],
       unlocks: [],
       createdAt: new Date(),
       updatedAt: new Date(),
     };
+    
+    // Add step to path and save
+    path.pathway.push(newStep as any);
+    await path.save();
 
     res.status(201).json({
       success: true,
@@ -602,9 +427,29 @@ export const removePathwayStep = async (
 
     logger.info('Removing pathway step', { pathId: id, stepId, userId });
 
+    // Query MongoDB for the learning path
+    const path = await LearningPath.findById(id);
+
+    if (!path) {
+      res.status(404).json({
+        success: false,
+        message: 'Learning path not found',
+        error: {
+          code: 'PATH_NOT_FOUND',
+          details: `No learning path found with ID: ${id}`
+        }
+      });
+      return;
+    }
+
     // TODO: Verify ownership
     // TODO: Check dependencies
-    // TODO: Remove from MongoDB
+    
+    // Remove step from path and save
+    path.pathway = path.pathway.filter((step: any) => step.id !== stepId);
+    await path.save();
+    
+    logger.info('Removed pathway step', { pathId: id, stepId, userId });
 
     res.status(200).json({
       success: true,
@@ -627,62 +472,17 @@ export const getLearningPathProgress = async (
 
     logger.info('Fetching learning path progress', { pathId: id, userId });
 
-    // TODO: Fetch from MongoDB
-
-    // Mock progress data
-    const mockProgress: LearningPathProgress = {
-      id: 'progress-1',
-      userId,
-      pathId: id,
-      enrolledAt: new Date('2024-11-01'),
-      enrollmentType: 'purchased',
-      progress: 45.5,
-      currentStepId: 'step-2',
-      completedSteps: ['step-1'],
-      skippedSteps: [],
-      totalTimeSpentMinutes: 320,
-      lastAccessedAt: new Date(),
-      isCompleted: false,
-      strengths: ['AWS Basics'],
-      weaknesses: ['Advanced Architecture'],
-      recommendedNextPaths: ['azure-devops-engineer-path'],
-      createdAt: new Date('2024-11-01'),
-      updatedAt: new Date(),
-    };
-
-    const response: PathwayProgressResponse = {
-      pathProgress: mockProgress,
-      stepProgress: [
-        {
-          stepId: 'step-1',
-          isCompleted: true,
-          isLocked: false,
-          timeSpent: 180,
-          lastAccessed: new Date('2024-11-15'),
-        },
-        {
-          stepId: 'step-2',
-          isCompleted: false,
-          isLocked: false,
-          timeSpent: 45,
-          lastAccessed: new Date(),
-        },
-      ],
-      nextRecommendations: mockLearningPaths.slice(0, 3),
-      achievements: [
-        {
-          type: 'badge',
-          title: 'AWS Beginner',
-          description: 'Completed first AWS course',
-          iconUrl: 'https://cloudmastershub.com/badges/aws-beginner.png',
-        },
-      ],
-    };
-
-    res.status(200).json({
-      success: true,
-      data: response,
+    // TODO: Fetch from MongoDB - for now return 501 Not Implemented
+    
+    res.status(501).json({
+      success: false,
+      message: 'Learning path progress tracking not yet implemented',
+      error: {
+        code: 'NOT_IMPLEMENTED',
+        details: 'Progress tracking for learning paths will be implemented in a future update'
+      }
     });
+    return;
   } catch (error) {
     logger.error('Error fetching learning path progress:', error);
     next(error);
