@@ -291,8 +291,9 @@ CourseSchema.pre('save', async function(next) {
     if (this.isNew || this.isModified('title')) {
       console.log('🔧 Ensuring slug uniqueness for course:', this.title);
       
-      const baseSlug = this.slug || generateSlug(this.title);
-      console.log('🔧 Working with base slug:', baseSlug);
+      // Always generate a new slug from the current title when title changes
+      const baseSlug = generateSlug(this.title);
+      console.log('🔧 Generated fresh base slug from title:', baseSlug);
       
       try {
         // Use mongoose.model to avoid circular reference
@@ -307,10 +308,9 @@ CourseSchema.pre('save', async function(next) {
           .filter(course => course._id.toString() !== this._id.toString())
           .map(course => course.slug);
         
-        if (existingSlugs.length > 0) {
-          this.slug = generateUniqueSlug(baseSlug, existingSlugs);
-          console.log('🔧 Made slug unique:', this.slug);
-        }
+        // Always set the slug, making it unique if necessary
+        this.slug = generateUniqueSlug(baseSlug, existingSlugs);
+        console.log('🔧 Set final unique slug:', this.slug);
       } catch (error) {
         console.error('🔧 Error ensuring slug uniqueness:', error);
         // Fallback - append timestamp to make it unique
