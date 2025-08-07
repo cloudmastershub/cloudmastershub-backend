@@ -256,6 +256,18 @@ export const createCourse = async (
       return;
     }
 
+    // Generate a better default instructor name from email
+    let defaultInstructorName = 'Instructor';
+    if (instructorEmail && instructorEmail !== 'instructor@example.com') {
+      // Extract name from email (e.g., john.doe@example.com -> John Doe)
+      const emailPrefix = instructorEmail.split('@')[0];
+      defaultInstructorName = emailPrefix
+        .replace(/[._-]/g, ' ') // Replace separators with spaces
+        .split(' ')
+        .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
+    }
+
     // Prepare course data with defaults and proper structure
     // Only include fields that exist in the Course schema
     const processedCourseData: any = {
@@ -268,10 +280,10 @@ export const createCourse = async (
       preview: courseData.preview || courseData.previewVideo || '',
       instructor: {
         id: instructorId,
-        name: courseData.instructor?.name || instructorEmail.split('@')[0] || 'Instructor',
+        name: courseData.instructor?.name || defaultInstructorName,
         avatar: courseData.instructor?.avatar || 'https://via.placeholder.com/150',
-        bio: courseData.instructor?.bio || '',
-        expertise: courseData.instructor?.expertise || [],
+        bio: courseData.instructor?.bio || `Experienced instructor specializing in ${courseData.category || 'cloud technologies'}`,
+        expertise: courseData.instructor?.expertise || [courseData.category].filter(Boolean),
         rating: courseData.instructor?.rating || 0
       },
       price: typeof courseData.price === 'object' ? (courseData.price?.amount || 0) : (courseData.price || 0),
