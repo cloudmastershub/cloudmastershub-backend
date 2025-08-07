@@ -190,7 +190,7 @@ export const getLearningPathById = async (
         id: path.instructorId || 'default-instructor',
         name: 'Learning Path Instructor',
         bio: 'Expert instructor for this learning path',
-        avatar: null,
+        avatar: '',
         expertise: [],
         rating: 0
       },
