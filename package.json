@@ -22,7 +22,7 @@
     "migrate:admin": "npm run migrate --workspace=@cloudmastershub/admin-service",
     "migrate:up": "npm run migrate:postgres && npm run migrate:mongo && npm run migrate:payments && npm run migrate:admin",
     "migrate:rollback": "npm run migrate:rollback --workspace=@cloudmastershub/user-service",
-    "setup:db": "npm run migrate:up && npm run seed --workspaces",
+    "setup:db": "npm run migrate:up",
     "start:api-gateway": "npm run start --workspace=@cloudmastershub/api-gateway",
     "start:user-service": "npm run start --workspace=@cloudmastershub/user-service",
     "start:course-service": "npm run start --workspace=@cloudmastershub/course-service",
