@@ -41,6 +41,7 @@ export enum DifficultyLevel {
 
 export enum CourseStatus {
   DRAFT = 'draft',
+  UNDER_REVIEW = 'under_review',
   PUBLISHED = 'published',
   ARCHIVED = 'archived',
 }

@@ -8,6 +8,7 @@ import {
 } from '../controllers/courseController';
 import { authenticate, AuthRequest } from '@cloudmastershub/middleware';
 import { requirePremiumSubscription } from '@cloudmastershub/middleware';
+import { CourseStatus } from '@cloudmastershub/types';
 import { Course } from '../models';
 import logger from '../utils/logger';
 
@@ -320,8 +321,8 @@ router.get('/stats', async (req: AuthRequest, res: Response, next: NextFunction)
     
     // Get real instructor statistics
     const instructorCourses = await Course.find({ 'instructor.id': instructorId }).lean();
-    const publishedCourses = instructorCourses.filter(c => c.status === 'published');
-    const draftCourses = instructorCourses.filter(c => c.status === 'draft');
+    const publishedCourses = instructorCourses.filter(c => c.status === CourseStatus.PUBLISHED);
+    const draftCourses = instructorCourses.filter(c => c.status === CourseStatus.DRAFT);
     
     const stats = {
       totalCourses: instructorCourses.length,
@@ -368,7 +369,7 @@ router.get('/analytics/overview', async (req: AuthRequest, res: Response, next: 
     
     // Get instructor courses and basic analytics
     const instructorCourses = await Course.find({ 'instructor.id': instructorId }).lean();
-    const publishedCourses = instructorCourses.filter(c => c.status === 'published');
+    const publishedCourses = instructorCourses.filter(c => c.status === CourseStatus.PUBLISHED);
     
     const analytics = {
       totalCourses: instructorCourses.length,
@@ -379,8 +380,8 @@ router.get('/analytics/overview', async (req: AuthRequest, res: Response, next: 
         : 0,
       totalRevenue: 0, // Placeholder - would integrate with payment service
       thisMonthEnrollments: 0, // Placeholder - would require date filtering
-      coursesInReview: instructorCourses.filter(c => c.status === 'under_review').length,
-      draftCourses: instructorCourses.filter(c => c.status === 'draft').length,
+      coursesInReview: instructorCourses.filter(c => c.status === CourseStatus.UNDER_REVIEW).length,
+      draftCourses: instructorCourses.filter(c => c.status === CourseStatus.DRAFT).length,
       timestamp: new Date().toISOString()
     };
     
