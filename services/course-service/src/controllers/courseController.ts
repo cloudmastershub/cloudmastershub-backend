@@ -284,8 +284,7 @@ export const createCourse = async (
       status: courseData.status || CourseStatus.DRAFT
     };
     
-    // Remove manual slug generation - let the pre-save middleware handle it
-    // This prevents conflicts and ensures consistent slug generation
+    // Don't set slug here - let the pre-save middleware handle it completely
     logger.info('Course data prepared for creation:', {
       title: processedCourseData.title,
       category: processedCourseData.category,
