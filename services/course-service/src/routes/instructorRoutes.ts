@@ -51,30 +51,90 @@ router.get('/courses/:id', async (req: AuthRequest, res: Response, next: NextFun
       instructorId: instructorId 
     });
     
-    // First check if course exists
+    // Enhanced course lookup with better error handling
     const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(id);
     let course = null;
     
-    if (isValidObjectId) {
-      course = await Course.findById(id).select('-__v').lean().maxTimeMS(5000);
-    }
+    logger.info('Starting course lookup', { 
+      searchId: id, 
+      instructorId, 
+      isValidObjectId,
+      searchType: isValidObjectId ? 'ObjectId' : 'slug'
+    });
     
-    if (!course) {
-      course = await Course.findOne({ slug: id }).select('-__v').lean().maxTimeMS(5000);
-    }
-    
-    if (!course) {
-      logger.warn('Course not found for instructor request', { 
-        searchId: id, 
+    try {
+      if (isValidObjectId) {
+        logger.debug('Attempting ObjectId lookup');
+        course = await Course.findById(id).select('-__v').lean().maxTimeMS(5000);
+        if (course) {
+          logger.info('Found course by ObjectId', { courseId: course._id, slug: course.slug });
+        }
+      }
+      
+      if (!course) {
+        logger.debug('Attempting slug lookup', { slug: id });
+        course = await Course.findOne({ slug: id }).select('-__v').lean().maxTimeMS(5000);
+        if (course) {
+          logger.info('Found course by slug', { courseId: course._id, slug: course.slug });
+        }
+      }
+      
+      if (!course) {
+        // Enhanced debugging: check for similar courses
+        logger.warn('Course not found, checking for similar slugs');
+        
+        const similarCourses = await Course.find({ 
+          slug: { $regex: new RegExp(id.substring(0, Math.min(10, id.length)), 'i') } 
+        }).select('slug title instructor.id').limit(5).maxTimeMS(3000);
+        
+        // Also check recent courses by this instructor
+        const recentInstructorCourses = await Course.find({ 
+          'instructor.id': instructorId 
+        }).select('slug title createdAt').sort({ createdAt: -1 }).limit(3).maxTimeMS(3000);
+        
+        logger.warn('Course not found - debugging info', { 
+          searchId: id, 
+          instructorId,
+          isValidObjectId,
+          similarCourses: similarCourses.map(c => ({ 
+            slug: c.slug, 
+            title: c.title,
+            isOwner: c.instructor.id === instructorId
+          })),
+          recentInstructorCourses: recentInstructorCourses.map(c => ({ 
+            slug: c.slug, 
+            title: c.title,
+            createdAt: c.createdAt
+          }))
+        });
+        
+        res.status(404).json({
+          success: false,
+          message: 'Course not found',
+          error: {
+            code: 'COURSE_NOT_FOUND',
+            details: `No course found with ID or slug: ${id}`,
+            suggestions: similarCourses.length > 0 ? 
+              'Similar courses found - check if you\'re using the correct slug' : 
+              'No similar courses found - verify the course was created successfully'
+          }
+        });
+        return;
+      }
+    } catch (dbError: any) {
+      logger.error('Database error during course lookup', {
+        error: dbError.message,
+        searchId: id,
         instructorId,
-        isValidObjectId 
+        stack: dbError.stack
       });
-      res.status(404).json({
+      
+      res.status(500).json({
         success: false,
-        message: 'Course not found',
+        message: 'Database error while searching for course',
         error: {
-          code: 'COURSE_NOT_FOUND',
-          details: `No course found with ID or slug: ${id}`
+          code: 'DATABASE_LOOKUP_ERROR',
+          details: 'Unable to search for course due to database connection issues'
         }
       });
       return;

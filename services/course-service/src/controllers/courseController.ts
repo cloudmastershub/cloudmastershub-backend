@@ -284,30 +284,13 @@ export const createCourse = async (
       status: courseData.status || CourseStatus.DRAFT
     };
     
-    // Generate slug manually to ensure it's set
-    const { generateSlug, generateUniqueSlug } = await import('@cloudmastershub/utils');
-    let slug: string;
-    
-    try {
-      const baseSlug = generateSlug(processedCourseData.title);
-      logger.info('Generated base slug:', { title: processedCourseData.title, baseSlug });
-      
-      // Check for existing slugs
-      const existingCourses = await Course.find({ 
-        slug: { $regex: `^${baseSlug}(-\\d+)?$` } 
-      }).select('slug');
-      
-      const existingSlugs = existingCourses.map(course => course.slug);
-      slug = generateUniqueSlug(baseSlug, existingSlugs);
-      
-      logger.info('Generated unique slug:', { baseSlug, existingSlugs, finalSlug: slug });
-    } catch (error) {
-      logger.error('Error generating slug, using fallback:', error);
-      slug = `course-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    }
-    
-    // Add slug to processed data
-    processedCourseData.slug = slug;
+    // Remove manual slug generation - let the pre-save middleware handle it
+    // This prevents conflicts and ensures consistent slug generation
+    logger.info('Course data prepared for creation:', {
+      title: processedCourseData.title,
+      category: processedCourseData.category,
+      instructorId: instructorId
+    });
     
     // Log the data being sent to help debug validation issues
     logger.info('Processing course creation with data:', {
@@ -315,8 +298,7 @@ export const createCourse = async (
       processedData: Object.keys(processedCourseData),
       instructorId,
       title: processedCourseData.title,
-      category: processedCourseData.category,
-      slug: processedCourseData.slug
+      category: processedCourseData.category
     });
 
     // Create new course
@@ -327,6 +309,7 @@ export const createCourse = async (
     logger.info('Created new course:', {
       courseId: savedCourse._id,
       title: savedCourse.title,
+      slug: savedCourse.slug,
       instructorId
     });
 
