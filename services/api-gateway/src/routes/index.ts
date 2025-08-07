@@ -123,6 +123,15 @@ const serviceRoutes = {
       '^/api/admin/courses': '/admin/courses'
     }
   },
+  '/admin/paths': {
+    target: process.env.COURSE_SERVICE_URL || 'http://course-service:3002',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/admin/paths': '/admin/paths'
+    }
+  },
   '/admin/users': {
     target: process.env.USER_SERVICE_URL || 'http://user-service:3001',
     changeOrigin: true,

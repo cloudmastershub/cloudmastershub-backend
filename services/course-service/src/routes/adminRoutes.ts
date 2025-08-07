@@ -5,6 +5,15 @@ import {
   updateCourse,
   deleteCourse
 } from '../controllers/courseController';
+import {
+  getAllLearningPaths,
+  getLearningPathById,
+  createLearningPath,
+  updateLearningPath,
+  deleteLearningPath,
+  addPathwayStep,
+  removePathwayStep
+} from '../controllers/learningPathController';
 import { authenticate, authorize, AuthRequest } from '@cloudmastershub/middleware';
 import { Course } from '../models';
 import logger from '../utils/logger';
@@ -334,6 +343,153 @@ router.get('/stats', async (req: AuthRequest, res: Response, next: NextFunction)
       success: false,
       error: {
         message: 'Failed to fetch platform statistics',
+        details: error.message
+      }
+    });
+  }
+});
+
+/**
+ * Learning Path Management Routes
+ * Admins can manage all learning paths
+ */
+
+// Get all learning paths (admin view)
+router.get('/paths', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    logger.info('Admin requesting all learning paths', { 
+      adminId: req.userId,
+      queryParams: req.query 
+    });
+    await getAllLearningPaths(req, res, next);
+  } catch (error: any) {
+    logger.error('Admin: Failed to fetch learning paths', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to fetch learning paths',
+        details: error.message
+      }
+    });
+  }
+});
+
+// Get learning path details (admin view)
+router.get('/paths/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    await getLearningPathById(req, res, next);
+  } catch (error: any) {
+    logger.error('Admin: Failed to fetch learning path details', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to fetch learning path details',
+        details: error.message
+      }
+    });
+  }
+});
+
+// Create learning path (admin only)
+router.post('/paths', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    logger.info('Admin creating learning path', {
+      adminId: req.userId,
+      pathData: req.body
+    });
+    await createLearningPath(req, res, next);
+  } catch (error: any) {
+    logger.error('Admin: Failed to create learning path', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to create learning path',
+        details: error.message
+      }
+    });
+  }
+});
+
+// Update learning path (admin only)
+router.put('/paths/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    logger.info('Admin updating learning path', {
+      adminId: req.userId,
+      pathId: req.params.id,
+      updates: req.body
+    });
+    await updateLearningPath(req, res, next);
+  } catch (error: any) {
+    logger.error('Admin: Failed to update learning path', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to update learning path',
+        details: error.message
+      }
+    });
+  }
+});
+
+// Delete learning path (admin only)
+router.delete('/paths/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    logger.info('Admin deleting learning path', {
+      adminId: req.userId,
+      pathId: req.params.id
+    });
+    await deleteLearningPath(req, res, next);
+  } catch (error: any) {
+    logger.error('Admin: Failed to delete learning path', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to delete learning path',
+        details: error.message
+      }
+    });
+  }
+});
+
+// Add course to learning path (admin only)
+router.post('/paths/:id/courses', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    logger.info('Admin adding course to learning path', {
+      adminId: req.userId,
+      pathId: req.params.id,
+      courseData: req.body
+    });
+    await addPathwayStep(req, res, next);
+  } catch (error: any) {
+    logger.error('Admin: Failed to add course to learning path', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to add course to learning path',
+        details: error.message
+      }
+    });
+  }
+});
+
+// Remove course from learning path (admin only)
+router.delete('/paths/:id/courses/:courseId', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    logger.info('Admin removing course from learning path', {
+      adminId: req.userId,
+      pathId: req.params.id,
+      courseId: req.params.courseId
+    });
+    
+    // Set the stepId parameter for the removePathwayStep function
+    req.params.stepId = req.params.courseId;
+    await removePathwayStep(req, res, next);
+  } catch (error: any) {
+    logger.error('Admin: Failed to remove course from learning path', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to remove course from learning path',
         details: error.message
       }
     });
