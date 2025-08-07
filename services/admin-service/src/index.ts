@@ -21,10 +21,40 @@ const PORT = process.env.PORT || 3005;
 // Security middleware
 app.use(helmet());
 
-// CORS configuration
+// CORS configuration with proper origin handling
+const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(origin => origin.trim()) || [
+  'http://localhost:3000',
+  'http://localhost:3001', 
+  'https://cloudmastershub.com',
+  'https://www.cloudmastershub.com'
+];
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  origin: (origin, callback) => {
+    console.log(`🌐 ADMIN-SERVICE CORS: Request from origin: ${origin || 'NO_ORIGIN'}`);
+    console.log(`🌐 ADMIN-SERVICE CORS: Allowed origins: ${allowedOrigins.join(', ')}`);
+    
+    // Allow requests with no origin (like mobile apps or Postman)
+    if (!origin) {
+      console.log('🌐 ADMIN-SERVICE CORS: Allowing request with no origin');
+      return callback(null, true);
+    }
+    
+    if (allowedOrigins.includes(origin)) {
+      console.log(`🌐 ADMIN-SERVICE CORS: Allowing request from ${origin}`);
+      callback(null, true);
+    } else {
+      console.warn(`🌐 ADMIN-SERVICE CORS: BLOCKED request from origin: ${origin}`);
+      console.warn(`🌐 ADMIN-SERVICE CORS: Available origins: ${allowedOrigins.join(', ')}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Request-ID'],
+  exposedHeaders: ['X-Total-Count', 'X-Page-Count'],
+  maxAge: 86400, // 24 hours
+  optionsSuccessStatus: 200 // For legacy browser support
 }));
 
 // Body parsing middleware
@@ -45,8 +75,9 @@ app.use('/admin/security', securityRoutes);
 app.get('/', (req, res) => {
   res.json({
     service: 'CloudMastersHub Admin Service',
-    version: '1.0.0',
+    version: '1.1-cors-fix',
     status: 'running',
+    corsUpdate: 'Applied dynamic origin validation including cloudmastershub.com',
     timestamp: new Date().toISOString(),
   });
 });
