@@ -4,6 +4,22 @@ import { Course } from '../models';
 import { CourseStatus } from '@cloudmastershub/types';
 import { getCourseEventPublisher } from '../events/courseEventPublisher';
 
+// Helper function to find course by ObjectId or slug
+const findCourse = async (courseId: string) => {
+  const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(courseId);
+  
+  let course = null;
+  if (isValidObjectId) {
+    course = await Course.findById(courseId);
+  }
+  
+  if (!course) {
+    course = await Course.findOne({ slug: courseId });
+  }
+  
+  return course;
+};
+
 // Add a new section to course curriculum
 export const addSection = async (
   req: Request,
@@ -18,12 +34,16 @@ export const addSection = async (
 
     logger.info('Adding section to course', { courseId, instructorId });
 
-    const course = await Course.findById(courseId);
+    const course = await findCourse(courseId);
     if (!course) {
+      logger.warn('Course not found for adding section', { courseId, instructorId });
       res.status(404).json({
         success: false,
         message: 'Course not found',
-        error: { code: 'COURSE_NOT_FOUND' }
+        error: { 
+          code: 'COURSE_NOT_FOUND',
+          details: `No course found with ID or slug: ${courseId}`
+        }
       });
       return;
     }
@@ -88,12 +108,15 @@ export const updateSection = async (
 
     logger.info('Updating section', { courseId, sectionId, instructorId });
 
-    const course = await Course.findById(courseId);
+    const course = await findCourse(courseId);
     if (!course) {
       res.status(404).json({
         success: false,
         message: 'Course not found',
-        error: { code: 'COURSE_NOT_FOUND' }
+        error: { 
+          code: 'COURSE_NOT_FOUND',
+          details: `No course found with ID or slug: ${courseId}`
+        }
       });
       return;
     }
@@ -161,12 +184,15 @@ export const deleteSection = async (
 
     logger.info('Deleting section', { courseId, sectionId, instructorId });
 
-    const course = await Course.findById(courseId);
+    const course = await findCourse(courseId);
     if (!course) {
       res.status(404).json({
         success: false,
         message: 'Course not found',
-        error: { code: 'COURSE_NOT_FOUND' }
+        error: { 
+          code: 'COURSE_NOT_FOUND',
+          details: `No course found with ID or slug: ${courseId}`
+        }
       });
       return;
     }
@@ -232,12 +258,15 @@ export const reorderSections = async (
 
     logger.info('Reordering sections', { courseId, instructorId });
 
-    const course = await Course.findById(courseId);
+    const course = await findCourse(courseId);
     if (!course) {
       res.status(404).json({
         success: false,
         message: 'Course not found',
-        error: { code: 'COURSE_NOT_FOUND' }
+        error: { 
+          code: 'COURSE_NOT_FOUND',
+          details: `No course found with ID or slug: ${courseId}`
+        }
       });
       return;
     }
@@ -304,12 +333,15 @@ export const addLesson = async (
 
     logger.info('Adding lesson to section', { courseId, sectionId, instructorId });
 
-    const course = await Course.findById(courseId);
+    const course = await findCourse(courseId);
     if (!course) {
       res.status(404).json({
         success: false,
         message: 'Course not found',
-        error: { code: 'COURSE_NOT_FOUND' }
+        error: { 
+          code: 'COURSE_NOT_FOUND',
+          details: `No course found with ID or slug: ${courseId}`
+        }
       });
       return;
     }
@@ -394,12 +426,15 @@ export const updateLesson = async (
 
     logger.info('Updating lesson', { courseId, sectionId, lessonId, instructorId });
 
-    const course = await Course.findById(courseId);
+    const course = await findCourse(courseId);
     if (!course) {
       res.status(404).json({
         success: false,
         message: 'Course not found',
-        error: { code: 'COURSE_NOT_FOUND' }
+        error: { 
+          code: 'COURSE_NOT_FOUND',
+          details: `No course found with ID or slug: ${courseId}`
+        }
       });
       return;
     }
@@ -484,12 +519,15 @@ export const deleteLesson = async (
 
     logger.info('Deleting lesson', { courseId, sectionId, lessonId, instructorId });
 
-    const course = await Course.findById(courseId);
+    const course = await findCourse(courseId);
     if (!course) {
       res.status(404).json({
         success: false,
         message: 'Course not found',
-        error: { code: 'COURSE_NOT_FOUND' }
+        error: { 
+          code: 'COURSE_NOT_FOUND',
+          details: `No course found with ID or slug: ${courseId}`
+        }
       });
       return;
     }
@@ -571,12 +609,15 @@ export const reorderLessons = async (
 
     logger.info('Reordering lessons', { courseId, sectionId, instructorId });
 
-    const course = await Course.findById(courseId);
+    const course = await findCourse(courseId);
     if (!course) {
       res.status(404).json({
         success: false,
         message: 'Course not found',
-        error: { code: 'COURSE_NOT_FOUND' }
+        error: { 
+          code: 'COURSE_NOT_FOUND',
+          details: `No course found with ID or slug: ${courseId}`
+        }
       });
       return;
     }
@@ -654,12 +695,15 @@ export const updateCurriculum = async (
 
     logger.info('Updating entire curriculum', { courseId, instructorId });
 
-    const course = await Course.findById(courseId);
+    const course = await findCourse(courseId);
     if (!course) {
       res.status(404).json({
         success: false,
         message: 'Course not found',
-        error: { code: 'COURSE_NOT_FOUND' }
+        error: { 
+          code: 'COURSE_NOT_FOUND',
+          details: `No course found with ID or slug: ${courseId}`
+        }
       });
       return;
     }

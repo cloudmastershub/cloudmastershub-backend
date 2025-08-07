@@ -82,7 +82,7 @@ const CourseSchema = new Schema<ICourse>({
   description: { 
     type: String, 
     required: true,
-    maxlength: 2000
+    maxlength: 5000 // Increased for detailed course descriptions
   },
   category: { 
     type: String, 
