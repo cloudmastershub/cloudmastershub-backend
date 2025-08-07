@@ -119,41 +119,8 @@ export const updateSettings = async (
       sectionsUpdated: Object.keys(updates),
     });
 
-    // Validate and merge updates
-    const updatedSettings = { ...mockSettings };
-
-    if (updates.general) {
-      updatedSettings.general = { ...updatedSettings.general, ...updates.general };
-    }
-    if (updates.security) {
-      updatedSettings.security = { ...updatedSettings.security, ...updates.security };
-    }
-    if (updates.payment) {
-      updatedSettings.payment = { ...updatedSettings.payment, ...updates.payment };
-    }
-    if (updates.content) {
-      updatedSettings.content = { ...updatedSettings.content, ...updates.content };
-    }
-    if (updates.email) {
-      updatedSettings.email = { ...updatedSettings.email, ...updates.email };
-    }
-
-    // Update mock data (in real implementation, save to database)
-    mockSettings = updatedSettings;
-
-    // Log the settings update
-    logger.info('Platform settings updated', {
-      adminId: req.adminId,
-      adminEmail: req.adminEmail,
-      updatedSections: Object.keys(updates),
-      timestamp: new Date().toISOString(),
-    });
-
-    res.status(200).json({
-      success: true,
-      message: 'Settings updated successfully',
-      data: mockSettings,
-    });
+    // No Mock Data Policy enforcement - return proper error
+    throwNotImplementedError();
   } catch (error) {
     logger.error('Error in updateSettings controller:', error);
     next(error);
@@ -170,10 +137,8 @@ export const getFeatureFlags = async (
       adminId: req.adminId,
     });
 
-    res.status(200).json({
-      success: true,
-      data: mockSettings.features,
-    });
+    // No Mock Data Policy enforcement - return proper error
+    throwNotImplementedError();
   } catch (error) {
     logger.error('Error in getFeatureFlags controller:', error);
     next(error);
@@ -195,39 +160,8 @@ export const updateFeatureFlag = async (
       enabled,
     });
 
-    if (!mockSettings.features[flagName]) {
-      res.status(404).json({
-        success: false,
-        error: {
-          message: 'Feature flag not found',
-        },
-      });
-      return;
-    }
-
-    // Update the feature flag
-    mockSettings.features[flagName] = {
-      ...mockSettings.features[flagName],
-      enabled,
-      ...(description && { description }),
-      lastModified: new Date(),
-      modifiedBy: req.adminEmail || 'admin',
-    };
-
-    // Log the feature flag update
-    logger.info('Feature flag updated', {
-      adminId: req.adminId,
-      adminEmail: req.adminEmail,
-      flagName,
-      enabled,
-      timestamp: new Date().toISOString(),
-    });
-
-    res.status(200).json({
-      success: true,
-      message: `Feature flag '${flagName}' updated successfully`,
-      data: mockSettings.features[flagName],
-    });
+    // No Mock Data Policy enforcement - return proper error
+    throwNotImplementedError();
   } catch (error) {
     logger.error('Error in updateFeatureFlag controller:', error);
     next(error);
@@ -252,16 +186,6 @@ export const createFeatureFlag = async (
       return;
     }
 
-    if (mockSettings.features[flagName]) {
-      res.status(409).json({
-        success: false,
-        error: {
-          message: 'Feature flag already exists',
-        },
-      });
-      return;
-    }
-
     logger.info('Admin creating feature flag', {
       adminId: req.adminId,
       flagName,
@@ -269,28 +193,8 @@ export const createFeatureFlag = async (
       description,
     });
 
-    // Create the new feature flag
-    mockSettings.features[flagName] = {
-      enabled,
-      description: description || `Feature flag: ${flagName}`,
-      lastModified: new Date(),
-      modifiedBy: req.adminEmail || 'admin',
-    };
-
-    // Log the feature flag creation
-    logger.info('Feature flag created', {
-      adminId: req.adminId,
-      adminEmail: req.adminEmail,
-      flagName,
-      enabled,
-      timestamp: new Date().toISOString(),
-    });
-
-    res.status(201).json({
-      success: true,
-      message: `Feature flag '${flagName}' created successfully`,
-      data: mockSettings.features[flagName],
-    });
+    // No Mock Data Policy enforcement - return proper error
+    throwNotImplementedError();
   } catch (error) {
     logger.error('Error in createFeatureFlag controller:', error);
     next(error);
@@ -310,31 +214,8 @@ export const deleteFeatureFlag = async (
       flagName,
     });
 
-    if (!mockSettings.features[flagName]) {
-      res.status(404).json({
-        success: false,
-        error: {
-          message: 'Feature flag not found',
-        },
-      });
-      return;
-    }
-
-    // Delete the feature flag
-    delete mockSettings.features[flagName];
-
-    // Log the feature flag deletion
-    logger.info('Feature flag deleted', {
-      adminId: req.adminId,
-      adminEmail: req.adminEmail,
-      flagName,
-      timestamp: new Date().toISOString(),
-    });
-
-    res.status(200).json({
-      success: true,
-      message: `Feature flag '${flagName}' deleted successfully`,
-    });
+    // No Mock Data Policy enforcement - return proper error
+    throwNotImplementedError();
   } catch (error) {
     logger.error('Error in deleteFeatureFlag controller:', error);
     next(error);
@@ -382,7 +263,7 @@ export const getSystemConfiguration = async (
           port: process.env.REDIS_PORT || '6379',
         },
       },
-      features: mockSettings.features,
+      features: defaultSettingsStructure.features,
     };
 
     res.status(200).json({
@@ -409,29 +290,8 @@ export const maintenanceMode = async (
       message: message ? 'provided' : 'none',
     });
 
-    // Update maintenance mode settings
-    mockSettings.general.maintenanceMode = enabled;
-    if (message) {
-      mockSettings.general.maintenanceMessage = message;
-    }
-
-    // Log the maintenance mode change
-    logger.warn('Maintenance mode updated', {
-      adminId: req.adminId,
-      adminEmail: req.adminEmail,
-      enabled,
-      message,
-      timestamp: new Date().toISOString(),
-    });
-
-    res.status(200).json({
-      success: true,
-      message: `Maintenance mode ${enabled ? 'enabled' : 'disabled'}`,
-      data: {
-        maintenanceMode: mockSettings.general.maintenanceMode,
-        maintenanceMessage: mockSettings.general.maintenanceMessage,
-      },
-    });
+    // No Mock Data Policy enforcement - return proper error
+    throwNotImplementedError();
   } catch (error) {
     logger.error('Error in maintenanceMode controller:', error);
     next(error);
