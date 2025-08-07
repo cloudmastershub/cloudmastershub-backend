@@ -360,4 +360,323 @@ router.get('/stats', async (req: AuthRequest, res: Response, next: NextFunction)
   }
 });
 
+// Analytics endpoints
+// Get instructor analytics overview
+router.get('/analytics/overview', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const instructorId = req.userId;
+    
+    // Get instructor courses and basic analytics
+    const instructorCourses = await Course.find({ 'instructor.id': instructorId }).lean();
+    const publishedCourses = instructorCourses.filter(c => c.status === 'published');
+    
+    const analytics = {
+      totalCourses: instructorCourses.length,
+      publishedCourses: publishedCourses.length,
+      totalStudents: instructorCourses.reduce((sum, course) => sum + (course.enrollmentCount || 0), 0),
+      averageRating: instructorCourses.length > 0 
+        ? instructorCourses.reduce((sum, course) => sum + (course.rating || 0), 0) / instructorCourses.length
+        : 0,
+      totalRevenue: 0, // Placeholder - would integrate with payment service
+      thisMonthEnrollments: 0, // Placeholder - would require date filtering
+      coursesInReview: instructorCourses.filter(c => c.status === 'under_review').length,
+      draftCourses: instructorCourses.filter(c => c.status === 'draft').length,
+      timestamp: new Date().toISOString()
+    };
+    
+    res.json({
+      success: true,
+      data: analytics
+    });
+  } catch (error: any) {
+    logger.error('Error fetching instructor analytics overview:', {
+      error: error.message,
+      instructorId: req.userId
+    });
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to fetch analytics overview',
+        details: error.message
+      }
+    });
+  }
+});
+
+// Get course-specific analytics
+router.get('/analytics/courses/:courseId', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { courseId } = req.params;
+    const instructorId = req.userId;
+    
+    // Find course by ObjectId or slug
+    let course = null;
+    const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(courseId);
+    
+    if (isValidObjectId) {
+      course = await Course.findById(courseId).lean();
+    }
+    
+    if (!course) {
+      course = await Course.findOne({ slug: courseId }).lean();
+    }
+    
+    if (!course) {
+      res.status(404).json({
+        success: false,
+        message: 'Course not found',
+        error: { code: 'COURSE_NOT_FOUND' }
+      });
+      return;
+    }
+    
+    // Check permission
+    if (course.instructor.id !== instructorId) {
+      res.status(403).json({
+        success: false,
+        message: 'Access denied',
+        error: { code: 'COURSE_ACCESS_DENIED' }
+      });
+      return;
+    }
+    
+    const analytics = {
+      courseId: course._id,
+      title: course.title,
+      totalStudents: course.enrollmentCount || 0,
+      rating: course.rating || 0,
+      completionRate: 0, // Placeholder - would require progress analysis
+      averageWatchTime: 0, // Placeholder - would require analytics data
+      revenue: 0, // Placeholder - would integrate with payment service
+      enrollmentsByMonth: [], // Placeholder - would require time-series data
+      topPerformingLessons: [], // Placeholder - would require lesson analytics
+      studentFeedback: [], // Placeholder - would require review data
+      timestamp: new Date().toISOString()
+    };
+    
+    res.json({
+      success: true,
+      data: analytics
+    });
+  } catch (error: any) {
+    logger.error('Error fetching course analytics:', {
+      error: error.message,
+      courseId: req.params.courseId,
+      instructorId: req.userId
+    });
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to fetch course analytics',
+        details: error.message
+      }
+    });
+  }
+});
+
+// Get student analytics
+router.get('/analytics/students', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const instructorId = req.userId;
+    
+    // Get instructor courses to calculate student metrics
+    const instructorCourses = await Course.find({ 'instructor.id': instructorId }).lean();
+    
+    const analytics = {
+      totalStudents: instructorCourses.reduce((sum, course) => sum + (course.enrollmentCount || 0), 0),
+      activeStudents: 0, // Placeholder - would require recent activity data
+      newStudentsThisMonth: 0, // Placeholder - would require enrollment date filtering
+      studentRetentionRate: 0, // Placeholder - would require completion analysis
+      topPerformingStudents: [], // Placeholder - would require student progress data
+      studentsByCountry: [], // Placeholder - would require user geographic data
+      studentEngagement: {
+        averageCompletionRate: 0,
+        averageTimeSpent: 0,
+        mostActiveHours: []
+      },
+      coursePopularity: instructorCourses.map(course => ({
+        courseId: course._id,
+        title: course.title,
+        enrollmentCount: course.enrollmentCount || 0,
+        rating: course.rating || 0
+      })).sort((a, b) => b.enrollmentCount - a.enrollmentCount),
+      timestamp: new Date().toISOString()
+    };
+    
+    res.json({
+      success: true,
+      data: analytics
+    });
+  } catch (error: any) {
+    logger.error('Error fetching student analytics:', {
+      error: error.message,
+      instructorId: req.userId
+    });
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to fetch student analytics',
+        details: error.message
+      }
+    });
+  }
+});
+
+// Get revenue analytics
+router.get('/analytics/revenue', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const instructorId = req.userId;
+    
+    // Get instructor courses for revenue calculation
+    const instructorCourses = await Course.find({ 'instructor.id': instructorId }).lean();
+    
+    const analytics = {
+      totalRevenue: 0, // Placeholder - would integrate with payment service
+      thisMonthRevenue: 0, // Placeholder - would require payment data filtering
+      revenueByMonth: [], // Placeholder - would require time-series payment data
+      revenueByCourse: instructorCourses.map(course => ({
+        courseId: course._id,
+        title: course.title,
+        price: course.price || 0,
+        enrollmentCount: course.enrollmentCount || 0,
+        estimatedRevenue: (course.price || 0) * (course.enrollmentCount || 0) * 0.7 // 70% instructor share estimate
+      })).sort((a, b) => b.estimatedRevenue - a.estimatedRevenue),
+      pendingPayouts: 0, // Placeholder - would require payout system integration
+      averageOrderValue: 0, // Placeholder - would require payment analysis
+      conversionRate: 0, // Placeholder - would require funnel analysis
+      refundRate: 0, // Placeholder - would require refund data
+      timestamp: new Date().toISOString()
+    };
+    
+    res.json({
+      success: true,
+      data: analytics
+    });
+  } catch (error: any) {
+    logger.error('Error fetching revenue analytics:', {
+      error: error.message,
+      instructorId: req.userId
+    });
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to fetch revenue analytics',
+        details: error.message
+      }
+    });
+  }
+});
+
+// Student management endpoints
+// Get all students across instructor's courses
+router.get('/students', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const instructorId = req.userId;
+    
+    // Get instructor courses to find enrolled students
+    const instructorCourses = await Course.find({ 'instructor.id': instructorId }).lean();
+    
+    const students = {
+      totalStudents: instructorCourses.reduce((sum, course) => sum + (course.enrollmentCount || 0), 0),
+      courseEnrollments: instructorCourses.map(course => ({
+        courseId: course._id,
+        title: course.title,
+        enrollmentCount: course.enrollmentCount || 0,
+        students: [] // Placeholder - would require enrollment/progress data integration
+      })),
+      recentEnrollments: [], // Placeholder - would require recent enrollment data
+      topPerformingStudents: [], // Placeholder - would require progress analysis
+      timestamp: new Date().toISOString()
+    };
+    
+    res.json({
+      success: true,
+      data: students
+    });
+  } catch (error: any) {
+    logger.error('Error fetching instructor students:', {
+      error: error.message,
+      instructorId: req.userId
+    });
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to fetch students',
+        details: error.message
+      }
+    });
+  }
+});
+
+// Get students for specific course
+router.get('/courses/:courseId/students', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { courseId } = req.params;
+    const instructorId = req.userId;
+    
+    // Find course by ObjectId or slug
+    let course = null;
+    const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(courseId);
+    
+    if (isValidObjectId) {
+      course = await Course.findById(courseId).lean();
+    }
+    
+    if (!course) {
+      course = await Course.findOne({ slug: courseId }).lean();
+    }
+    
+    if (!course) {
+      res.status(404).json({
+        success: false,
+        message: 'Course not found',
+        error: { code: 'COURSE_NOT_FOUND' }
+      });
+      return;
+    }
+    
+    // Check permission
+    if (course.instructor.id !== instructorId) {
+      res.status(403).json({
+        success: false,
+        message: 'Access denied',
+        error: { code: 'COURSE_ACCESS_DENIED' }
+      });
+      return;
+    }
+    
+    const students = {
+      courseId: course._id,
+      courseTitle: course.title,
+      totalEnrollments: course.enrollmentCount || 0,
+      students: [], // Placeholder - would require CourseProgress integration
+      enrollmentStats: {
+        totalEnrollments: course.enrollmentCount || 0,
+        activeStudents: 0,
+        completedStudents: 0,
+        averageProgress: 0
+      },
+      timestamp: new Date().toISOString()
+    };
+    
+    res.json({
+      success: true,
+      data: students
+    });
+  } catch (error: any) {
+    logger.error('Error fetching course students:', {
+      error: error.message,
+      courseId: req.params.courseId,
+      instructorId: req.userId
+    });
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to fetch course students',
+        details: error.message
+      }
+    });
+  }
+});
+
 export default router;
