@@ -470,7 +470,8 @@ export const updateCourse = async (
     }
 
     // Check if user has permission to update this course
-    if (course.instructor.id !== instructorId && !req.headers['x-is-admin']) {
+    const isAdmin = authReq.userRoles?.includes('admin') || req.headers['x-is-admin'];
+    if (course.instructor.id !== instructorId && !isAdmin) {
       res.status(403).json({
         success: false,
         message: 'Unauthorized to update this course',
@@ -556,8 +557,20 @@ export const deleteCourse = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const instructorId = req.headers['x-user-id'] || 'instructor-123';
+    // Get instructor ID from authenticated user (set by authentication middleware)
+    const authReq = req as any; // AuthRequest interface
+    const instructorId = authReq.userId || req.headers['x-user-id'] || 'instructor-123';
     const reason = req.body.reason || 'Course deletion requested';
+
+    logger.info('Delete course request:', { 
+      courseId: id, 
+      instructorId,
+      userRoles: authReq.userRoles,
+      headers: {
+        'x-user-id': req.headers['x-user-id'],
+        'x-is-admin': req.headers['x-is-admin']
+      }
+    });
 
     // Support both ObjectId and slug lookup like admin instructor assignment endpoint
     let course = null;
@@ -572,6 +585,13 @@ export const deleteCourse = async (
     }
 
     if (!course) {
+      logger.warn('Course not found for deletion:', { 
+        searchId: id, 
+        isValidObjectId,
+        searchedAsObjectId: isValidObjectId,
+        searchedAsSlug: true
+      });
+      
       res.status(404).json({
         success: false,
         message: 'Course not found',
@@ -584,7 +604,25 @@ export const deleteCourse = async (
     }
 
     // Check if user has permission to delete this course
-    if (course.instructor.id !== instructorId && !req.headers['x-is-admin']) {
+    const isAdmin = authReq.userRoles?.includes('admin') || req.headers['x-is-admin'];
+    
+    logger.info('Permission check for course deletion:', {
+      courseInstructorId: course.instructor.id,
+      requestingUserId: instructorId,
+      isOwner: course.instructor.id === instructorId,
+      isAdmin: isAdmin,
+      userRoles: authReq.userRoles
+    });
+    
+    if (course.instructor.id !== instructorId && !isAdmin) {
+      logger.warn('Unauthorized course deletion attempt:', {
+        courseId: course._id,
+        courseSlug: course.slug,
+        courseInstructorId: course.instructor.id,
+        requestingUserId: instructorId,
+        isAdmin: isAdmin
+      });
+      
       res.status(403).json({
         success: false,
         message: 'Unauthorized to delete this course',
