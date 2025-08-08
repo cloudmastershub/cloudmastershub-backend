@@ -664,9 +664,23 @@ router.get('/students', async (req: AuthRequest, res: Response, next: NextFuncti
       courseId: { $in: courseIds } 
     }).select('userId courseId enrolledAt progress lastAccessedAt completedLessons completedAt').sort({ lastAccessedAt: -1 }).lean();
     
-    // Transform data to match frontend expectations
+    if (enrollments.length === 0) {
+      res.json({
+        success: true,
+        data: []
+      });
+      return;
+    }
+    
+    // Get real user data from user service
+    const { userServiceClient } = await import('../utils/userServiceClient');
+    const userIds = [...new Set(enrollments.map(e => e.userId))]; // Remove duplicates
+    const userProfiles = await userServiceClient.getUserProfiles(userIds);
+    
+    // Transform data to match frontend expectations with real user data
     const students = enrollments.map(enrollment => {
       const course = instructorCourses.find(c => c._id.toString() === enrollment.courseId);
+      const userProfile = userProfiles[enrollment.userId];
       
       return {
         id: enrollment._id.toString(),
@@ -676,7 +690,7 @@ router.get('/students', async (req: AuthRequest, res: Response, next: NextFuncti
         status: enrollment.completedAt ? 'completed' : 'active',
         progress: {
           completedLessons: enrollment.completedLessons?.length || 0,
-          totalLessons: 10, // Default - would be calculated from course curriculum
+          totalLessons: course?.curriculum?.reduce((sum, section) => sum + (section.lessons?.length || 0), 0) || 10,
           completedLabs: 0, // Default - would require lab progress integration
           totalLabs: 3, // Default - would be calculated from course curriculum
           overallProgress: enrollment.progress,
@@ -688,18 +702,20 @@ router.get('/students', async (req: AuthRequest, res: Response, next: NextFuncti
           thumbnail: course?.thumbnail || 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&h=300&fit=crop'
         },
         user: {
-          id: enrollment.userId,
-          firstName: 'Student', // Would be populated from user service
-          lastName: `${enrollment.userId.substring(0, 8)}`,
-          email: `${enrollment.userId}@example.com` // Would be populated from user service
+          id: userProfile.id,
+          firstName: userProfile.firstName,
+          lastName: userProfile.lastName,
+          email: userProfile.email,
+          avatar: userProfile.avatar
         }
       };
     });
     
-    logger.info('Retrieved instructor students from database:', {
+    logger.info('Retrieved instructor students with real user data:', {
       instructorId,
       totalCourses: instructorCourses.length,
-      totalStudents: students.length
+      totalStudents: students.length,
+      usersWithProfiles: Object.keys(userProfiles).length
     });
     
     res.json({
@@ -764,33 +780,65 @@ router.get('/courses/:courseId/students', async (req: AuthRequest, res: Response
       courseId: course._id.toString() 
     }).select('userId courseId enrolledAt progress lastAccessedAt completedLessons completedAt').sort({ lastAccessedAt: -1 }).lean();
     
-    // Transform to match frontend expectations
-    const students = enrollments.map(enrollment => ({
-      id: enrollment._id.toString(),
-      userId: enrollment.userId,
-      courseId: enrollment.courseId,
-      enrolledAt: enrollment.enrolledAt.toISOString(),
-      status: enrollment.completedAt ? 'completed' : 'active',
-      progress: {
-        completedLessons: enrollment.completedLessons?.length || 0,
-        totalLessons: course.curriculum?.reduce((sum, section) => sum + (section.lessons?.length || 0), 0) || 10,
-        completedLabs: 0, // Would require lab progress integration
-        totalLabs: 3, // Default
-        overallProgress: enrollment.progress,
-        lastActivity: enrollment.lastAccessedAt.toISOString()
-      },
-      course: {
-        id: course._id.toString(),
-        title: course.title,
-        thumbnail: course.thumbnail || 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&h=300&fit=crop'
-      },
-      user: {
-        id: enrollment.userId,
-        firstName: 'Student', // Would be populated from user service
-        lastName: `${enrollment.userId.substring(0, 8)}`,
-        email: `${enrollment.userId}@example.com` // Would be populated from user service
-      }
-    }));
+    if (enrollments.length === 0) {
+      const result = {
+        courseId: course._id,
+        courseTitle: course.title,
+        totalEnrollments: 0,
+        students: [],
+        enrollmentStats: {
+          totalEnrollments: 0,
+          activeStudents: 0,
+          completedStudents: 0,
+          averageProgress: 0
+        },
+        timestamp: new Date().toISOString()
+      };
+      
+      res.json({
+        success: true,
+        data: result
+      });
+      return;
+    }
+    
+    // Get real user data from user service
+    const { userServiceClient } = await import('../utils/userServiceClient');
+    const userIds = [...new Set(enrollments.map(e => e.userId))]; // Remove duplicates
+    const userProfiles = await userServiceClient.getUserProfiles(userIds);
+    
+    // Transform to match frontend expectations with real user data
+    const students = enrollments.map(enrollment => {
+      const userProfile = userProfiles[enrollment.userId];
+      
+      return {
+        id: enrollment._id.toString(),
+        userId: enrollment.userId,
+        courseId: enrollment.courseId,
+        enrolledAt: enrollment.enrolledAt.toISOString(),
+        status: enrollment.completedAt ? 'completed' : 'active',
+        progress: {
+          completedLessons: enrollment.completedLessons?.length || 0,
+          totalLessons: course.curriculum?.reduce((sum, section) => sum + (section.lessons?.length || 0), 0) || 10,
+          completedLabs: 0, // Would require lab progress integration
+          totalLabs: 3, // Default
+          overallProgress: enrollment.progress,
+          lastActivity: enrollment.lastAccessedAt.toISOString()
+        },
+        course: {
+          id: course._id.toString(),
+          title: course.title,
+          thumbnail: course.thumbnail || 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&h=300&fit=crop'
+        },
+        user: {
+          id: userProfile.id,
+          firstName: userProfile.firstName,
+          lastName: userProfile.lastName,
+          email: userProfile.email,
+          avatar: userProfile.avatar
+        }
+      };
+    });
     
     // Calculate stats
     const activeStudents = students.filter(s => s.status === 'active').length;
@@ -813,12 +861,13 @@ router.get('/courses/:courseId/students', async (req: AuthRequest, res: Response
       timestamp: new Date().toISOString()
     };
     
-    logger.info('Retrieved course students from database:', {
+    logger.info('Retrieved course students with real user data:', {
       instructorId,
       courseId: course._id,
       totalStudents: students.length,
       activeStudents,
-      completedStudents
+      completedStudents,
+      usersWithProfiles: Object.keys(userProfiles).length
     });
     
     res.json({
