@@ -7,7 +7,10 @@ import {
   getAdminUser,
   createAdminUser,
   updateAdminUser,
-  deleteAdminUser
+  deleteAdminUser,
+  updateUserRoles,
+  updateUserSubscription,
+  updateUserStatus
 } from '../controllers/adminController';
 import { UserRole } from '../models/User';
 
@@ -73,5 +76,29 @@ router.put('/users/:userId', updateAdminUser);
  * @access  Admin only
  */
 router.delete('/users/:userId', deleteAdminUser);
+
+/**
+ * @route   PUT /admin/users/:userId/roles
+ * @desc    Update user roles
+ * @access  Admin only
+ * @body    { roles: string[] }
+ */
+router.put('/users/:userId/roles', updateUserRoles);
+
+/**
+ * @route   PUT /admin/users/:userId/subscription
+ * @desc    Update user subscription tier
+ * @access  Admin only
+ * @body    { subscriptionTier: string }
+ */
+router.put('/users/:userId/subscription', updateUserSubscription);
+
+/**
+ * @route   PUT /admin/users/:userId/status
+ * @desc    Update user status (activate, suspend, ban)
+ * @access  Admin only
+ * @body    { action: string, reason?: string }
+ */
+router.put('/users/:userId/status', updateUserStatus);
 
 export default router;

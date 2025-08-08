@@ -718,3 +718,282 @@ export const deleteAdminUser = async (req: AuthenticatedRequest, res: Response):
     });
   }
 };
+
+/**
+ * Update user roles
+ */
+export const updateUserRoles = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { userId } = req.params;
+    const { roles } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid user ID format'
+      });
+      return;
+    }
+
+    if (!Array.isArray(roles)) {
+      res.status(400).json({
+        success: false,
+        message: 'Roles must be an array'
+      });
+      return;
+    }
+
+    const validRoles = Object.values(UserRole);
+    const invalidRoles = roles.filter(role => !validRoles.includes(role));
+    if (invalidRoles.length > 0) {
+      res.status(400).json({
+        success: false,
+        message: `Invalid roles: ${invalidRoles.join(', ')}`
+      });
+      return;
+    }
+
+    // Prevent removing admin role from self
+    if (userId === req.userId && !roles.includes(UserRole.ADMIN)) {
+      res.status(400).json({
+        success: false,
+        message: 'Cannot remove admin role from your own account'
+      });
+      return;
+    }
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { 
+        roles,
+        updatedAt: new Date()
+      },
+      { new: true }
+    ).select('-password -__v');
+
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+      return;
+    }
+
+    logger.info('Admin updated user roles', {
+      adminId: req.userId,
+      targetUserId: userId,
+      newRoles: roles,
+      previousRoles: user.roles
+    });
+
+    res.json({
+      success: true,
+      message: 'User roles updated successfully',
+      data: {
+        id: user._id,
+        email: user.email,
+        roles: user.roles,
+        updatedAt: user.updatedAt
+      }
+    });
+  } catch (error) {
+    logger.error('Failed to update user roles:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update user roles',
+      error: {
+        code: 'USER_ROLES_UPDATE_ERROR',
+        details: process.env.NODE_ENV === 'development' ? error : undefined
+      }
+    });
+  }
+};
+
+/**
+ * Update user subscription tier
+ */
+export const updateUserSubscription = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { userId } = req.params;
+    const { subscriptionTier } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid user ID format'
+      });
+      return;
+    }
+
+    if (!subscriptionTier) {
+      res.status(400).json({
+        success: false,
+        message: 'Subscription tier is required'
+      });
+      return;
+    }
+
+    const validTiers = ['free', 'individual', 'professional', 'enterprise'];
+    if (!validTiers.includes(subscriptionTier)) {
+      res.status(400).json({
+        success: false,
+        message: `Invalid subscription tier: ${subscriptionTier}`
+      });
+      return;
+    }
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { 
+        subscription: subscriptionTier,
+        updatedAt: new Date()
+      },
+      { new: true }
+    ).select('-password -__v');
+
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+      return;
+    }
+
+    logger.info('Admin updated user subscription', {
+      adminId: req.userId,
+      targetUserId: userId,
+      newSubscription: subscriptionTier,
+      previousSubscription: user.subscription
+    });
+
+    res.json({
+      success: true,
+      message: 'User subscription updated successfully',
+      data: {
+        id: user._id,
+        email: user.email,
+        subscription: user.subscription,
+        updatedAt: user.updatedAt
+      }
+    });
+  } catch (error) {
+    logger.error('Failed to update user subscription:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update user subscription',
+      error: {
+        code: 'USER_SUBSCRIPTION_UPDATE_ERROR',
+        details: process.env.NODE_ENV === 'development' ? error : undefined
+      }
+    });
+  }
+};
+
+/**
+ * Update user status (activate, suspend, ban)
+ */
+export const updateUserStatus = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { userId } = req.params;
+    const { action, reason } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid user ID format'
+      });
+      return;
+    }
+
+    if (!action) {
+      res.status(400).json({
+        success: false,
+        message: 'Action is required'
+      });
+      return;
+    }
+
+    const validActions = ['activate', 'suspend', 'ban'];
+    if (!validActions.includes(action)) {
+      res.status(400).json({
+        success: false,
+        message: `Invalid action: ${action}`
+      });
+      return;
+    }
+
+    // Prevent self-targeting for suspend/ban actions
+    if (userId === req.userId && (action === 'suspend' || action === 'ban')) {
+      res.status(400).json({
+        success: false,
+        message: 'Cannot suspend or ban your own account'
+      });
+      return;
+    }
+
+    let updateData: any = {
+      updatedAt: new Date()
+    };
+
+    switch (action) {
+      case 'activate':
+        updateData.isActive = true;
+        updateData.bannedAt = null;
+        updateData.suspendedAt = null;
+        break;
+      case 'suspend':
+        updateData.isActive = false;
+        updateData.suspendedAt = new Date();
+        updateData.suspensionReason = reason;
+        break;
+      case 'ban':
+        updateData.isActive = false;
+        updateData.bannedAt = new Date();
+        updateData.banReason = reason;
+        break;
+    }
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      updateData,
+      { new: true }
+    ).select('-password -__v');
+
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+      return;
+    }
+
+    logger.info(`Admin ${action}ed user`, {
+      adminId: req.userId,
+      targetUserId: userId,
+      action,
+      reason,
+      targetUserEmail: user.email
+    });
+
+    res.json({
+      success: true,
+      message: `User ${action}ed successfully`,
+      data: {
+        id: user._id,
+        email: user.email,
+        isActive: user.isActive,
+        updatedAt: user.updatedAt
+      }
+    });
+  } catch (error) {
+    logger.error('Failed to update user status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update user status',
+      error: {
+        code: 'USER_STATUS_UPDATE_ERROR',
+        details: process.env.NODE_ENV === 'development' ? error : undefined
+      }
+    });
+  }
+};

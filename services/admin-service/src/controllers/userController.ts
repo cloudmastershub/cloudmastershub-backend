@@ -355,3 +355,140 @@ export const bulkUserAction = async (
     next(error);
   }
 };
+
+export const updateUserRoles = async (
+  req: AdminRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { userId } = req.params;
+    const { roles } = req.body;
+
+    if (!Array.isArray(roles)) {
+      res.status(400).json({
+        success: false,
+        error: {
+          message: 'Roles must be an array',
+        },
+      });
+      return;
+    }
+
+    const validRoles = ['student', 'instructor', 'admin'];
+    const invalidRoles = roles.filter(role => !validRoles.includes(role));
+    if (invalidRoles.length > 0) {
+      res.status(400).json({
+        success: false,
+        error: {
+          message: `Invalid roles: ${invalidRoles.join(', ')}`,
+        },
+      });
+      return;
+    }
+
+    logger.info('Admin updating user roles', {
+      adminId: req.adminId,
+      targetUserId: userId,
+      newRoles: roles,
+    });
+
+    const result = await userService.updateUserRoles(userId, roles);
+
+    if (!result.success) {
+      res.status(400).json({
+        success: false,
+        error: {
+          message: result.error || 'Failed to update user roles',
+        },
+      });
+      return;
+    }
+
+    // Log the successful admin action
+    logger.info('User roles updated successfully', {
+      adminId: req.adminId,
+      adminEmail: req.adminEmail,
+      targetUserId: userId,
+      newRoles: roles,
+      timestamp: new Date().toISOString(),
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'User roles updated successfully',
+      data: result.data,
+    });
+  } catch (error) {
+    logger.error('Error in updateUserRoles controller:', error);
+    next(error);
+  }
+};
+
+export const updateUserSubscription = async (
+  req: AdminRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { userId } = req.params;
+    const { subscriptionTier } = req.body;
+
+    if (!subscriptionTier) {
+      res.status(400).json({
+        success: false,
+        error: {
+          message: 'Subscription tier is required',
+        },
+      });
+      return;
+    }
+
+    const validTiers = ['free', 'individual', 'professional', 'enterprise'];
+    if (!validTiers.includes(subscriptionTier)) {
+      res.status(400).json({
+        success: false,
+        error: {
+          message: `Invalid subscription tier: ${subscriptionTier}`,
+        },
+      });
+      return;
+    }
+
+    logger.info('Admin updating user subscription', {
+      adminId: req.adminId,
+      targetUserId: userId,
+      newSubscriptionTier: subscriptionTier,
+    });
+
+    const result = await userService.updateUserSubscription(userId, subscriptionTier);
+
+    if (!result.success) {
+      res.status(400).json({
+        success: false,
+        error: {
+          message: result.error || 'Failed to update user subscription',
+        },
+      });
+      return;
+    }
+
+    // Log the successful admin action
+    logger.info('User subscription updated successfully', {
+      adminId: req.adminId,
+      adminEmail: req.adminEmail,
+      targetUserId: userId,
+      newSubscriptionTier: subscriptionTier,
+      timestamp: new Date().toISOString(),
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'User subscription updated successfully',
+      data: result.data,
+    });
+  } catch (error) {
+    logger.error('Error in updateUserSubscription controller:', error);
+    next(error);
+  }
+};

@@ -7,6 +7,8 @@ import {
   reviewInstructorApplication,
   getUserStats,
   bulkUserAction,
+  updateUserRoles,
+  updateUserSubscription,
 } from '../controllers/userController';
 import { requireAdmin, requirePermission, logAdminAction } from '../middleware/adminAuth';
 import {
@@ -51,6 +53,22 @@ router.put(
   validateUserAction,
   logAdminAction('MANAGE_USER_STATUS'),
   manageUser
+);
+
+// Role management
+router.put(
+  '/:userId/roles',
+  requirePermission(AdminPermission.MANAGE_USERS),
+  logAdminAction('UPDATE_USER_ROLES'),
+  updateUserRoles
+);
+
+// Subscription management
+router.put(
+  '/:userId/subscription',
+  requirePermission(AdminPermission.MANAGE_USERS),
+  logAdminAction('UPDATE_USER_SUBSCRIPTION'),
+  updateUserSubscription
 );
 
 router.post(

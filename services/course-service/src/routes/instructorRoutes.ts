@@ -480,29 +480,101 @@ router.get('/analytics/students', async (req: AuthRequest, res: Response, next: 
   try {
     const instructorId = req.userId;
     
-    // Get instructor courses to calculate student metrics
+    // Get instructor courses
     const instructorCourses = await Course.find({ 'instructor.id': instructorId }).lean();
+    const courseIds = instructorCourses.map(c => c._id.toString());
+    
+    if (courseIds.length === 0) {
+      res.json({
+        success: true,
+        data: {
+          totalStudents: 0,
+          activeStudents: 0,
+          completionRate: 0,
+          averageProgress: 0,
+          recentActivities: [],
+          topPerformers: [],
+          strugglingStudents: []
+        }
+      });
+      return;
+    }
+    
+    // Get real enrollment data
+    const { CourseProgress } = await import('../models');
+    const enrollments = await CourseProgress.find({ 
+      courseId: { $in: courseIds } 
+    }).lean();
+    
+    // Calculate real analytics
+    const totalStudents = enrollments.length;
+    const completedStudents = enrollments.filter(e => e.completedAt).length;
+    const completionRate = totalStudents > 0 ? Math.round((completedStudents / totalStudents) * 100) : 0;
+    const averageProgress = totalStudents > 0 
+      ? Math.round(enrollments.reduce((sum, e) => sum + e.progress, 0) / totalStudents) 
+      : 0;
+    
+    // Recent activity (last 7 days)
+    const recentDate = new Date();
+    recentDate.setDate(recentDate.getDate() - 7);
+    const activeStudents = enrollments.filter(e => e.lastAccessedAt >= recentDate).length;
+    
+    // Top performers (highest progress)
+    const topPerformers = enrollments
+      .sort((a, b) => b.progress - a.progress)
+      .slice(0, 5)
+      .map(e => ({
+        userId: e.userId,
+        progress: e.progress,
+        courseId: e.courseId
+      }));
+    
+    // Struggling students (low progress, enrolled > 30 days ago)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const strugglingStudents = enrollments
+      .filter(e => e.enrolledAt <= thirtyDaysAgo && e.progress < 25)
+      .sort((a, b) => a.progress - b.progress)
+      .slice(0, 5)
+      .map(e => ({
+        userId: e.userId,
+        progress: e.progress,
+        courseId: e.courseId,
+        enrolledAt: e.enrolledAt
+      }));
     
     const analytics = {
-      totalStudents: instructorCourses.reduce((sum, course) => sum + (course.enrollmentCount || 0), 0),
-      activeStudents: 0, // Placeholder - would require recent activity data
-      newStudentsThisMonth: 0, // Placeholder - would require enrollment date filtering
-      studentRetentionRate: 0, // Placeholder - would require completion analysis
-      topPerformingStudents: [], // Placeholder - would require student progress data
-      studentsByCountry: [], // Placeholder - would require user geographic data
-      studentEngagement: {
-        averageCompletionRate: 0,
-        averageTimeSpent: 0,
-        mostActiveHours: []
-      },
-      coursePopularity: instructorCourses.map(course => ({
-        courseId: course._id,
-        title: course.title,
-        enrollmentCount: course.enrollmentCount || 0,
-        rating: course.rating || 0
-      })).sort((a, b) => b.enrollmentCount - a.enrollmentCount),
+      totalStudents,
+      activeStudents,
+      completionRate,
+      averageProgress,
+      recentActivities: [], // Would require activity log integration
+      topPerformers,
+      strugglingStudents,
+      coursePopularity: instructorCourses.map(course => {
+        const courseEnrollments = enrollments.filter(e => e.courseId === course._id.toString());
+        return {
+          courseId: course._id,
+          title: course.title,
+          enrollmentCount: courseEnrollments.length,
+          completionRate: courseEnrollments.length > 0 
+            ? Math.round((courseEnrollments.filter(e => e.completedAt).length / courseEnrollments.length) * 100)
+            : 0,
+          averageProgress: courseEnrollments.length > 0
+            ? Math.round(courseEnrollments.reduce((sum, e) => sum + e.progress, 0) / courseEnrollments.length)
+            : 0
+        };
+      }).sort((a, b) => b.enrollmentCount - a.enrollmentCount),
       timestamp: new Date().toISOString()
     };
+    
+    logger.info('Retrieved student analytics from database:', {
+      instructorId,
+      totalStudents,
+      activeStudents,
+      completionRate,
+      averageProgress
+    });
     
     res.json({
       success: true,
@@ -574,21 +646,61 @@ router.get('/students', async (req: AuthRequest, res: Response, next: NextFuncti
   try {
     const instructorId = req.userId;
     
-    // Get instructor courses to find enrolled students
-    const instructorCourses = await Course.find({ 'instructor.id': instructorId }).lean();
+    // Get instructor courses
+    const instructorCourses = await Course.find({ 'instructor.id': instructorId }).select('_id title thumbnail').lean();
+    const courseIds = instructorCourses.map(c => c._id.toString());
     
-    const students = {
-      totalStudents: instructorCourses.reduce((sum, course) => sum + (course.enrollmentCount || 0), 0),
-      courseEnrollments: instructorCourses.map(course => ({
-        courseId: course._id,
-        title: course.title,
-        enrollmentCount: course.enrollmentCount || 0,
-        students: [] // Placeholder - would require enrollment/progress data integration
-      })),
-      recentEnrollments: [], // Placeholder - would require recent enrollment data
-      topPerformingStudents: [], // Placeholder - would require progress analysis
-      timestamp: new Date().toISOString()
-    };
+    if (courseIds.length === 0) {
+      res.json({
+        success: true,
+        data: []
+      });
+      return;
+    }
+    
+    // Get real student enrollment data from CourseProgress
+    const { CourseProgress } = await import('../models');
+    const enrollments = await CourseProgress.find({ 
+      courseId: { $in: courseIds } 
+    }).select('userId courseId enrolledAt progress lastAccessedAt completedLessons completedAt').sort({ lastAccessedAt: -1 }).lean();
+    
+    // Transform data to match frontend expectations
+    const students = enrollments.map(enrollment => {
+      const course = instructorCourses.find(c => c._id.toString() === enrollment.courseId);
+      
+      return {
+        id: enrollment._id.toString(),
+        userId: enrollment.userId,
+        courseId: enrollment.courseId,
+        enrolledAt: enrollment.enrolledAt.toISOString(),
+        status: enrollment.completedAt ? 'completed' : 'active',
+        progress: {
+          completedLessons: enrollment.completedLessons?.length || 0,
+          totalLessons: 10, // Default - would be calculated from course curriculum
+          completedLabs: 0, // Default - would require lab progress integration
+          totalLabs: 3, // Default - would be calculated from course curriculum
+          overallProgress: enrollment.progress,
+          lastActivity: enrollment.lastAccessedAt.toISOString()
+        },
+        course: {
+          id: course?._id.toString() || enrollment.courseId,
+          title: course?.title || 'Unknown Course',
+          thumbnail: course?.thumbnail || 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&h=300&fit=crop'
+        },
+        user: {
+          id: enrollment.userId,
+          firstName: 'Student', // Would be populated from user service
+          lastName: `${enrollment.userId.substring(0, 8)}`,
+          email: `${enrollment.userId}@example.com` // Would be populated from user service
+        }
+      };
+    });
+    
+    logger.info('Retrieved instructor students from database:', {
+      instructorId,
+      totalCourses: instructorCourses.length,
+      totalStudents: students.length
+    });
     
     res.json({
       success: true,
@@ -646,23 +758,72 @@ router.get('/courses/:courseId/students', async (req: AuthRequest, res: Response
       return;
     }
     
-    const students = {
+    // Get real student enrollment data
+    const { CourseProgress } = await import('../models');
+    const enrollments = await CourseProgress.find({ 
+      courseId: course._id.toString() 
+    }).select('userId courseId enrolledAt progress lastAccessedAt completedLessons completedAt').sort({ lastAccessedAt: -1 }).lean();
+    
+    // Transform to match frontend expectations
+    const students = enrollments.map(enrollment => ({
+      id: enrollment._id.toString(),
+      userId: enrollment.userId,
+      courseId: enrollment.courseId,
+      enrolledAt: enrollment.enrolledAt.toISOString(),
+      status: enrollment.completedAt ? 'completed' : 'active',
+      progress: {
+        completedLessons: enrollment.completedLessons?.length || 0,
+        totalLessons: course.curriculum?.reduce((sum, section) => sum + (section.lessons?.length || 0), 0) || 10,
+        completedLabs: 0, // Would require lab progress integration
+        totalLabs: 3, // Default
+        overallProgress: enrollment.progress,
+        lastActivity: enrollment.lastAccessedAt.toISOString()
+      },
+      course: {
+        id: course._id.toString(),
+        title: course.title,
+        thumbnail: course.thumbnail || 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&h=300&fit=crop'
+      },
+      user: {
+        id: enrollment.userId,
+        firstName: 'Student', // Would be populated from user service
+        lastName: `${enrollment.userId.substring(0, 8)}`,
+        email: `${enrollment.userId}@example.com` // Would be populated from user service
+      }
+    }));
+    
+    // Calculate stats
+    const activeStudents = students.filter(s => s.status === 'active').length;
+    const completedStudents = students.filter(s => s.status === 'completed').length;
+    const averageProgress = students.length > 0 
+      ? students.reduce((sum, s) => sum + s.progress.overallProgress, 0) / students.length 
+      : 0;
+    
+    const result = {
       courseId: course._id,
       courseTitle: course.title,
-      totalEnrollments: course.enrollmentCount || 0,
-      students: [], // Placeholder - would require CourseProgress integration
+      totalEnrollments: students.length,
+      students: students,
       enrollmentStats: {
-        totalEnrollments: course.enrollmentCount || 0,
-        activeStudents: 0,
-        completedStudents: 0,
-        averageProgress: 0
+        totalEnrollments: students.length,
+        activeStudents,
+        completedStudents,
+        averageProgress: Math.round(averageProgress)
       },
       timestamp: new Date().toISOString()
     };
     
+    logger.info('Retrieved course students from database:', {
+      instructorId,
+      courseId: course._id,
+      totalStudents: students.length,
+      activeStudents,
+      completedStudents
+    });
+    
     res.json({
       success: true,
-      data: students
+      data: result
     });
   } catch (error: any) {
     logger.error('Error fetching course students:', {

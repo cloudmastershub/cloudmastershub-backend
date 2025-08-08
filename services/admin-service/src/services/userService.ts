@@ -194,6 +194,48 @@ class UserServiceClient {
       };
     }
   }
+
+  async updateUserRoles(userId: string, roles: string[]): Promise<ServiceResponse> {
+    try {
+      const response = await fetch(`${this.baseUrl}/admin/users/${userId}/roles`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ roles }),
+      });
+
+      const data = await response.json();
+      return data as ServiceResponse;
+    } catch (error) {
+      logger.error('Failed to update user roles:', error);
+      return {
+        success: false,
+        error: 'Failed to communicate with user service',
+      };
+    }
+  }
+
+  async updateUserSubscription(userId: string, subscriptionTier: string): Promise<ServiceResponse> {
+    try {
+      const response = await fetch(`${this.baseUrl}/admin/users/${userId}/subscription`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ subscriptionTier }),
+      });
+
+      const data = await response.json();
+      return data as ServiceResponse;
+    } catch (error) {
+      logger.error('Failed to update user subscription:', error);
+      return {
+        success: false,
+        error: 'Failed to communicate with user service',
+      };
+    }
+  }
 }
 
 export default new UserServiceClient();
