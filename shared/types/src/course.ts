@@ -49,6 +49,7 @@ export enum CourseStatus {
 export interface Instructor {
   id: string;
   name: string;
+  email?: string; // Optional email field for frontend compatibility
   avatar: string;
   bio: string;
   expertise: string[];

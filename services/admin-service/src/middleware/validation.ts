@@ -235,3 +235,172 @@ export const validateReportRequest = [
 
   handleValidationErrors,
 ];
+
+// Learning Path Validation
+export const validatePathList = [
+  query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
+
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage('Limit must be between 1 and 100'),
+
+  query('search')
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Search query must be 1-100 characters'),
+
+  query('category')
+    .optional()
+    .isIn(['cloud', 'devops', 'security', 'data', 'ai'])
+    .withMessage('Invalid category'),
+
+  query('level')
+    .optional()
+    .isIn(['beginner', 'intermediate', 'advanced', 'expert'])
+    .withMessage('Invalid level'),
+
+  query('status')
+    .optional()
+    .isIn(['draft', 'published', 'archived'])
+    .withMessage('Invalid status'),
+
+  query('sortBy')
+    .optional()
+    .isIn(['title', 'createdAt', 'updatedAt', 'enrollmentCount', 'totalDuration'])
+    .withMessage('Invalid sort field'),
+
+  query('sortOrder')
+    .optional()
+    .isIn(['asc', 'desc'])
+    .withMessage('Sort order must be asc or desc'),
+
+  handleValidationErrors,
+];
+
+export const validateCreatePath = [
+  body('title')
+    .trim()
+    .isLength({ min: 3, max: 100 })
+    .withMessage('Title must be 3-100 characters'),
+
+  body('description')
+    .trim()
+    .isLength({ min: 10, max: 1000 })
+    .withMessage('Description must be 10-1000 characters'),
+
+  body('shortDescription')
+    .optional()
+    .trim()
+    .isLength({ max: 200 })
+    .withMessage('Short description must be less than 200 characters'),
+
+  body('category')
+    .isIn(['cloud', 'devops', 'security', 'data', 'ai'])
+    .withMessage('Invalid category'),
+
+  body('level')
+    .isIn(['beginner', 'intermediate', 'advanced', 'expert'])
+    .withMessage('Invalid level'),
+
+  body('price')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Price must be a positive number'),
+
+  body('currency')
+    .optional()
+    .isIn(['USD', 'EUR', 'GBP'])
+    .withMessage('Invalid currency'),
+
+  body('isFree')
+    .optional()
+    .isBoolean()
+    .withMessage('isFree must be boolean'),
+
+  body('status')
+    .optional()
+    .isIn(['draft', 'published', 'archived'])
+    .withMessage('Invalid status'),
+
+  body('outcomes')
+    .optional()
+    .isArray()
+    .withMessage('Outcomes must be an array'),
+
+  body('prerequisites')
+    .optional()
+    .isArray()
+    .withMessage('Prerequisites must be an array'),
+
+  body('tags')
+    .optional()
+    .isArray()
+    .withMessage('Tags must be an array'),
+
+  handleValidationErrors,
+];
+
+export const validateUpdatePath = [
+  param('pathId')
+    .isLength({ min: 1 })
+    .withMessage('Path ID is required'),
+
+  body('title')
+    .optional()
+    .trim()
+    .isLength({ min: 3, max: 100 })
+    .withMessage('Title must be 3-100 characters'),
+
+  body('description')
+    .optional()
+    .trim()
+    .isLength({ min: 10, max: 1000 })
+    .withMessage('Description must be 10-1000 characters'),
+
+  body('status')
+    .optional()
+    .isIn(['draft', 'published', 'archived'])
+    .withMessage('Invalid status'),
+
+  body('category')
+    .optional()
+    .isIn(['cloud', 'devops', 'security', 'data', 'ai'])
+    .withMessage('Invalid category'),
+
+  body('level')
+    .optional()
+    .isIn(['beginner', 'intermediate', 'advanced', 'expert'])
+    .withMessage('Invalid level'),
+
+  handleValidationErrors,
+];
+
+export const validatePathAction = [
+  param('pathId')
+    .isLength({ min: 1 })
+    .withMessage('Path ID is required'),
+
+  body('courseId')
+    .optional()
+    .isLength({ min: 1 })
+    .withMessage('Course ID is required when provided'),
+
+  body('order')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Order must be a non-negative integer'),
+
+  body('isRequired')
+    .optional()
+    .isBoolean()
+    .withMessage('isRequired must be boolean'),
+
+  body('estimatedTimeMinutes')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Estimated time must be a positive integer'),
+
+  handleValidationErrors,
+];

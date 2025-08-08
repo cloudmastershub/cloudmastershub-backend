@@ -12,6 +12,7 @@ import contentRoutes from './routes/contentRoutes';
 import analyticsRoutes from './routes/analyticsRoutes';
 import settingsRoutes from './routes/settingsRoutes';
 import securityRoutes from './routes/securityRoutes';
+import pathRoutes from './routes/pathRoutes';
 
 dotenv.config();
 
@@ -70,6 +71,7 @@ app.use('/admin/content', contentRoutes);
 app.use('/admin/analytics', analyticsRoutes);
 app.use('/admin/settings', settingsRoutes);
 app.use('/admin/security', securityRoutes);
+app.use('/admin/paths', pathRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {

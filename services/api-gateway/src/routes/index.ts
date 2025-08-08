@@ -114,6 +114,15 @@ const serviceRoutes = {
     }
   },
   // Admin routes - order matters (most specific first)
+  '/admin/instructors': {
+    target: process.env.COURSE_SERVICE_URL || 'http://course-service:3002',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/admin/instructors': '/admin/instructors'
+    }
+  },
   '/admin/courses': {
     target: process.env.COURSE_SERVICE_URL || 'http://course-service:3002',
     changeOrigin: true,
@@ -265,6 +274,44 @@ router.use('/admin/users', createProxyMiddleware({
   },
 }));
 
+// Admin instructors route - must go to course-service  
+router.use('/admin/instructors', createProxyMiddleware({
+  target: process.env.COURSE_SERVICE_URL || 'http://course-service:3002',
+  changeOrigin: true,
+  timeout: 30000,
+  proxyTimeout: 30000,
+  pathRewrite: {
+    '^/api/admin/instructors': '/admin/instructors'
+  },
+  secure: false,
+  ws: true,
+  logLevel: 'debug',
+  onError: (err, req, res) => {
+    logger.error(`Proxy error for /admin/instructors:`, err);
+    if (!res.headersSent) {
+      res.status(502).json({
+        success: false,
+        error: {
+          message: 'Service temporarily unavailable',
+          service: 'course-service',
+        },
+      });
+    }
+  },
+  onProxyReq: (proxyReq, req, res) => {
+    logger.debug(`Proxying EXACT ${req.method} ${req.originalUrl} to course-service:3002${req.path}`);
+    if (req.body && Object.keys(req.body).length > 0) {
+      const bodyData = JSON.stringify(req.body);
+      proxyReq.setHeader('Content-Type', 'application/json');
+      proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+      proxyReq.write(bodyData);
+    }
+  },
+  onProxyRes: (proxyRes, req, res) => {
+    logger.debug(`Received response ${proxyRes.statusCode} for EXACT ${req.method} ${req.originalUrl}`);
+  },
+}));
+
 // Admin courses route - must go to course-service
 router.use('/admin/courses', createProxyMiddleware({
   target: process.env.COURSE_SERVICE_URL || 'http://course-service:3002',
@@ -344,7 +391,7 @@ router.use('/admin/paths', createProxyMiddleware({
 // Handle general routes with prefix matching
 Object.entries(serviceRoutes).forEach(([path, config]) => {
   // Skip specific admin routes as they're handled above
-  if (['/admin/stats', '/admin/users', '/admin/courses', '/admin/paths'].includes(path)) return;
+  if (['/admin/stats', '/admin/users', '/admin/instructors', '/admin/courses', '/admin/paths'].includes(path)) return;
   
   router.use(
     path,

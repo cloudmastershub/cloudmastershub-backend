@@ -11,6 +11,7 @@ export interface ICourse extends Omit<Course, 'id'>, Document {
 const InstructorSchema = new Schema({
   id: { type: String, required: true },
   name: { type: String, required: true },
+  email: { type: String, required: false }, // Add email field for frontend compatibility
   avatar: { type: String, required: false, default: 'https://via.placeholder.com/150' },
   bio: { type: String, required: false, default: '' },
   expertise: [{ type: String }],

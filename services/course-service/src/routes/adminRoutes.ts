@@ -81,6 +81,7 @@ router.put('/courses/:id/instructor', async (req: AuthRequest, res: Response, ne
     course.instructor = {
       id: instructorId,
       name: instructorName || 'Unknown Instructor',
+      email: instructorId || '', // Use instructorId as email since it's typically the email address
       avatar: instructorAvatar || course.instructor.avatar || 'https://via.placeholder.com/150',
       bio: instructorBio || course.instructor.bio || '',
       expertise: instructorExpertise || course.instructor.expertise || [],
