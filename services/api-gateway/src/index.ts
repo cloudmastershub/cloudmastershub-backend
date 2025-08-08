@@ -6,6 +6,7 @@ import { createProxyMiddleware } from 'http-proxy-middleware';
 import logger from './utils/logger';
 import { errorHandler } from './middleware/errorHandler';
 import { rateLimiter } from './middleware/rateLimiter';
+import { extractUserFromJWT } from './middleware/authenticate';
 import routes from './routes';
 
 dotenv.config();
@@ -83,6 +84,9 @@ app.get('/health', (req, res) => {
 
 // Apply rate limiter before body parsing
 app.use(rateLimiter);
+
+// Extract user information from JWT tokens for backend services
+app.use('/api', extractUserFromJWT);
 
 // Apply body parsing only to non-proxy routes
 app.use((req, res, next) => {

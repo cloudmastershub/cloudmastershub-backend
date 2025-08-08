@@ -135,6 +135,7 @@ export const getCourseById = async (
 ): Promise<void> => {
   try {
     const { id: slug } = req.params;
+    const userId = req.headers['x-user-id'] as string;
 
     // Validate slug format before proceeding
     if (!isValidSlug(slug)) {
@@ -166,7 +167,7 @@ export const getCourseById = async (
       return;
     }
 
-    logger.info('Fetching course by slug from MongoDB', { slug });
+    logger.info('Fetching course by slug from MongoDB', { slug, userId });
 
     try {
       // Only look up by slug - no legacy ID support
@@ -185,16 +186,38 @@ export const getCourseById = async (
         return;
       }
 
+      // Check if user is enrolled (if user ID is available)
+      let isEnrolled = false;
+      if (userId) {
+        const enrollment = await CourseProgress.findOne({
+          userId,
+          courseId: course._id.toString()
+        }).lean();
+        isEnrolled = !!enrollment;
+        
+        logger.info('Checked enrollment status', {
+          courseId: course._id.toString(),
+          userId,
+          isEnrolled
+        });
+      }
+
+      const courseWithEnrollment = {
+        ...course,
+        isEnrolled
+      };
+
       logger.info('Retrieved course from MongoDB', { 
         courseId: course._id, 
         title: course.title,
         slug: course.slug || 'no-slug',
+        isEnrolled,
         searchedBy: isValidObjectId(slug) ? 'ObjectId' : 'slug'
       });
 
       res.json({
         success: true,
-        data: course,
+        data: courseWithEnrollment,
       });
     } catch (dbError: any) {
       logger.error('MongoDB query error:', { 
@@ -854,11 +877,6 @@ export const getUserCourses = async (
 
     logger.info('Fetching enrolled courses for user', { userId });
 
-    // Debug: Check what enrollment records exist
-    const allEnrollments = await CourseProgress.find({}).lean();
-    logger.info(`Total enrollments in database: ${allEnrollments.length}`);
-    logger.info('Sample enrollment userIds:', allEnrollments.slice(0, 5).map(e => ({ userId: e.userId, courseId: e.courseId })));
-
     // Find all course progress records for the user
     const enrollments = await CourseProgress.find({ userId })
       .populate('courseId')
@@ -866,15 +884,6 @@ export const getUserCourses = async (
       .lean();
 
     logger.info(`Found ${enrollments.length} enrollments for user ${userId}`);
-    
-    // Log enrollment details for debugging
-    if (enrollments.length > 0) {
-      logger.info('First enrollment details:', {
-        userId: enrollments[0].userId,
-        courseId: enrollments[0].courseId,
-        enrolledAt: enrollments[0].enrolledAt
-      });
-    }
 
     // Transform the data to include progress information with each course
     const coursesWithProgress = enrollments
