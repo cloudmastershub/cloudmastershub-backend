@@ -808,6 +808,7 @@ export const enrollInCourse = async (
       data: {
         enrollmentId: courseProgress._id,
         courseId: course._id.toString(),
+        courseSlug: course.slug, // Include slug for frontend navigation
         userId,
         enrollmentType,
         enrolledAt: courseProgress.enrolledAt,
@@ -859,7 +860,8 @@ export const getUserCourses = async (
         return {
           ...course,
           _id: course._id,
-          id: course._id.toString(),
+          id: course.slug || course._id.toString(), // Use slug as id for frontend navigation
+          slug: course.slug, // Ensure slug is included
           // Add progress data
           progress: enrollment.progress || 0,
           enrolledAt: enrollment.enrolledAt,
