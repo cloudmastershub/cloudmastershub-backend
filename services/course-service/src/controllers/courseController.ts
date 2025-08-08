@@ -879,35 +879,62 @@ export const getUserCourses = async (
 
     // Find all course progress records for the user
     const enrollments = await CourseProgress.find({ userId })
-      .populate('courseId')
       .sort({ enrolledAt: -1 })
       .lean();
 
     logger.info(`Found ${enrollments.length} enrollments for user ${userId}`);
 
-    // Transform the data to include progress information with each course
-    const coursesWithProgress = enrollments
-      .filter(enrollment => enrollment.courseId) // Filter out any null course references
-      .map(enrollment => {
-        const course = enrollment.courseId as any;
-        return {
-          ...course,
-          _id: course._id,
-          id: course.slug || course._id.toString(), // Use slug as id for frontend navigation
-          slug: course.slug, // Ensure slug is included
-          // Add progress data
-          progress: enrollment.progress || 0,
-          enrolledAt: enrollment.enrolledAt,
-          lastAccessedAt: enrollment.lastAccessedAt,
-          completedLessons: enrollment.completedLessons || [],
-          watchedTime: enrollment.watchedTime || 0,
-          // Calculate lessons completed count
-          lessonsCount: course.sections?.reduce((total: number, section: any) => 
-            total + (section.lessons?.length || 0), 0) || 0
-        };
-      });
+    // Manually fetch course data since courseId is stored as string, not ObjectId reference
+    const coursesWithProgress = [];
+    
+    for (const enrollment of enrollments) {
+      try {
+        // courseId is stored as ObjectId string, so we can query by _id
+        let course = null;
+        
+        // Try to find by ObjectId first (for enrollments that have ObjectId strings)
+        if (isValidObjectId(enrollment.courseId)) {
+          course = await Course.findById(enrollment.courseId).lean();
+        }
+        
+        // If not found by ObjectId, try by slug (for enrollments that have slug strings) 
+        if (!course && !isValidObjectId(enrollment.courseId)) {
+          course = await Course.findOne({ slug: enrollment.courseId }).lean();
+        }
+        
+        if (course) {
+          coursesWithProgress.push({
+            ...course,
+            _id: course._id,
+            id: course.slug || course._id.toString(), // Use slug as id for frontend navigation
+            slug: course.slug, // Ensure slug is included
+            // Add progress data
+            progress: enrollment.progress || 0,
+            enrolledAt: enrollment.enrolledAt,
+            lastAccessedAt: enrollment.lastAccessedAt,
+            completedLessons: enrollment.completedLessons || [],
+            watchedTime: enrollment.watchedTime || 0,
+            // Calculate lessons completed count from curriculum
+            lessonsCount: course.curriculum?.reduce((total: number, section: any) => 
+              total + (section.lessons?.length || 0), 0) || 0
+          });
+        } else {
+          logger.warn(`Course not found for enrollment`, { 
+            userId, 
+            courseId: enrollment.courseId,
+            isValidObjectId: isValidObjectId(enrollment.courseId)
+          });
+        }
+      } catch (courseError) {
+        logger.error('Error fetching course for enrollment', { 
+          userId, 
+          courseId: enrollment.courseId, 
+          error: courseError 
+        });
+      }
+    }
 
-    logger.info(`Retrieved ${coursesWithProgress.length} enrolled courses for user ${userId}`);
+    logger.info(`Retrieved ${coursesWithProgress.length} enrolled courses with data for user ${userId}`);
 
     res.json({
       success: true,

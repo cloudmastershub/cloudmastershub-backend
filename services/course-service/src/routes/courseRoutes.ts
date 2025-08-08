@@ -42,6 +42,75 @@ router.get('/:id/content', authenticate, validateSlugParam('id'), (req, res, nex
   });
 });
 
+// Course progress endpoint (for learning interface)
+router.get('/:id/progress', (req, res, next) => {
+  const courseSlug = req.params.id;
+  const userId = req.headers['x-user-id'] as string;
+  
+  if (!userId) {
+    return res.status(400).json({
+      success: false,
+      message: 'User authentication required',
+      error: { code: 'USER_ID_REQUIRED' }
+    });
+  }
+  
+  // Import and use the progress controller logic directly here
+  const { CourseProgress } = require('../models');
+  const logger = require('../utils/logger').default;
+  
+  (async () => {
+    try {
+      logger.info(`Fetching course progress`, { courseSlug, userId });
+      
+      // Find course first to get the ObjectId
+      const { Course } = require('../models');
+      const course = await Course.findOne({ slug: courseSlug }).lean();
+      
+      if (!course) {
+        return res.status(404).json({
+          success: false,
+          message: 'Course not found',
+          error: { code: 'COURSE_NOT_FOUND' }
+        });
+      }
+      
+      // Find progress record
+      const progress = await CourseProgress.findOne({
+        userId,
+        courseId: course._id.toString()
+      }).lean();
+      
+      if (!progress) {
+        // User not enrolled
+        return res.json({
+          success: true,
+          data: null
+        });
+      }
+      
+      logger.info(`Found progress record`, { userId, courseId: course._id.toString(), progress: progress.progress });
+      
+      res.json({
+        success: true,
+        data: {
+          userId: progress.userId,
+          courseId: course.slug,
+          enrolledAt: progress.enrolledAt,
+          progress: progress.progress || 0,
+          lastAccessedAt: progress.lastAccessedAt,
+          completedLessons: progress.completedLessons || [],
+          currentLesson: progress.currentLesson,
+          watchedTime: progress.watchedTime || 0
+        }
+      });
+    } catch (error) {
+      logger.error('Error fetching course progress:', error);
+      next(error);
+    }
+  })();
+});
+
 // User's enrolled courses (internal service endpoint)
 router.get('/user/:userId/courses', getUserCourses);
 
