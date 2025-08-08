@@ -201,7 +201,10 @@ export const getUserCourses = async (
       return;
     }
 
-    logger.info(`Fetching enrolled courses for user ${userId}`);
+    logger.info(`Fetching enrolled courses for user ${userId}`, { 
+      userIdType: typeof userId,
+      userIdLength: userId?.length 
+    });
 
     // Call the course service to get user's enrolled courses
     try {
@@ -219,7 +222,12 @@ export const getUserCourses = async (
         data: response.data.data || []
       });
     } catch (courseServiceError: any) {
-      logger.error('Error fetching courses from course service:', courseServiceError.message);
+      logger.error('Error fetching courses from course service:', {
+        message: courseServiceError.message,
+        status: courseServiceError.response?.status,
+        data: courseServiceError.response?.data,
+        url: `${process.env.COURSE_SERVICE_URL || 'http://course-service:3002'}/user/${userId}/courses`
+      });
       
       // Return empty array if course service is unavailable
       res.json({

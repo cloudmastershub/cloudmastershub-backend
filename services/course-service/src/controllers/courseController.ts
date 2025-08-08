@@ -697,6 +697,14 @@ export const enrollInCourse = async (
     const userId = req.headers['x-user-id'] || req.body.userId;
     const { enrollmentType = 'free' } = req.body;
 
+    logger.info('Enrollment request', { 
+      slug, 
+      userId, 
+      enrollmentType, 
+      headers: req.headers['x-user-id'], 
+      body: req.body.userId 
+    });
+
     // Validate slug format
     if (!isValidSlug(slug)) {
       if (isLegacyId(slug)) {
@@ -846,11 +854,27 @@ export const getUserCourses = async (
 
     logger.info('Fetching enrolled courses for user', { userId });
 
+    // Debug: Check what enrollment records exist
+    const allEnrollments = await CourseProgress.find({}).lean();
+    logger.info(`Total enrollments in database: ${allEnrollments.length}`);
+    logger.info('Sample enrollment userIds:', allEnrollments.slice(0, 5).map(e => ({ userId: e.userId, courseId: e.courseId })));
+
     // Find all course progress records for the user
     const enrollments = await CourseProgress.find({ userId })
       .populate('courseId')
       .sort({ enrolledAt: -1 })
       .lean();
+
+    logger.info(`Found ${enrollments.length} enrollments for user ${userId}`);
+    
+    // Log enrollment details for debugging
+    if (enrollments.length > 0) {
+      logger.info('First enrollment details:', {
+        userId: enrollments[0].userId,
+        courseId: enrollments[0].courseId,
+        enrolledAt: enrollments[0].enrolledAt
+      });
+    }
 
     // Transform the data to include progress information with each course
     const coursesWithProgress = enrollments
