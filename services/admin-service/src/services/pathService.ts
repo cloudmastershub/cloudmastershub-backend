@@ -56,9 +56,9 @@ class PathServiceClient {
         };
       }
 
-      const data = await response.json();
+      const data = await response.json() as ServiceResponse;
       logger.info('Successfully fetched learning paths', { count: data.data?.length || 0 });
-      return data as ServiceResponse;
+      return data;
     } catch (error) {
       logger.error('Failed to fetch learning paths from course service:', error);
       return {
@@ -93,9 +93,9 @@ class PathServiceClient {
         };
       }
 
-      const data = await response.json();
+      const data = await response.json() as ServiceResponse;
       logger.info('Successfully fetched learning path', { pathId });
-      return data as ServiceResponse;
+      return data;
     } catch (error) {
       logger.error('Failed to fetch learning path by ID from course service:', error);
       return {
@@ -133,9 +133,9 @@ class PathServiceClient {
         };
       }
 
-      const data = await response.json();
+      const data = await response.json() as ServiceResponse;
       logger.info('Successfully created learning path', { pathId: data.data?.id });
-      return data as ServiceResponse;
+      return data;
     } catch (error) {
       logger.error('Failed to create learning path in course service:', error);
       return {
@@ -171,9 +171,9 @@ class PathServiceClient {
         };
       }
 
-      const data = await response.json();
+      const data = await response.json() as ServiceResponse;
       logger.info('Successfully updated learning path', { pathId });
-      return data as ServiceResponse;
+      return data;
     } catch (error) {
       logger.error('Failed to update learning path in course service:', error);
       return {
@@ -208,9 +208,9 @@ class PathServiceClient {
         };
       }
 
-      const data = await response.json();
+      const data = await response.json() as ServiceResponse;
       logger.info('Successfully deleted learning path', { pathId });
-      return data as ServiceResponse;
+      return data;
     } catch (error) {
       logger.error('Failed to delete learning path in course service:', error);
       return {
@@ -261,9 +261,9 @@ class PathServiceClient {
         };
       }
 
-      const data = await response.json();
+      const data = await response.json() as ServiceResponse;
       logger.info('Successfully added course to learning path', { pathId, courseId: courseData.courseId });
-      return data as ServiceResponse;
+      return data;
     } catch (error) {
       logger.error('Failed to add course to learning path in course service:', error);
       return {
@@ -316,9 +316,9 @@ class PathServiceClient {
         };
       }
 
-      const data = await response.json();
+      const data = await response.json() as ServiceResponse;
       logger.info('Successfully removed course from learning path', { pathId, courseId });
-      return data as ServiceResponse;
+      return data;
     } catch (error) {
       logger.error('Failed to remove course from learning path in course service:', error);
       return {
