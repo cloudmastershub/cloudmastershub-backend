@@ -6,6 +6,7 @@ import logger from '../utils/logger';
 import { getUserEventPublisher } from '../events/userEventPublisher';
 import * as userService from '../services/userService';
 import { referralService } from '../services/referralService';
+import User from '../models/User';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'cloudmastershub-jwt-secret-2024-production-key';
 const JWT_EXPIRES_IN = '15m';
@@ -189,40 +190,46 @@ export const googleAuth = async (req: Request, res: Response, next: NextFunction
     // Check if this is the admin user
     const isAdminUser = email === 'mbuaku@gmail.com';
     
-    // Try to get existing user or create new one
-    let user = await userService.getUserByEmail(email);
+    // Try to get existing user or create new one using MongoDB directly
+    let user = await User.findOne({ email: email.toLowerCase() });
     
     if (!user) {
       // Create new user with referral initialization
-      logger.info('Creating new user via Google OAuth', { email, firstName, lastName });
+      logger.info('Creating new user via Google OAuth (MongoDB)', { email, firstName, lastName });
       
-      user = await userService.createUser({
-        email,
+      user = new User({
+        email: email.toLowerCase(),
         firstName: firstName || (isAdminUser ? 'Admin' : 'User'),
         lastName: lastName || (isAdminUser ? 'User' : ''),
-        profilePicture: avatar,
+        avatar: avatar,
         roles: isAdminUser ? ['admin', 'student'] : ['student'],
-        subscriptionType: isAdminUser ? 'enterprise' : 'free',
+        subscription: isAdminUser ? 'enterprise' : 'free',
         emailVerified: true,
+        isActive: true,
+        lastLogin: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
       });
       
-      logger.info('New user created successfully with referral system', { 
-        userId: user.id, 
+      await user.save();
+      
+      logger.info('New user created successfully in MongoDB', { 
+        userId: user._id.toString(), 
         email: user.email 
       });
       
       // Handle referral signup if referral code was provided
       if (referralCode) {
         try {
-          await referralService.recordReferralSignup(user.id, referralCode);
+          await referralService.recordReferralSignup(user._id.toString(), referralCode);
           logger.info('Referral signup recorded for new user', { 
-            userId: user.id, 
+            userId: user._id.toString(), 
             email: user.email,
             referralCode 
           });
         } catch (referralError) {
           logger.error('Failed to record referral signup for new user', { 
-            userId: user.id, 
+            userId: user._id.toString(), 
             referralCode, 
             error: referralError 
           });
@@ -230,35 +237,37 @@ export const googleAuth = async (req: Request, res: Response, next: NextFunction
         }
       }
     } else {
-      // Update existing user's profile if needed
-      const updates: any = {};
-      if (avatar && user.profilePicture !== avatar) {
-        updates.profilePicture = avatar;
-      }
-      if (Object.keys(updates).length > 0) {
-        user = await userService.updateUser(user.id, updates) || user;
-        logger.info('Updated existing user profile', { userId: user.id, updates });
+      // Update existing user's profile and last login
+      const updates: any = { lastLogin: new Date(), updatedAt: new Date() };
+      if (avatar && user.avatar !== avatar) {
+        updates.avatar = avatar;
       }
       
-      logger.info('Existing user signed in via Google OAuth', { 
-        userId: user.id, 
-        email: user.email 
+      await User.updateOne({ _id: user._id }, updates);
+      
+      // Refetch user to get updated data
+      user = await User.findById(user._id);
+      
+      logger.info('Existing user signed in via Google OAuth (MongoDB)', { 
+        userId: user?._id.toString(), 
+        email: user?.email 
       });
     }
     
     logger.info(`Google OAuth user ${isAdminUser ? '(ADMIN)' : '(STUDENT)'}`, { 
       email, 
       roles: user.roles, 
-      subscriptionTier: user.subscriptionPlan || user.subscriptionStatus
+      subscriptionTier: user.subscription
     });
 
+    const userId = user._id.toString();
     const accessToken = jwt.sign(
       { 
-        userId: user.id, 
+        userId: userId, 
         email: user.email, 
         roles: user.roles,
-        subscriptionTier: user.subscriptionPlan || user.subscriptionStatus || 'free',
-        subscriptionStatus: user.subscriptionStatus || 'active',
+        subscriptionTier: user.subscription || 'free',
+        subscriptionStatus: 'active',
         authProvider: 'google'
       }, 
       JWT_SECRET, 
@@ -266,14 +275,14 @@ export const googleAuth = async (req: Request, res: Response, next: NextFunction
     );
 
     const refreshToken = jwt.sign(
-      { userId: user.id, type: 'refresh' }, 
+      { userId: userId, type: 'refresh' }, 
       JWT_SECRET, 
       { expiresIn: REFRESH_TOKEN_EXPIRES_IN }
     );
 
     // Publish login event (non-blocking to prevent auth failures)
     const eventPublisher = getUserEventPublisher();
-    eventPublisher.publishUserLogin(user.id, {
+    eventPublisher.publishUserLogin(userId, {
       email: user.email,
       loginMethod: 'google_oauth',
       ipAddress: req.ip || req.connection.remoteAddress,
@@ -282,21 +291,36 @@ export const googleAuth = async (req: Request, res: Response, next: NextFunction
       // Log error but don't fail authentication
       logger.warn('Failed to publish login event', { 
         error: error.message, 
-        userId: user.id,
+        userId: userId,
         email: user.email,
         loginMethod: 'google_oauth'
       });
     });
 
     logger.info('Google OAuth login successful', { 
-      userId: user.id, 
+      userId: userId, 
       email: user.email 
     });
 
     res.json({
       success: true,
       data: {
-        user,
+        user: {
+          id: userId,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          avatar: user.avatar,
+          roles: user.roles,
+          subscriptionTier: user.subscription || 'free',
+          subscriptionStatus: 'active',
+          authProvider: 'google',
+          emailVerified: user.emailVerified,
+          isActive: user.isActive,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+          lastLogin: user.lastLogin
+        },
         accessToken,
         refreshToken,
       },

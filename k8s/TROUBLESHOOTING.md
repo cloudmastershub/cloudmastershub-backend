@@ -101,7 +101,7 @@ curl -s -w "Status: %{http_code}\n" https://api.cloudmastershub.com/health
 **Solution:**
 ```bash
 # Apply backend-to-backend network policy
-kubectl apply -f /home/master/my-apps/CloudMastersHub/BackEnd/k8s/backend-to-backend-networkpolicy.yaml
+kubectl apply -f /home/master/my-apps/cloudmastershub/backend/k8s/backend-to-backend-networkpolicy.yaml
 
 # Restart API gateway to pick up new connectivity
 kubectl rollout restart deployment/cloudmastershub-api-gateway -n cloudmastershub-dev
@@ -225,7 +225,7 @@ kubectl exec -n cloudmastershub-dev deployment/cloudmastershub-api-gateway -- \
 ```bash
 # Remove all custom network policies (use with caution)
 kubectl delete networkpolicy backend-to-backend -n cloudmastershub-dev
-kubectl apply -f /home/master/my-apps/CloudMastersHub/BackEnd/k8s/backend-to-backend-networkpolicy.yaml
+kubectl apply -f /home/master/my-apps/cloudmastershub/backend/k8s/backend-to-backend-networkpolicy.yaml
 ```
 
 ### Reset Ingress Annotations

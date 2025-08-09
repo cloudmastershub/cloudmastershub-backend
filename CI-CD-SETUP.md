@@ -15,7 +15,7 @@ The CI/CD pipeline is designed to:
 
 ### Monorepo Structure
 ```
-BackEnd/
+backend/
 ├── services/              # Microservices
 │   ├── api-gateway/      # Port 3000
 │   ├── user-service/     # Port 3001
