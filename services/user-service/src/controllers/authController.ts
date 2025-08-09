@@ -246,12 +246,29 @@ export const googleAuth = async (req: Request, res: Response, next: NextFunction
       await User.updateOne({ _id: user._id }, updates);
       
       // Refetch user to get updated data
-      user = await User.findById(user._id);
+      const updatedUser = await User.findById(user._id);
+      if (!updatedUser) {
+        res.status(500).json({
+          success: false,
+          error: { message: 'User update failed' },
+        });
+        return;
+      }
+      user = updatedUser;
       
       logger.info('Existing user signed in via Google OAuth (MongoDB)', { 
-        userId: user?._id.toString(), 
-        email: user?.email 
+        userId: user._id.toString(), 
+        email: user.email 
       });
+    }
+    
+    // Ensure user is not null at this point
+    if (!user) {
+      res.status(500).json({
+        success: false,
+        error: { message: 'User creation/retrieval failed' },
+      });
+      return;
     }
     
     logger.info(`Google OAuth user ${isAdminUser ? '(ADMIN)' : '(STUDENT)'}`, { 
