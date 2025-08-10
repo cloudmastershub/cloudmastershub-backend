@@ -184,16 +184,16 @@ export interface CreateLearningPathRequest {
   shortDescription?: string;
   category: CourseCategory;
   level: DifficultyLevel;
-  thumbnail: string;
+  thumbnail?: string; // Optional for admin-created paths
   price: number;
-  currency: string;
-  objectives: string[];
-  skills: string[];
-  prerequisites: string[];
-  outcomes: string[];
-  tags: string[];
-  includesCertificate: boolean;
-  supportLevel: 'basic' | 'standard' | 'premium';
+  currency?: string; // Optional, defaults to USD
+  objectives?: string[]; // Optional, can be empty initially
+  skills?: string[]; // Optional, can be empty initially
+  prerequisites?: string[]; // Optional, can be empty initially
+  outcomes?: string[]; // Optional, can be empty initially
+  tags?: string[]; // Optional, can be empty initially
+  includesCertificate?: boolean; // Optional, defaults to false
+  supportLevel?: 'basic' | 'standard' | 'premium'; // Optional, defaults to basic
 }
 
 export interface UpdateLearningPathRequest extends Partial<CreateLearningPathRequest> {

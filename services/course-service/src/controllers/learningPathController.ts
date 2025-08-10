@@ -220,7 +220,8 @@ export const createLearningPath = async (
 
     logger.info('Creating new learning path', { 
       title: pathData.title, 
-      instructorId,
+      instructorId: instructorId || 'none (admin-created)',
+      finalInstructorId: instructorId || 'platform',
       requestBody: req.body 
     });
 
@@ -285,17 +286,9 @@ export const createLearningPath = async (
       return;
     }
 
-    if (!instructorId) {
-      res.status(400).json({
-        success: false,
-        message: 'Instructor ID is required',
-        error: {
-          code: 'MISSING_INSTRUCTOR_ID',
-          details: 'User must be authenticated as instructor'
-        }
-      });
-      return;
-    }
+    // For admin-created learning paths, instructor ID is optional
+    // It can be assigned later or left as platform content
+    const finalInstructorId = instructorId || 'platform'; // Use 'platform' as default for admin-created paths
 
     // TODO: Validate instructor permissions
     
@@ -307,7 +300,7 @@ export const createLearningPath = async (
       category: pathData.category,
       level: pathData.level,
       thumbnail: pathData.thumbnail || '', // Default empty string for now
-      instructorId,
+      instructorId: finalInstructorId,
       price: Number(pathData.price),
       currency: pathData.currency || 'USD',
       isFree: Number(pathData.price) === 0,
