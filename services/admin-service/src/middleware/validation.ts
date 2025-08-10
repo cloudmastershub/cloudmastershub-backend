@@ -11,16 +11,19 @@ export const handleValidationErrors = (req: Request, res: Response, next: NextFu
       errors: errors.array(),
       path: req.path,
       method: req.method,
+      body: req.body,
     });
+
+    const formattedErrors = errors.array().map((error) => ({
+      field: error.type === 'field' ? error.path : 'unknown',
+      message: error.msg,
+      value: error.type === 'field' ? error.value : undefined,
+    }));
 
     res.status(400).json({
       success: false,
-      message: 'Validation failed',
-      errors: errors.array().map((error) => ({
-        field: error.type === 'field' ? error.path : 'unknown',
-        message: error.msg,
-        value: error.type === 'field' ? error.value : undefined,
-      })),
+      message: `Validation failed: ${formattedErrors.map(e => `${e.field} - ${e.message}`).join(', ')}`,
+      errors: formattedErrors,
     });
     return;
   }
@@ -316,6 +319,12 @@ export const validateCreatePath = [
 
   body('isFree')
     .optional()
+    .customSanitizer(value => {
+      // Convert to boolean properly
+      if (value === 'true' || value === true || value === 1 || value === '1') return true;
+      if (value === 'false' || value === false || value === 0 || value === '0') return false;
+      return value;
+    })
     .isBoolean()
     .withMessage('isFree must be boolean'),
 

@@ -101,6 +101,12 @@ export const createPath = async (
   try {
     const pathData = req.body;
 
+    // Log the incoming data for debugging
+    logger.info('Incoming path data from frontend:', {
+      body: req.body,
+      headers: req.headers['content-type'],
+    });
+
     // Add admin info to the path data
     pathData.createdBy = req.adminId;
     pathData.instructorId = req.adminId;
