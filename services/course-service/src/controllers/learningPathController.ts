@@ -218,32 +218,145 @@ export const createLearningPath = async (
     const pathData = req.body as CreateLearningPathRequest;
     const instructorId = (req as any).user?.userId; // From JWT middleware
 
-    logger.info('Creating new learning path', { title: pathData.title, instructorId });
+    logger.info('Creating new learning path', { 
+      title: pathData.title, 
+      instructorId,
+      requestBody: req.body 
+    });
+
+    // Validate required fields
+    if (!pathData.title) {
+      res.status(400).json({
+        success: false,
+        message: 'Title is required',
+        error: {
+          code: 'MISSING_TITLE',
+          details: 'Learning path title is required'
+        }
+      });
+      return;
+    }
+
+    if (!pathData.description) {
+      res.status(400).json({
+        success: false,
+        message: 'Description is required',
+        error: {
+          code: 'MISSING_DESCRIPTION', 
+          details: 'Learning path description is required'
+        }
+      });
+      return;
+    }
+
+    if (!pathData.category) {
+      res.status(400).json({
+        success: false,
+        message: 'Category is required',
+        error: {
+          code: 'MISSING_CATEGORY',
+          details: 'Learning path category is required'
+        }
+      });
+      return;
+    }
+
+    if (!pathData.level) {
+      res.status(400).json({
+        success: false,
+        message: 'Level is required',
+        error: {
+          code: 'MISSING_LEVEL',
+          details: 'Learning path difficulty level is required'
+        }
+      });
+      return;
+    }
+
+    if (pathData.price === undefined || pathData.price === null) {
+      res.status(400).json({
+        success: false,
+        message: 'Price is required',
+        error: {
+          code: 'MISSING_PRICE',
+          details: 'Learning path price is required (use 0 for free)'
+        }
+      });
+      return;
+    }
+
+    if (!instructorId) {
+      res.status(400).json({
+        success: false,
+        message: 'Instructor ID is required',
+        error: {
+          code: 'MISSING_INSTRUCTOR_ID',
+          details: 'User must be authenticated as instructor'
+        }
+      });
+      return;
+    }
 
     // TODO: Validate instructor permissions
     
-    // Prepare learning path data
+    // Prepare learning path data with defaults for required fields
     const pathDataToSave = {
-      ...pathData,
+      title: pathData.title,
+      description: pathData.description,
+      shortDescription: pathData.shortDescription || pathData.description.substring(0, 300),
+      category: pathData.category,
+      level: pathData.level,
+      thumbnail: pathData.thumbnail || '', // Default empty string for now
       instructorId,
+      price: Number(pathData.price),
+      originalPrice: pathData.originalPrice ? Number(pathData.originalPrice) : undefined,
+      currency: pathData.currency || 'USD',
+      isFree: Number(pathData.price) === 0,
+      
+      // Content structure (empty initially)
       pathway: [],
       totalSteps: 0,
       totalCourses: 0,
       totalLabs: 0,
       estimatedDurationHours: 0,
+      
+      // Learning outcomes
+      objectives: pathData.objectives || [],
+      skills: pathData.skills || [],
+      prerequisites: pathData.prerequisites || [],
+      outcomes: pathData.outcomes || [],
+      
+      // Defaults
       rating: 0,
       reviewCount: 0,
       enrollmentCount: 0,
       completionRate: 0,
+      tags: pathData.tags || [],
+      
+      // Publishing
       status: CourseStatus.DRAFT,
       isPublished: false,
-      isFree: pathData.price === 0,
+      
+      // SEO
+      metaDescription: pathData.metaDescription || pathData.description.substring(0, 160),
+      keywords: pathData.keywords || [],
+      
+      // Features
+      includesCertificate: pathData.includesCertificate || false,
       hasHandsOnLabs: false,
+      supportLevel: pathData.supportLevel || 'basic'
     };
+
+    logger.info('Prepared learning path data for save:', pathDataToSave);
 
     // Create and save to MongoDB
     const newPath = new LearningPath(pathDataToSave);
     const savedPath = await newPath.save();
+    
+    logger.info('Learning path saved successfully:', {
+      id: savedPath._id,
+      title: savedPath.title
+    });
     
     // Transform for response
     const newPathResponse = {
@@ -256,9 +369,54 @@ export const createLearningPath = async (
       message: 'Learning path created successfully',
       data: newPathResponse,
     });
-  } catch (error) {
-    logger.error('Error creating learning path:', error);
-    next(error);
+  } catch (error: any) {
+    logger.error('Error creating learning path:', {
+      error: error.message,
+      stack: error.stack,
+      name: error.name,
+      code: error.code
+    });
+
+    // Handle MongoDB validation errors
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.keys(error.errors).map(key => ({
+        field: key,
+        message: error.errors[key].message
+      }));
+      
+      res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        error: {
+          code: 'VALIDATION_ERROR',
+          details: validationErrors
+        }
+      });
+      return;
+    }
+
+    // Handle duplicate key errors
+    if (error.code === 11000) {
+      res.status(400).json({
+        success: false,
+        message: 'Learning path with this name already exists',
+        error: {
+          code: 'DUPLICATE_PATH',
+          details: 'A learning path with this title already exists'
+        }
+      });
+      return;
+    }
+
+    // Generic error handling
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create learning path',
+      error: {
+        code: 'CREATION_ERROR',
+        details: error.message
+      }
+    });
   }
 };
 

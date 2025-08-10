@@ -70,7 +70,7 @@ const LearningPathSchema = new Schema<ILearningPath>({
   },
   thumbnail: { 
     type: String, 
-    required: true
+    default: ''
   },
   instructorId: { 
     type: String, 
