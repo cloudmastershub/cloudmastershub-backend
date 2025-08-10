@@ -309,7 +309,6 @@ export const createLearningPath = async (
       thumbnail: pathData.thumbnail || '', // Default empty string for now
       instructorId,
       price: Number(pathData.price),
-      originalPrice: pathData.originalPrice ? Number(pathData.originalPrice) : undefined,
       currency: pathData.currency || 'USD',
       isFree: Number(pathData.price) === 0,
       
@@ -336,10 +335,6 @@ export const createLearningPath = async (
       // Publishing
       status: CourseStatus.DRAFT,
       isPublished: false,
-      
-      // SEO
-      metaDescription: pathData.metaDescription || pathData.description.substring(0, 160),
-      keywords: pathData.keywords || [],
       
       // Features
       includesCertificate: pathData.includesCertificate || false,
