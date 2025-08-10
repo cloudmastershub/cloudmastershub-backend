@@ -45,8 +45,28 @@ router.get('/:id', validatePathId, getLearningPathById);
 
 // Protected routes (authentication required)
 
+// Admin bypass middleware for premium subscription requirement
+const adminOrPremiumSubscription = (req: any, res: any, next: any) => {
+  console.log('🔐 Learning Path Creation - User Info:', {
+    userId: req.user?.id,
+    email: req.user?.email,
+    roles: req.user?.roles,
+    isAdmin: req.user?.roles?.includes('admin')
+  });
+  
+  // Check if user is admin
+  if (req.user?.roles?.includes('admin')) {
+    console.log('✅ Admin bypass - skipping premium subscription check');
+    return next(); // Skip subscription check for admins
+  }
+  
+  console.log('🔒 Non-admin user - requiring premium subscription');
+  // Otherwise, require premium subscription
+  return requirePremiumSubscription()(req, res, next);
+};
+
 // Instructor/Admin routes for managing learning paths
-router.post('/', authenticate, requirePremiumSubscription(), validateCreateLearningPath, validateBusinessRules, createLearningPath);
+router.post('/', authenticate, adminOrPremiumSubscription, validateCreateLearningPath, validateBusinessRules, createLearningPath);
 router.put('/:id', authenticate, validateUpdateLearningPath, validateBusinessRules, updateLearningPath);
 router.delete('/:id', authenticate, validatePathId, deleteLearningPath); // Admin only
 

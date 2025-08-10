@@ -10,7 +10,11 @@ class PathServiceClient {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = process.env.COURSE_SERVICE_URL || 'http://course-service:3002';
+    // Use API Gateway to reach course service in production, direct service URL in development
+    this.baseUrl = process.env.COURSE_SERVICE_URL || 
+      (process.env.NODE_ENV === 'production' 
+        ? 'https://api.cloudmastershub.com/api' 
+        : 'http://course-service:3002');
   }
 
   async getAllPaths(params: {
