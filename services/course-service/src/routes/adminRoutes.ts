@@ -20,6 +20,18 @@ import logger from '../utils/logger';
 
 const router = Router();
 
+// Health check for admin paths (no auth required - must be BEFORE auth middleware)
+router.get('/paths/health', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Admin paths endpoint is working - DEBUG VERSION',
+    timestamp: new Date().toISOString(),
+    service: 'course-service',
+    endpoint: '/admin/paths',
+    version: 'v2.0-debug-paths'
+  });
+});
+
 // All admin routes require authentication and admin role
 router.use(authenticate);
 router.use(authorize('admin', 'super_admin'));
@@ -394,20 +406,55 @@ router.get('/paths/:id', async (req: AuthRequest, res: Response, next: NextFunct
 // Create learning path (admin only)
 router.post('/paths', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    logger.info('Admin creating learning path', {
+    logger.info('Admin creating learning path - DETAILED DEBUG', {
       adminId: req.userId,
-      pathData: req.body
+      userEmail: req.user?.email,
+      requestBody: req.body,
+      headers: req.headers,
+      timestamp: new Date().toISOString()
     });
+    
+    // Check if request body is valid
+    if (!req.body) {
+      logger.error('Admin: No request body provided');
+      return res.status(400).json({
+        success: false,
+        error: {
+          message: 'Request body is required',
+          code: 'MISSING_BODY'
+        }
+      });
+    }
+
+    // Log the type and content of the request
+    logger.info('Request body type and content:', {
+      bodyType: typeof req.body,
+      bodyKeys: Object.keys(req.body || {}),
+      bodyContent: req.body
+    });
+
     await createLearningPath(req, res, next);
   } catch (error: any) {
-    logger.error('Admin: Failed to create learning path', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        message: 'Failed to create learning path',
-        details: error.message
-      }
+    logger.error('Admin: Failed to create learning path - DETAILED ERROR', {
+      errorMessage: error.message,
+      errorStack: error.stack,
+      errorName: error.name,
+      errorCode: error.code,
+      requestBody: req.body,
+      adminId: req.userId
     });
+    
+    // Don't call res.status if response already sent
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to create learning path',
+          details: error.message,
+          code: error.code || 'UNKNOWN_ERROR'
+        }
+      });
+    }
   }
 });
 
