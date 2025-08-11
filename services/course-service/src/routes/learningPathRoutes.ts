@@ -66,7 +66,8 @@ const adminOrPremiumSubscription = (req: any, res: any, next: any) => {
 };
 
 // Instructor/Admin routes for managing learning paths
-router.post('/', authenticate, adminOrPremiumSubscription, validateCreateLearningPath, validateBusinessRules, createLearningPath);
+// Temporarily disable validation middleware to see Mongoose validation errors directly
+router.post('/', authenticate, adminOrPremiumSubscription, createLearningPath);
 router.put('/:id', authenticate, validateUpdateLearningPath, validateBusinessRules, updateLearningPath);
 router.delete('/:id', authenticate, validatePathId, deleteLearningPath); // Admin only
 
