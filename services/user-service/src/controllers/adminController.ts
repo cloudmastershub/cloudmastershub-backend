@@ -341,6 +341,17 @@ export const getAdminUsers = async (req: AuthenticatedRequest, res: Response): P
       sortOrder = 'desc'
     } = req.query;
 
+    logger.info('Admin users request received', {
+      adminId: req.userId,
+      query: req.query,
+      page,
+      limit,
+      search,
+      role,
+      subscriptionTier,
+      isActive
+    });
+
     // Build filter query
     const filter: any = {};
     
@@ -364,12 +375,20 @@ export const getAdminUsers = async (req: AuthenticatedRequest, res: Response): P
       filter.isActive = isActive === 'true';
     }
 
+    logger.info('Query filter built', { filter });
+
     // Build sort object
     const sort: any = {};
     sort[sortBy as string] = sortOrder === 'desc' ? -1 : 1;
 
     // Execute query with pagination
     const skip = (Number(page) - 1) * Number(limit);
+    
+    logger.info('Executing database query', { 
+      skip, 
+      limit: Number(limit), 
+      sort 
+    });
     
     const [users, total] = await Promise.all([
       User.find(filter)
@@ -380,6 +399,11 @@ export const getAdminUsers = async (req: AuthenticatedRequest, res: Response): P
         .lean(),
       User.countDocuments(filter)
     ]);
+    
+    logger.info('Database query completed', { 
+      usersFound: users.length, 
+      totalCount: total 
+    });
 
     const response: AdminUserListResponse = {
       users: users.map(user => ({
@@ -407,8 +431,22 @@ export const getAdminUsers = async (req: AuthenticatedRequest, res: Response): P
       total,
       page,
       limit,
-      filters: { role, subscriptionTier, isActive, search }
+      filters: { role, subscriptionTier, isActive, search },
+      responseUsersCount: response.users.length
     });
+
+    // Log first user for debugging
+    if (response.users.length > 0) {
+      logger.info('Sample user from response', {
+        firstUser: response.users[0]
+      });
+    } else {
+      logger.warn('No users found in database', {
+        filterUsed: filter,
+        mongooseConnectionState: mongoose.connection.readyState,
+        databaseName: mongoose.connection.db?.databaseName
+      });
+    }
 
     res.json({
       success: true,
