@@ -50,7 +50,7 @@ export const getAllCourses = async (
     }
     
     if (category && category !== 'all') {
-      filter.category = category.toString().toUpperCase();
+      filter.category = category.toString().toLowerCase();
     }
     
     if (level) {

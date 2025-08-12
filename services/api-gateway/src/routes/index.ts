@@ -59,6 +59,15 @@ const serviceRoutes = {
       '^/api/paths': '/paths'
     }
   },
+  '/learning-paths': {
+    target: process.env.COURSE_SERVICE_URL || 'http://course-service:3002',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/learning-paths': '/paths'
+    }
+  },
   '/labs': {
     target: process.env.LAB_SERVICE_URL || 'http://lab-service:3003',
     changeOrigin: true,
