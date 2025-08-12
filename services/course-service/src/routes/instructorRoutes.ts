@@ -595,6 +595,123 @@ router.get('/analytics/students', async (req: AuthRequest, res: Response, next: 
   }
 });
 
+// Get engagement analytics
+router.get('/analytics/engagement', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const instructorId = req.userId;
+    const { timeframe = 'month' } = req.query;
+    
+    // Get instructor courses
+    const instructorCourses = await Course.find({ 'instructor.id': instructorId }).lean();
+    const courseIds = instructorCourses.map(c => c._id.toString());
+    
+    if (courseIds.length === 0) {
+      res.json({
+        success: true,
+        data: {
+          activeStudents: 0,
+          averageSessionTime: 0,
+          completionRate: 0,
+          questionResponseTime: 0,
+          studentSatisfaction: 0,
+          coursesCompleted: 0,
+          certificatesIssued: 0,
+          retentionRate: 0
+        }
+      });
+      return;
+    }
+    
+    // Get real enrollment data
+    const { CourseProgress } = await import('../models');
+    const enrollments = await CourseProgress.find({ 
+      courseId: { $in: courseIds } 
+    }).lean();
+    
+    // Calculate engagement metrics
+    const now = new Date();
+    let daysToLookBack = 30; // default for month
+    if (timeframe === 'week') daysToLookBack = 7;
+    if (timeframe === 'quarter') daysToLookBack = 90;
+    if (timeframe === 'year') daysToLookBack = 365;
+    
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - daysToLookBack);
+    
+    // Active students (accessed course in timeframe)
+    const activeStudents = enrollments.filter(e => e.lastAccessedAt >= cutoffDate).length;
+    
+    // Completion metrics
+    const completedEnrollments = enrollments.filter(e => e.completedAt && e.completedAt >= cutoffDate);
+    const coursesCompleted = completedEnrollments.length;
+    const certificatesIssued = completedEnrollments.length; // Assuming certificate on completion
+    
+    // Overall completion rate
+    const completionRate = enrollments.length > 0 
+      ? Math.round((enrollments.filter(e => e.completedAt).length / enrollments.length) * 100)
+      : 0;
+    
+    // Retention rate (students who returned after first lesson)
+    const studentsWithProgress = enrollments.filter(e => e.progress > 10);
+    const retentionRate = enrollments.length > 0
+      ? Math.round((studentsWithProgress.length / enrollments.length) * 100)
+      : 0;
+    
+    // Average session time (placeholder - would require session tracking)
+    const averageSessionTime = 45; // Default 45 minutes
+    
+    // Question response time (placeholder - would require Q&A system integration)
+    const questionResponseTime = 24; // Default 24 hours
+    
+    // Student satisfaction (placeholder - would require review system integration)
+    const averageRating = instructorCourses.reduce((sum, course) => sum + (course.rating || 0), 0) / (instructorCourses.length || 1);
+    const studentSatisfaction = Math.round(averageRating * 10) / 10; // Round to 1 decimal
+    
+    const engagementMetrics = {
+      activeStudents,
+      averageSessionTime,
+      completionRate,
+      questionResponseTime,
+      studentSatisfaction,
+      coursesCompleted,
+      certificatesIssued,
+      retentionRate,
+      // Additional metrics
+      totalEnrollments: enrollments.length,
+      newEnrollments: enrollments.filter(e => e.enrolledAt >= cutoffDate).length,
+      averageProgress: enrollments.length > 0
+        ? Math.round(enrollments.reduce((sum, e) => sum + e.progress, 0) / enrollments.length)
+        : 0,
+      timestamp: new Date().toISOString()
+    };
+    
+    logger.info('Retrieved engagement metrics:', {
+      instructorId,
+      timeframe,
+      activeStudents,
+      completionRate,
+      retentionRate
+    });
+    
+    res.json({
+      success: true,
+      data: engagementMetrics
+    });
+  } catch (error: any) {
+    logger.error('Error fetching engagement analytics:', {
+      error: error.message,
+      instructorId: req.userId
+    });
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to fetch engagement analytics',
+        details: error.message
+      }
+    });
+  }
+});
+
 // Get revenue analytics
 router.get('/analytics/revenue', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
