@@ -106,7 +106,7 @@ router.get('/courses/:id', async (req: AuthRequest, res: Response, next: NextFun
         // Check if course exists but belongs to different instructor
         const courseByDifferentInstructor = await Course.findOne({
           slug: id
-        }).select('slug title instructor.id instructor.firstName instructor.lastName').maxTimeMS(3000);
+        }).select('slug title instructor.id instructor.name').maxTimeMS(3000);
         
         logger.error('Course not found - comprehensive debugging info', { 
           searchId: id, 
@@ -144,7 +144,7 @@ router.get('/courses/:id', async (req: AuthRequest, res: Response, next: NextFun
           details += `. Found similar course with different casing: "${caseInsensitiveCourse.slug}"`;
         } else if (courseByDifferentInstructor) {
           suggestions.push('Course exists but belongs to different instructor');
-          details += `. Course exists but owned by ${courseByDifferentInstructor.instructor.firstName} ${courseByDifferentInstructor.instructor.lastName}`;
+          details += `. Course exists but owned by ${courseByDifferentInstructor.instructor.name} (${courseByDifferentInstructor.instructor.id})`;
         } else if (similarCourses.length > 0) {
           const ownedSimilar = similarCourses.filter(c => c.instructor.id === instructorId);
           if (ownedSimilar.length > 0) {
