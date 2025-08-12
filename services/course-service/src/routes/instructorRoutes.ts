@@ -49,18 +49,22 @@ router.get('/courses/:id', async (req: AuthRequest, res: Response, next: NextFun
     
     logger.info('Instructor requesting course details', { 
       courseId: id, 
-      instructorId: instructorId 
+      instructorId: instructorId,
+      requestUrl: req.url,
+      userAgent: req.headers['user-agent']?.substring(0, 100)
     });
     
     // Enhanced course lookup with better error handling
     const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+    const isValidSlug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id) && id.length >= 3 && id.length <= 100;
     let course = null;
     
     logger.info('Starting course lookup', { 
       searchId: id, 
       instructorId, 
       isValidObjectId,
-      searchType: isValidObjectId ? 'ObjectId' : 'slug'
+      isValidSlug,
+      searchType: isValidObjectId ? 'ObjectId' : (isValidSlug ? 'slug' : 'unknown')
     });
     
     try {
@@ -81,43 +85,92 @@ router.get('/courses/:id', async (req: AuthRequest, res: Response, next: NextFun
       }
       
       if (!course) {
-        // Enhanced debugging: check for similar courses
-        logger.warn('Course not found, checking for similar slugs');
+        // Enhanced debugging: check for similar courses and exact matches with different casing
+        logger.warn('Course not found, performing comprehensive search');
         
+        // Check for exact matches with different casing
+        const caseInsensitiveCourse = await Course.findOne({ 
+          slug: { $regex: new RegExp(`^${id}$`, 'i') }
+        }).select('slug title instructor.id').maxTimeMS(3000);
+        
+        // Check for similar courses
         const similarCourses = await Course.find({ 
           slug: { $regex: new RegExp(id.substring(0, Math.min(10, id.length)), 'i') } 
         }).select('slug title instructor.id').limit(5).maxTimeMS(3000);
         
-        // Also check recent courses by this instructor
-        const recentInstructorCourses = await Course.find({ 
+        // Check all courses by this instructor
+        const allInstructorCourses = await Course.find({ 
           'instructor.id': instructorId 
-        }).select('slug title createdAt').sort({ createdAt: -1 }).limit(3).maxTimeMS(3000);
+        }).select('slug title createdAt').sort({ createdAt: -1 }).limit(10).maxTimeMS(3000);
         
-        logger.warn('Course not found - debugging info', { 
+        // Check if course exists but belongs to different instructor
+        const courseByDifferentInstructor = await Course.findOne({
+          slug: id
+        }).select('slug title instructor.id instructor.firstName instructor.lastName').maxTimeMS(3000);
+        
+        logger.error('Course not found - comprehensive debugging info', { 
           searchId: id, 
           instructorId,
           isValidObjectId,
+          isValidSlug,
+          caseInsensitiveCourse: caseInsensitiveCourse ? {
+            slug: caseInsensitiveCourse.slug,
+            title: caseInsensitiveCourse.title,
+            isOwner: caseInsensitiveCourse.instructor.id === instructorId
+          } : null,
+          courseByDifferentInstructor: courseByDifferentInstructor ? {
+            slug: courseByDifferentInstructor.slug,
+            title: courseByDifferentInstructor.title,
+            actualInstructor: courseByDifferentInstructor.instructor
+          } : null,
           similarCourses: similarCourses.map(c => ({ 
             slug: c.slug, 
             title: c.title,
             isOwner: c.instructor.id === instructorId
           })),
-          recentInstructorCourses: recentInstructorCourses.map(c => ({ 
+          allInstructorCourses: allInstructorCourses.map(c => ({ 
             slug: c.slug, 
             title: c.title,
             createdAt: c.createdAt
           }))
         });
         
+        // Provide helpful error response
+        let suggestions = [];
+        let details = `No course found with ID or slug: ${id}`;
+        
+        if (caseInsensitiveCourse && caseInsensitiveCourse.instructor.id === instructorId) {
+          suggestions.push(`Did you mean "${caseInsensitiveCourse.slug}"? (case mismatch)`);
+          details += `. Found similar course with different casing: "${caseInsensitiveCourse.slug}"`;
+        } else if (courseByDifferentInstructor) {
+          suggestions.push('Course exists but belongs to different instructor');
+          details += `. Course exists but owned by ${courseByDifferentInstructor.instructor.firstName} ${courseByDifferentInstructor.instructor.lastName}`;
+        } else if (similarCourses.length > 0) {
+          const ownedSimilar = similarCourses.filter(c => c.instructor.id === instructorId);
+          if (ownedSimilar.length > 0) {
+            suggestions.push(`Similar courses you own: ${ownedSimilar.map(c => c.slug).join(', ')}`);
+          }
+          suggestions.push('Check slug format - must be lowercase with hyphens');
+        } else if (allInstructorCourses.length > 0) {
+          suggestions.push(`Your available courses: ${allInstructorCourses.slice(0, 3).map(c => c.slug).join(', ')}`);
+        } else {
+          suggestions.push('No courses found for your account - create a course first');
+        }
+
         res.status(404).json({
           success: false,
           message: 'Course not found',
           error: {
             code: 'COURSE_NOT_FOUND',
-            details: `No course found with ID or slug: ${id}`,
-            suggestions: similarCourses.length > 0 ? 
-              'Similar courses found - check if you\'re using the correct slug' : 
-              'No similar courses found - verify the course was created successfully'
+            details: details,
+            searchedFor: id,
+            isValidSlug: isValidSlug,
+            suggestions: suggestions,
+            debug: {
+              instructorId: instructorId,
+              totalCoursesOwned: allInstructorCourses.length,
+              searchType: isValidObjectId ? 'ObjectId' : (isValidSlug ? 'slug' : 'invalid_format')
+            }
           }
         });
         return;
