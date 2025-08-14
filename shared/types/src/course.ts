@@ -30,6 +30,8 @@ export enum CourseCategory {
   DEVOPS = 'devops',
   SECURITY = 'security',
   DATA = 'data',
+  AI = 'ai',
+  GENERAL = 'general',
 }
 
 export enum DifficultyLevel {
