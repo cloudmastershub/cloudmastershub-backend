@@ -487,6 +487,10 @@ export const updateLearningPath = async (
       data: updatedPath,
     });
   } catch (error: any) {
+    const { id } = req.params;
+    const updates = req.body as UpdateLearningPathRequest;
+    const userId = (req as any).user?.userId;
+    
     logger.error('Error updating learning path:', {
       error: error.message,
       stack: error.stack,
