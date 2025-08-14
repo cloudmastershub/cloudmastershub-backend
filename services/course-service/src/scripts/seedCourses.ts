@@ -2,7 +2,6 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import path from 'path';
 import { Course } from '../models/Course';
-import { LearningPath } from '../models/LearningPath';
 
 // Load environment variables
 dotenv.config({ path: path.join(__dirname, '../../.env') });
@@ -304,57 +303,8 @@ const sampleCourses = [
   }
 ];
 
-// Sample learning paths
-const sampleLearningPaths = [
-  {
-    title: 'AWS Solutions Architect Path',
-    slug: 'aws-solutions-architect-path',
-    description: 'Complete learning path to become an AWS Solutions Architect',
-    category: 'AWS',
-    level: 'intermediate',
-    estimatedDurationHours: 120,
-    totalCourses: 5,
-    totalLabs: 20,
-    totalSteps: 50,
-    tags: ['aws', 'architect', 'certification', 'cloud'],
-    prerequisites: ['Basic networking knowledge', 'Understanding of web applications'],
-    skills: ['AWS Services', 'Cloud Architecture', 'Security', 'Cost Optimization'],
-    isActive: true,
-    isFree: false
-  },
-  {
-    title: 'Cloud DevOps Engineer Path',
-    slug: 'cloud-devops-engineer-path',
-    description: 'Master DevOps practices across multiple cloud platforms',
-    category: 'DevOps',
-    level: 'advanced',
-    estimatedDurationHours: 150,
-    totalCourses: 6,
-    totalLabs: 30,
-    totalSteps: 60,
-    tags: ['devops', 'automation', 'ci/cd', 'kubernetes'],
-    prerequisites: ['Programming experience', 'Linux knowledge', 'Git proficiency'],
-    skills: ['CI/CD', 'Kubernetes', 'Terraform', 'Monitoring'],
-    isActive: true,
-    isFree: false
-  },
-  {
-    title: 'Cloud Security Specialist Path',
-    slug: 'cloud-security-specialist-path',
-    description: 'Comprehensive security training for cloud environments',
-    category: 'Security',
-    level: 'advanced',
-    estimatedDurationHours: 100,
-    totalCourses: 4,
-    totalLabs: 15,
-    totalSteps: 40,
-    tags: ['security', 'compliance', 'governance', 'cloud'],
-    prerequisites: ['Network security basics', 'Cloud platform knowledge'],
-    skills: ['Cloud Security', 'Compliance', 'IAM', 'Encryption'],
-    isActive: true,
-    isFree: false
-  }
-];
+// No sample learning paths - CloudMastersHub operates on real data only
+// Learning paths should be created through the admin interface with real content
 
 async function seedDatabase() {
   try {
@@ -365,24 +315,19 @@ async function seedDatabase() {
     // Clear existing data
     console.log('🧹 Clearing existing data...');
     await Course.deleteMany({ slug: { $in: sampleCourses.map(c => c.slug) } });
-    await LearningPath.deleteMany({ slug: { $in: sampleLearningPaths.map(p => p.slug) } });
+    // No learning paths to seed - real data only
 
     // Insert courses
     console.log('📚 Seeding courses...');
     const insertedCourses = await Course.insertMany(sampleCourses);
     console.log(`✅ Inserted ${insertedCourses.length} courses`);
 
-    // Insert learning paths
-    console.log('🛤️ Seeding learning paths...');
-    const insertedPaths = await LearningPath.insertMany(sampleLearningPaths);
-    console.log(`✅ Inserted ${insertedPaths.length} learning paths`);
-
     console.log('🎉 Database seeding completed successfully!');
     
     // Display summary
     console.log('\n📊 Summary:');
     console.log(`- Courses: ${insertedCourses.length}`);
-    console.log(`- Learning Paths: ${insertedPaths.length}`);
+    console.log(`- Learning Paths: 0 (Real data only - create through admin interface)`);
     
     insertedCourses.forEach(course => {
       console.log(`  📘 ${course.title} (${course.level}) - ${course.isFree ? 'FREE' : '$' + course.price}`);

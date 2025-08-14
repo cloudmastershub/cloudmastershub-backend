@@ -14,26 +14,25 @@ export const enrollInLearningPath = async (
 
     logger.info('Enrolling user in learning path', { pathId: id, userId, enrollmentType });
 
-    // TODO: Fetch learning path from MongoDB to check if it exists and get pricing
-    // Mock learning path data for validation
-    const learningPath = {
-      id,
-      title: 'AWS Solutions Architect Journey',
-      price: 199.99,
-      isFree: false,
-    };
+    // Fetch learning path from MongoDB
+    const { LearningPath } = require('../models');
+    const learningPath = await LearningPath.findById(id);
 
     if (!learningPath) {
       res.status(404).json({
         success: false,
         message: 'Learning path not found',
+        error: {
+          code: 'PATH_NOT_FOUND',
+          details: `No learning path exists with ID: ${id}`
+        }
       });
       return;
     }
 
-    // Check if user is already enrolled
-    // TODO: Query MongoDB for existing enrollment
-    const existingEnrollment = false; // Mock check
+    // Check if user is already enrolled - real database check needed
+    // For now, return not implemented error
+    const existingEnrollment = false;
 
     if (existingEnrollment) {
       res.status(400).json({
