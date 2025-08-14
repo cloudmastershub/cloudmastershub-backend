@@ -28,6 +28,7 @@ export const getAllLearningPaths = async (
   next: NextFunction
 ): Promise<void> => {
   try {
+    const traceId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const {
       page = 1,
       limit = 20,
@@ -44,7 +45,10 @@ export const getAllLearningPaths = async (
       sortOrder = 'desc',
     } = req.query as LearningPathQueryParams;
 
-    logger.info('Fetching learning paths from database', {
+    logger.info('Learning Paths - Request Started', {
+      traceId,
+      requestPath: req.path,
+      userAgent: req.get('User-Agent'),
       filters: { category, level, instructorId, isFree, search },
       pagination: { page, limit },
       sort: { sortBy, sortOrder },
@@ -113,14 +117,31 @@ export const getAllLearningPaths = async (
     const limitNum = Number(limit);
     const skip = (pageNum - 1) * limitNum;
 
-    const [paths, totalCount] = await Promise.all([
-      LearningPath.find(query)
-        .sort(sortOptions)
-        .skip(skip)
-        .limit(limitNum)
-        .lean(),
-      LearningPath.countDocuments(query)
-    ]);
+    // Use sequential queries to ensure consistency and avoid race conditions
+    logger.info('Learning Paths - Executing Database Queries', {
+      traceId,
+      queryFilters: query,
+      sortOptions,
+      pagination: { pageNum, limitNum, skip }
+    });
+
+    // First get the total count
+    const totalCount = await LearningPath.countDocuments(query);
+    
+    // Then get the actual paths using the same query
+    const paths = await LearningPath.find(query)
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(limitNum)
+      .lean();
+
+    logger.info('Learning Paths - Database Results', {
+      traceId,
+      totalCount,
+      pathsFound: paths.length,
+      hasConsistency: paths.length <= totalCount,
+      queryMatchCount: totalCount
+    });
 
     // Transform paths to match frontend expectations
     const transformedPaths = paths.map((path: any) => ({
@@ -139,12 +160,23 @@ export const getAllLearningPaths = async (
       totalPages: Math.ceil(totalCount / limitNum),
     };
 
+    logger.info('Learning Paths - Response Prepared', {
+      traceId,
+      responseSize: transformedPaths.length,
+      totalAvailable: totalCount,
+      pageInfo: { page: pageNum, limit: limitNum, totalPages: Math.ceil(totalCount / limitNum) }
+    });
+
     res.status(200).json({
       success: true,
       data: response,
     });
   } catch (error) {
-    logger.error('Error fetching learning paths:', error);
+    logger.error('Learning Paths - Request Failed', { 
+      traceId: req.headers['x-trace-id'] || 'unknown',
+      error: error.message,
+      stack: error.stack 
+    });
     next(error);
   }
 };
