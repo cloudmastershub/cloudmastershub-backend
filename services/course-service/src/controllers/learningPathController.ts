@@ -418,12 +418,18 @@ export const updateLearningPath = async (
     const updates = req.body as UpdateLearningPathRequest;
     const userId = (req as any).user?.userId;
 
-    logger.info('Updating learning path', { pathId: id, userId });
+    logger.info('Updating learning path', { 
+      pathId: id, 
+      userId, 
+      updates: JSON.stringify(updates, null, 2),
+      updateFields: Object.keys(updates)
+    });
 
     // Query MongoDB for the learning path
     const path = await LearningPath.findById(id);
 
     if (!path) {
+      logger.error('Learning path not found', { pathId: id, userId });
       res.status(404).json({
         success: false,
         message: 'Learning path not found',
@@ -435,24 +441,96 @@ export const updateLearningPath = async (
       return;
     }
 
+    logger.info('Found learning path for update', {
+      pathId: id,
+      currentTitle: path.title,
+      currentStatus: path.status,
+      currentCategory: path.category
+    });
+
     // TODO: Verify ownership or admin permissions
     // Update path fields
     Object.keys(updates).forEach(key => {
       if (key !== '_id' && key !== 'createdAt') {
+        logger.info(`Updating field ${key}`, {
+          oldValue: (path as any)[key],
+          newValue: (updates as any)[key]
+        });
         (path as any)[key] = (updates as any)[key];
       }
     });
 
     path.updatedAt = new Date();
+    
+    logger.info('About to save updated learning path', {
+      pathId: id,
+      modifiedFields: path.modifiedPaths(),
+      pathData: {
+        title: path.title,
+        status: path.status,
+        category: path.category,
+        level: path.level
+      }
+    });
+
     const updatedPath = await path.save();
+
+    logger.info('Learning path updated successfully', {
+      pathId: id,
+      updatedTitle: updatedPath.title,
+      updatedStatus: updatedPath.status
+    });
 
     res.status(200).json({
       success: true,
       message: 'Learning path updated successfully',
       data: updatedPath,
     });
-  } catch (error) {
-    logger.error('Error updating learning path:', error);
+  } catch (error: any) {
+    logger.error('Error updating learning path:', {
+      error: error.message,
+      stack: error.stack,
+      name: error.name,
+      code: error.code,
+      pathId: id,
+      userId,
+      updates
+    });
+
+    // Handle MongoDB validation errors
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.keys(error.errors).map(key => ({
+        field: key,
+        message: error.errors[key].message,
+        value: error.errors[key].value
+      }));
+      
+      logger.error('Validation error details:', { validationErrors });
+      
+      res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        error: {
+          code: 'VALIDATION_ERROR',
+          details: validationErrors
+        }
+      });
+      return;
+    }
+
+    // Handle duplicate key errors
+    if (error.code === 11000) {
+      res.status(400).json({
+        success: false,
+        message: 'Learning path with this name already exists',
+        error: {
+          code: 'DUPLICATE_PATH',
+          details: 'A learning path with this title already exists'
+        }
+      });
+      return;
+    }
+
     next(error);
   }
 };

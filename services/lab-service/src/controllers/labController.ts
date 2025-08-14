@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import logger from '../utils/logger';
 import { getLabEventPublisher } from '../events/labEventPublisher';
+import Lab, { ILab } from '../models/Lab';
+import { Types } from 'mongoose';
 
 export const getAllLabs = async (
   req: Request,
@@ -8,40 +10,75 @@ export const getAllLabs = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    // TODO: Apply filters for provider, difficulty, search when implementing database queries
-    // const { provider, difficulty, search } = req.query;
+    const { provider, difficulty, search, category, page = '1', limit = '20' } = req.query;
 
-    // Mock lab data
-    const labs = [
-      {
-        id: 'lab-aws-ec2-basics',
-        title: 'Launch Your First EC2 Instance',
-        description: 'Learn how to launch and configure an EC2 instance in AWS',
-        provider: 'aws',
-        difficulty: 'beginner',
-        estimatedTime: 30, // minutes
-        prerequisites: ['AWS Account', 'Basic Linux knowledge'],
-        objectives: ['Launch an EC2 instance', 'Connect via SSH', 'Install a web server'],
-        tags: ['ec2', 'compute', 'aws'],
-      },
-      {
-        id: 'lab-azure-vm',
-        title: 'Create Azure Virtual Machine',
-        description: 'Deploy and manage a virtual machine in Azure',
-        provider: 'azure',
-        difficulty: 'beginner',
-        estimatedTime: 25,
-        prerequisites: ['Azure Account'],
-        objectives: ['Create a resource group', 'Deploy a VM', 'Configure networking'],
-        tags: ['vm', 'compute', 'azure'],
-      },
-    ];
+    // Build query filter
+    const filter: any = { isActive: true };
+    
+    if (provider && provider !== 'all') {
+      filter.provider = provider;
+    }
+    
+    if (difficulty && difficulty !== 'all') {
+      filter.difficulty = difficulty;
+    }
+    
+    if (category) {
+      filter.category = category;
+    }
+    
+    if (search) {
+      filter.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { tags: { $in: [String(search).toLowerCase()] } }
+      ];
+    }
+
+    // Pagination
+    const pageNum = parseInt(page as string, 10);
+    const limitNum = parseInt(limit as string, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Execute query with pagination
+    const [labs, total] = await Promise.all([
+      Lab.find(filter)
+        .select('-instructions -createdBy -updatedBy')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
+      Lab.countDocuments(filter)
+    ]);
+
+    // Transform data for response
+    const transformedLabs = labs.map(lab => ({
+      id: lab._id.toString(),
+      title: lab.title,
+      description: lab.description,
+      provider: lab.provider,
+      difficulty: lab.difficulty,
+      estimatedTime: lab.estimatedTime,
+      category: lab.category,
+      prerequisites: lab.prerequisites,
+      objectives: lab.objectives,
+      tags: lab.tags,
+      courseId: lab.courseId,
+      pathId: lab.pathId
+    }));
 
     res.json({
       success: true,
-      data: labs,
+      data: transformedLabs,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        pages: Math.ceil(total / limitNum)
+      }
     });
   } catch (error) {
+    logger.error('Error fetching labs:', error);
     next(error);
   }
 };
@@ -54,50 +91,51 @@ export const getLabById = async (
   try {
     const { id } = req.params;
 
-    // TODO: Fetch lab from database
+    // Validate ID format
+    if (!Types.ObjectId.isValid(id)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid lab ID format'
+      });
+      return;
+    }
 
-    const lab = {
-      id,
-      title: 'Launch Your First EC2 Instance',
-      description: 'Learn how to launch and configure an EC2 instance in AWS',
-      provider: 'aws',
-      difficulty: 'beginner',
-      estimatedTime: 30,
-      prerequisites: ['AWS Account', 'Basic Linux knowledge'],
-      objectives: ['Launch an EC2 instance', 'Connect via SSH', 'Install a web server'],
-      instructions: [
-        {
-          step: 1,
-          title: 'Navigate to EC2 Dashboard',
-          content: 'Log in to AWS Console and navigate to EC2 service',
-          hints: ['Look for EC2 in the services menu'],
-        },
-        {
-          step: 2,
-          title: 'Launch Instance',
-          content: 'Click Launch Instance and select Amazon Linux 2',
-          hints: ['Choose t2.micro for free tier'],
-        },
-      ],
-      resources: {
-        cpuLimit: '1 vCPU',
-        memoryLimit: '1 GB',
-        timeLimit: 60, // minutes
-      },
-      validation: {
-        checkpoints: [
-          'Instance is running',
-          'Security group allows SSH',
-          'Web server is accessible',
-        ],
-      },
+    // Fetch lab from database
+    const lab = await Lab.findById(id).lean();
+
+    if (!lab) {
+      res.status(404).json({
+        success: false,
+        message: 'Lab not found'
+      });
+      return;
+    }
+
+    // Transform data for response
+    const transformedLab = {
+      id: lab._id.toString(),
+      title: lab.title,
+      description: lab.description,
+      provider: lab.provider,
+      difficulty: lab.difficulty,
+      estimatedTime: lab.estimatedTime,
+      category: lab.category,
+      prerequisites: lab.prerequisites,
+      objectives: lab.objectives,
+      tags: lab.tags,
+      instructions: lab.instructions,
+      resources: lab.resources,
+      validation: lab.validation,
+      courseId: lab.courseId,
+      pathId: lab.pathId
     };
 
     res.json({
       success: true,
-      data: lab,
+      data: transformedLab
     });
   } catch (error) {
+    logger.error('Error fetching lab by ID:', error);
     next(error);
   }
 };
@@ -110,28 +148,30 @@ export const getLabByCourse = async (
   try {
     const { courseId } = req.params;
 
-    // TODO: Fetch labs associated with course
+    // Fetch labs associated with course
+    const labs = await Lab.find({ courseId, isActive: true })
+      .select('title description difficulty estimatedTime category')
+      .sort({ createdAt: 1 })
+      .lean();
 
-    const labs = [
-      {
-        id: 'lab-1',
-        courseId,
-        title: 'Practice Lab 1',
-        order: 1,
-      },
-      {
-        id: 'lab-2',
-        courseId,
-        title: 'Practice Lab 2',
-        order: 2,
-      },
-    ];
+    // Transform data for response
+    const transformedLabs = labs.map((lab, index) => ({
+      id: lab._id.toString(),
+      courseId,
+      title: lab.title,
+      description: lab.description,
+      difficulty: lab.difficulty,
+      estimatedTime: lab.estimatedTime,
+      category: lab.category,
+      order: index + 1
+    }));
 
     res.json({
       success: true,
-      data: labs,
+      data: transformedLabs
     });
   } catch (error) {
+    logger.error('Error fetching labs by course:', error);
     next(error);
   }
 };
@@ -139,21 +179,28 @@ export const getLabByCourse = async (
 export const createLab = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const labData = req.body;
+    const instructorId = (req as any).userId || labData.instructorId; // Get from auth token
 
-    // TODO: Validate and save lab to database
+    // Create new lab document
+    const newLab = new Lab({
+      ...labData,
+      createdBy: instructorId,
+      isActive: false // Start as draft
+    });
 
-    const labId = `lab-${Date.now()}`;
-    const instructorId = req.body.instructorId || 'instructor-123'; // In real app, get from auth token
+    // Validate and save
+    const savedLab = await newLab.save();
+    const labId = savedLab._id.toString();
 
-    logger.info('Creating new lab:', labData.title);
+    logger.info('Created new lab:', { id: labId, title: savedLab.title });
 
     // Publish lab created event
     const eventPublisher = getLabEventPublisher();
     await eventPublisher.publishLabCreated(labId, {
-      title: labData.title,
-      type: labData.type || 'aws',
-      difficulty: labData.difficulty || 'beginner',
-      duration: labData.estimatedTime || 30,
+      title: savedLab.title,
+      type: savedLab.provider,
+      difficulty: savedLab.difficulty,
+      duration: savedLab.estimatedTime,
       instructorId
     });
 
@@ -161,13 +208,23 @@ export const createLab = async (req: Request, res: Response, next: NextFunction)
       success: true,
       data: {
         id: labId,
-        ...labData,
-        instructorId,
-        status: 'draft',
-        createdAt: new Date(),
-      },
+        title: savedLab.title,
+        description: savedLab.description,
+        provider: savedLab.provider,
+        difficulty: savedLab.difficulty,
+        estimatedTime: savedLab.estimatedTime,
+        category: savedLab.category,
+        prerequisites: savedLab.prerequisites,
+        objectives: savedLab.objectives,
+        tags: savedLab.tags,
+        courseId: savedLab.courseId,
+        pathId: savedLab.pathId,
+        status: savedLab.isActive ? 'published' : 'draft',
+        createdAt: savedLab.createdAt
+      }
     });
   } catch (error) {
+    logger.error('Error creating lab:', error);
     next(error);
   }
 };
@@ -176,31 +233,66 @@ export const updateLab = async (req: Request, res: Response, next: NextFunction)
   try {
     const { id } = req.params;
     const updates = req.body;
+    const instructorId = (req as any).userId || updates.instructorId; // Get from auth token
 
-    // TODO: Update lab in database
+    // Validate ID format
+    if (!Types.ObjectId.isValid(id)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid lab ID format'
+      });
+      return;
+    }
 
-    const instructorId = req.body.instructorId || 'instructor-123'; // In real app, get from auth token
+    // Handle status update
+    if (updates.status) {
+      updates.isActive = updates.status === 'published';
+      delete updates.status;
+    }
 
-    logger.info(`Updating lab ${id}`);
+    // Update lab in database
+    updates.updatedBy = instructorId;
+    const updatedLab = await Lab.findByIdAndUpdate(
+      id,
+      { $set: updates },
+      { new: true, runValidators: true }
+    ).lean();
+
+    if (!updatedLab) {
+      res.status(404).json({
+        success: false,
+        message: 'Lab not found'
+      });
+      return;
+    }
+
+    logger.info(`Updated lab ${id}`);
 
     // Publish lab updated event
     const eventPublisher = getLabEventPublisher();
     await eventPublisher.publishLabUpdated(id, updates, instructorId);
 
-    // Check if status was changed to published
-    if (updates.status === 'published') {
+    // Check if lab was published
+    if (updatedLab.isActive && !updates.isActive) {
       await eventPublisher.publishLabPublished(id, instructorId);
     }
 
     res.json({
       success: true,
       data: {
-        id,
-        ...updates,
-        updatedAt: new Date(),
-      },
+        id: updatedLab._id.toString(),
+        title: updatedLab.title,
+        description: updatedLab.description,
+        provider: updatedLab.provider,
+        difficulty: updatedLab.difficulty,
+        estimatedTime: updatedLab.estimatedTime,
+        category: updatedLab.category,
+        status: updatedLab.isActive ? 'published' : 'draft',
+        updatedAt: updatedLab.updatedAt
+      }
     });
   } catch (error) {
+    logger.error('Error updating lab:', error);
     next(error);
   }
 };
@@ -208,13 +300,30 @@ export const updateLab = async (req: Request, res: Response, next: NextFunction)
 export const deleteLab = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
-
-    // TODO: Delete lab from database
-
-    const instructorId = req.body.instructorId || 'instructor-123'; // In real app, get from auth token
+    const instructorId = (req as any).userId || req.body.instructorId; // Get from auth token
     const reason = req.body.reason || 'Lab deletion requested';
 
-    logger.info(`Deleting lab ${id}`);
+    // Validate ID format
+    if (!Types.ObjectId.isValid(id)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid lab ID format'
+      });
+      return;
+    }
+
+    // Delete lab from database
+    const deletedLab = await Lab.findByIdAndDelete(id);
+
+    if (!deletedLab) {
+      res.status(404).json({
+        success: false,
+        message: 'Lab not found'
+      });
+      return;
+    }
+
+    logger.info(`Deleted lab ${id}`);
 
     // Publish lab deleted event
     const eventPublisher = getLabEventPublisher();
@@ -222,9 +331,10 @@ export const deleteLab = async (req: Request, res: Response, next: NextFunction)
 
     res.json({
       success: true,
-      message: 'Lab deleted successfully',
+      message: 'Lab deleted successfully'
     });
   } catch (error) {
+    logger.error('Error deleting lab:', error);
     next(error);
   }
 };

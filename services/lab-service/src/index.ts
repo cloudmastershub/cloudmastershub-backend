@@ -8,6 +8,7 @@ import { errorHandler } from './middleware/errorHandler';
 import { initializeLabPaymentEventSubscriber } from './events/paymentEventSubscriber';
 import logger from './utils/logger';
 import { initializeQueue } from './services/queueService';
+import DatabaseConnection from './database/connection';
 
 dotenv.config();
 
@@ -70,18 +71,50 @@ app.use('/sessions', sessionRoutes);
 
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-  logger.info(`Lab Service running on port ${PORT}`);
-  
-  // Initialize queue service after server starts
+// Initialize database connection before starting server
+const startServer = async () => {
   try {
-    initializeQueue();
-    logger.info('Queue service initialized');
+    // Connect to MongoDB
+    const dbConnection = DatabaseConnection.getInstance();
+    await dbConnection.connect();
+    logger.info('Connected to MongoDB');
+
+    // Start Express server
+    app.listen(PORT, () => {
+      logger.info(`Lab Service running on port ${PORT}`);
+      
+      // Initialize queue service after server starts
+      try {
+        initializeQueue();
+        logger.info('Queue service initialized');
+      } catch (error) {
+        logger.error('Failed to initialize queue service:', error);
+      }
+      
+      // Initialize payment event subscriber
+      initializeLabPaymentEventSubscriber();
+      logger.info('Lab service payment event subscriber initialized');
+    });
   } catch (error) {
-    logger.error('Failed to initialize queue service:', error);
+    logger.error('Failed to start Lab Service:', error);
+    process.exit(1);
   }
-  
-  // Initialize payment event subscriber
-  initializeLabPaymentEventSubscriber();
-  logger.info('Lab service payment event subscriber initialized');
+};
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  logger.info('SIGTERM received, shutting down gracefully');
+  const dbConnection = DatabaseConnection.getInstance();
+  await dbConnection.disconnect();
+  process.exit(0);
 });
+
+process.on('SIGINT', async () => {
+  logger.info('SIGINT received, shutting down gracefully');
+  const dbConnection = DatabaseConnection.getInstance();
+  await dbConnection.disconnect();
+  process.exit(0);
+});
+
+// Start the server
+startServer();
