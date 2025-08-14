@@ -171,11 +171,11 @@ export const getAllLearningPaths = async (
       success: true,
       data: response,
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Learning Paths - Request Failed', { 
       traceId: req.headers['x-trace-id'] || 'unknown',
-      error: error.message,
-      stack: error.stack 
+      error: error?.message || 'Unknown error',
+      stack: error?.stack || 'No stack trace'
     });
     next(error);
   }
