@@ -190,7 +190,7 @@ export const createLab = async (req: Request, res: Response, next: NextFunction)
 
     // Validate and save
     const savedLab = await newLab.save();
-    const labId = savedLab._id.toString();
+    const labId = (savedLab._id as Types.ObjectId).toString();
 
     logger.info('Created new lab:', { id: labId, title: savedLab.title });
 
@@ -198,7 +198,7 @@ export const createLab = async (req: Request, res: Response, next: NextFunction)
     const eventPublisher = getLabEventPublisher();
     await eventPublisher.publishLabCreated(labId, {
       title: savedLab.title,
-      type: savedLab.provider,
+      type: savedLab.provider === 'multi-cloud' ? 'aws' : savedLab.provider as 'aws' | 'azure' | 'gcp',
       difficulty: savedLab.difficulty,
       duration: savedLab.estimatedTime,
       instructorId
@@ -270,7 +270,11 @@ export const updateLab = async (req: Request, res: Response, next: NextFunction)
 
     // Publish lab updated event
     const eventPublisher = getLabEventPublisher();
-    await eventPublisher.publishLabUpdated(id, updates, instructorId);
+    const updateForEvent = { ...updates };
+    if (updateForEvent.type === 'multi-cloud') {
+      updateForEvent.type = 'aws'; // Map multi-cloud to aws for event compatibility
+    }
+    await eventPublisher.publishLabUpdated(id, updateForEvent as any, instructorId);
 
     // Check if lab was published
     if (updatedLab.isActive && !updates.isActive) {
