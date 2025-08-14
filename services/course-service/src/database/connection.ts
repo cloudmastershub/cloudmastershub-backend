@@ -72,7 +72,7 @@ class DatabaseConnection {
         this.isConnected = true;
       });
 
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Failed to connect to MongoDB:', error);
       this.isConnected = false;
       throw error;
@@ -88,7 +88,7 @@ class DatabaseConnection {
       await mongoose.disconnect();
       this.isConnected = false;
       logger.info('MongoDB disconnected');
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Error disconnecting from MongoDB:', error);
       throw error;
     }

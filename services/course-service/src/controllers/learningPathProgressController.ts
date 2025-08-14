@@ -152,7 +152,7 @@ export const enrollInLearningPath = async (
         },
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error enrolling in learning path:', error);
     next(error);
   }
@@ -207,7 +207,7 @@ export const updateStepProgress = async (
         achievements: [], // TODO: Check for new achievements
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error updating step progress:', error);
     next(error);
   }
@@ -284,7 +284,7 @@ export const getUserLearningPaths = async (
         },
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error fetching user learning paths:', error);
     next(error);
   }
@@ -327,7 +327,7 @@ export const getLearningPathCertificate = async (
       message: 'Certificate generated successfully',
       data: certificate,
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error generating certificate:', error);
     next(error);
   }
@@ -400,7 +400,7 @@ export const getRecommendations = async (
         basedOn: ['completed_paths', 'skill_gaps', 'industry_trends'],
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error generating recommendations:', error);
     next(error);
   }
@@ -475,7 +475,7 @@ export const getLearningAnalytics = async (
       timeframe,
       generatedAt: new Date(),
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error fetching learning analytics:', error);
     next(error);
   }

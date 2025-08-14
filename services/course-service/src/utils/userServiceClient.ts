@@ -152,7 +152,7 @@ class UserServiceClient {
       
       // Capitalize first letter
       return cleanName.charAt(0).toUpperCase() + cleanName.slice(1).toLowerCase();
-    } catch (error) {
+    } catch (error: any) {
       return 'Student';
     }
   }
@@ -173,7 +173,7 @@ class UserServiceClient {
       // If no clear last name, use domain
       const domain = email.split('@')[1]?.split('.')[0];
       return domain ? domain.charAt(0).toUpperCase() + domain.slice(1) : '';
-    } catch (error) {
+    } catch (error: any) {
       return '';
     }
   }

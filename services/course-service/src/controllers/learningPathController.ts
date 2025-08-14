@@ -235,7 +235,7 @@ export const getLearningPathById = async (
       success: true,
       data: response,
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error fetching learning path by ID:', error);
     next(error);
   }
@@ -612,7 +612,7 @@ export const deleteLearningPath = async (
       success: true,
       message: 'Learning path deleted successfully',
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error deleting learning path:', error);
     next(error);
   }
@@ -670,7 +670,7 @@ export const addPathwayStep = async (
       message: 'Pathway step added successfully',
       data: newStep,
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error adding pathway step:', error);
     next(error);
   }
@@ -715,7 +715,7 @@ export const removePathwayStep = async (
       success: true,
       message: 'Pathway step removed successfully',
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error removing pathway step:', error);
     next(error);
   }
@@ -743,7 +743,7 @@ export const getLearningPathProgress = async (
       }
     });
     return;
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error fetching learning path progress:', error);
     next(error);
   }

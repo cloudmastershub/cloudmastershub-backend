@@ -39,7 +39,7 @@ export const getUserProgress = async (
       success: true,
       data: progress,
     });
-  } catch (error) {
+  } catch (error: any) {
     next(error);
   }
 };
@@ -67,7 +67,7 @@ export const updateProgress = async (
         updatedAt: new Date(),
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     next(error);
   }
 };
@@ -99,7 +99,7 @@ export const getCourseProgress = async (
       success: true,
       data: courseProgress,
     });
-  } catch (error) {
+  } catch (error: any) {
     next(error);
   }
 };
@@ -126,7 +126,7 @@ export const getCompletedCourses = async (
       success: true,
       data: completedCourses,
     });
-  } catch (error) {
+  } catch (error: any) {
     next(error);
   }
 };

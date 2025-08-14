@@ -95,7 +95,7 @@ const startServer = async () => {
       initializeCoursePaymentEventSubscriber();
       logger.info('Course service payment event subscriber initialized');
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Failed to start course service:', error);
     process.exit(1);
   }

@@ -41,7 +41,7 @@ export const getLessonsByCourse = async (
       success: true,
       data: lessons,
     });
-  } catch (error) {
+  } catch (error: any) {
     next(error);
   }
 };
@@ -76,7 +76,7 @@ export const getLessonById = async (
       success: true,
       data: lesson,
     });
-  } catch (error) {
+  } catch (error: any) {
     next(error);
   }
 };
@@ -103,7 +103,7 @@ export const createLesson = async (
         createdAt: new Date(),
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     next(error);
   }
 };
@@ -130,7 +130,7 @@ export const updateLesson = async (
         updatedAt: new Date(),
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     next(error);
   }
 };
@@ -151,7 +151,7 @@ export const deleteLesson = async (
       success: true,
       message: 'Lesson deleted successfully',
     });
-  } catch (error) {
+  } catch (error: any) {
     next(error);
   }
 };
@@ -179,7 +179,7 @@ export const markLessonComplete = async (
         watchTime,
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     next(error);
   }
 };

@@ -122,7 +122,7 @@ export const getAllCourses = async (
       });
       return;
     }
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error fetching courses:', error);
     next(error);
   }
@@ -236,7 +236,7 @@ export const getCourseById = async (
       });
       return;
     }
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error fetching course:', error);
     next(error);
   }
@@ -364,7 +364,7 @@ export const createCourse = async (
       data: savedCourse,
       message: 'Course created successfully'
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error creating course:', error);
     
     // Handle MongoDB validation errors
@@ -553,7 +553,7 @@ export const updateCourse = async (
       data: updatedCourse,
       message: 'Course updated successfully'
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error updating course:', error);
     
     const err = error as any;
@@ -690,7 +690,7 @@ export const deleteCourse = async (
       success: true,
       message: 'Course deleted successfully',
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error deleting course:', error);
     
     const err = error as any;
@@ -847,7 +847,7 @@ export const enrollInCourse = async (
       },
       message: 'Successfully enrolled in course'
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error enrolling in course:', error);
     
     const err = error as any;
@@ -940,7 +940,7 @@ export const getUserCourses = async (
       success: true,
       data: coursesWithProgress,
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error fetching user courses:', error);
     next(error);
   }

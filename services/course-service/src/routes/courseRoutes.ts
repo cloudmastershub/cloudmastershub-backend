@@ -104,7 +104,7 @@ router.get('/:id/progress', (req, res, next) => {
           watchedTime: progress.watchedTime || 0
         }
       });
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Error fetching course progress:', error);
       next(error);
     }

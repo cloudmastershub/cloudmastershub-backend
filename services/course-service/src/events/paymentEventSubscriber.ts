@@ -33,7 +33,7 @@ class CoursePaymentEventSubscriber {
       await this.redisClient.connect();
       await this.subscribeToPaymentEvents();
 
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Failed to initialize Redis for course payment events:', error);
     }
   }
@@ -57,7 +57,7 @@ class CoursePaymentEventSubscriber {
 
       logger.info('Course service subscribed to payment events:', channels);
 
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Failed to subscribe to payment events in course service:', error);
     }
   }
@@ -104,7 +104,7 @@ class CoursePaymentEventSubscriber {
           logger.warn('Unknown payment event type in course service:', event.type);
       }
 
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Error processing payment event in course service:', {
         channel,
         message,
@@ -128,7 +128,7 @@ class CoursePaymentEventSubscriber {
         await this.grantPlatformAccess(userId, plan);
       }
 
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Error handling subscription created event in course service:', error);
     }
   }
@@ -152,7 +152,7 @@ class CoursePaymentEventSubscriber {
         await this.revokePlatformAccess(userId);
       }
 
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Error handling subscription updated event in course service:', error);
     }
   }
@@ -166,7 +166,7 @@ class CoursePaymentEventSubscriber {
       // Revoke access to premium courses
       await this.revokePlatformAccess(userId);
 
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Error handling subscription cancelled event in course service:', error);
     }
   }
@@ -193,7 +193,7 @@ class CoursePaymentEventSubscriber {
         await this.grantLearningPathAccess(userId, resourceId!, 'purchase');
       }
 
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Error handling purchase completed event in course service:', error);
     }
   }
@@ -215,7 +215,7 @@ class CoursePaymentEventSubscriber {
         await this.grantLearningPathAccess(userId, resourceId!, metadata.source || 'admin_grant');
       }
 
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Error handling access granted event in course service:', error);
     }
   }
@@ -238,7 +238,7 @@ class CoursePaymentEventSubscriber {
         await this.revokePlatformAccess(userId);
       }
 
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Error handling access revoked event in course service:', error);
     }
   }
@@ -257,7 +257,7 @@ class CoursePaymentEventSubscriber {
       // For now, we'll just log the action
       logger.info('Platform access granted successfully', { userId, plan });
 
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Error granting platform access:', error);
       throw error;
     }
@@ -277,7 +277,7 @@ class CoursePaymentEventSubscriber {
       // For now, we'll just log the action
       logger.info('Platform access revoked successfully', { userId });
 
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Error revoking platform access:', error);
       throw error;
     }
@@ -295,7 +295,7 @@ class CoursePaymentEventSubscriber {
 
       logger.info('Course access granted successfully', { userId, courseId, source });
 
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Error granting course access:', error);
       throw error;
     }
@@ -313,7 +313,7 @@ class CoursePaymentEventSubscriber {
 
       logger.info('Course access revoked successfully', { userId, courseId });
 
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Error revoking course access:', error);
       throw error;
     }
@@ -331,7 +331,7 @@ class CoursePaymentEventSubscriber {
 
       logger.info('Learning path access granted successfully', { userId, pathId, source });
 
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Error granting learning path access:', error);
       throw error;
     }
@@ -349,7 +349,7 @@ class CoursePaymentEventSubscriber {
 
       logger.info('Learning path access revoked successfully', { userId, pathId });
 
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Error revoking learning path access:', error);
       throw error;
     }
@@ -361,7 +361,7 @@ class CoursePaymentEventSubscriber {
         await this.redisClient.disconnect();
         logger.info('Course service payment event subscriber disconnected from Redis');
       }
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Error disconnecting course payment event subscriber:', error);
     }
   }

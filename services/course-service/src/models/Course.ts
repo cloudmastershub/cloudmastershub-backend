@@ -248,7 +248,7 @@ CourseSchema.pre('validate', async function(next) {
       try {
         baseSlug = generateSlug(this.title);
         console.log('🔧 Generated base slug:', baseSlug);
-      } catch (error) {
+      } catch (error: any) {
         console.error('🔧 Error generating slug:', error);
         // Fallback slug generation
         baseSlug = this.title
@@ -272,7 +272,7 @@ CourseSchema.pre('validate', async function(next) {
     }
     
     next();
-  } catch (error) {
+  } catch (error: any) {
     console.error('🔧 Error in Course pre-validation middleware:', error);
     
     // If slug generation fails completely, set a basic slug to prevent validation error
@@ -312,7 +312,7 @@ CourseSchema.pre('save', async function(next) {
         // Always set the slug, making it unique if necessary
         this.slug = generateUniqueSlug(baseSlug, existingSlugs);
         console.log('🔧 Set final unique slug:', this.slug);
-      } catch (error) {
+      } catch (error: any) {
         console.error('🔧 Error ensuring slug uniqueness:', error);
         // Fallback - append timestamp to make it unique
         this.slug = `${baseSlug}-${Date.now()}`;
@@ -332,7 +332,7 @@ CourseSchema.pre('save', async function(next) {
     
     console.log('🔧 Pre-save middleware completed successfully');
     next();
-  } catch (error) {
+  } catch (error: any) {
     console.error('🔧 Error in Course pre-save middleware:', error);
     
     // If slug generation fails completely, set a basic slug to prevent validation error

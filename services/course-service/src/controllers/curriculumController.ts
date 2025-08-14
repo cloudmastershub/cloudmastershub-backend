@@ -88,7 +88,7 @@ export const addSection = async (
       data: newSection,
       message: 'Section added successfully'
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error adding section:', error);
     next(error);
   }
@@ -165,7 +165,7 @@ export const updateSection = async (
       data: section,
       message: 'Section updated successfully'
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error updating section:', error);
     next(error);
   }
@@ -238,7 +238,7 @@ export const deleteSection = async (
       success: true,
       message: 'Section deleted successfully'
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error deleting section:', error);
     next(error);
   }
@@ -313,7 +313,7 @@ export const reorderSections = async (
       data: course.curriculum,
       message: 'Sections reordered successfully'
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error reordering sections:', error);
     next(error);
   }
@@ -406,7 +406,7 @@ export const addLesson = async (
       data: newLesson,
       message: 'Lesson added successfully'
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error adding lesson:', error);
     next(error);
   }
@@ -500,7 +500,7 @@ export const updateLesson = async (
       data: lesson,
       message: 'Lesson updated successfully'
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error updating lesson:', error);
     next(error);
   }
@@ -589,7 +589,7 @@ export const deleteLesson = async (
       success: true,
       message: 'Lesson deleted successfully'
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error deleting lesson:', error);
     next(error);
   }
@@ -675,7 +675,7 @@ export const reorderLessons = async (
       data: section.lessons,
       message: 'Lessons reordered successfully'
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error reordering lessons:', error);
     next(error);
   }
@@ -759,7 +759,7 @@ export const updateCurriculum = async (
       data: course.curriculum,
       message: 'Curriculum updated successfully'
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error updating curriculum:', error);
     next(error);
   }

@@ -364,7 +364,7 @@ export const validateBusinessRules = async (
     }
 
     next();
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Business validation error:', error);
     res.status(500).json({
       success: false,
