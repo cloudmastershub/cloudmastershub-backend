@@ -2,6 +2,7 @@ import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import logger from './utils/logger';
 import { errorHandler } from './middleware/errorHandler';
@@ -81,6 +82,18 @@ app.get('/health', (req, res) => {
     corsUpdate: 'Applied dynamic origin validation'
   });
 });
+
+// Serve static files (course images, etc.)
+const publicPath = path.join(__dirname, '../../public');
+app.use('/images', express.static(path.join(publicPath, 'images'), {
+  maxAge: '7d', // Cache images for 7 days
+  setHeaders: (res, filepath) => {
+    // Set proper content type for SVG files
+    if (filepath.endsWith('.svg')) {
+      res.setHeader('Content-Type', 'image/svg+xml');
+    }
+  }
+}));
 
 // Apply rate limiter before body parsing
 app.use(rateLimiter);

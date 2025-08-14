@@ -331,7 +331,7 @@ export const createLearningPath = async (
       shortDescription: pathData.shortDescription || pathData.description.substring(0, 300),
       category: pathData.category,
       level: pathData.level,
-      thumbnail: pathData.thumbnail || '', // Default empty string for now
+      thumbnail: pathData.thumbnail || 'https://api.cloudmastershub.com/images/courses/default-course.svg',
       instructorId: finalInstructorId,
       price: Number(pathData.price),
       currency: pathData.currency || 'USD',

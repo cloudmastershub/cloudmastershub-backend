@@ -21,7 +21,7 @@ const sampleCourses = [
     duration: 30,
     price: 0,
     isFree: true,
-    thumbnail: 'https://cloudmastershub.com/images/aws-practitioner.jpg',
+    thumbnail: 'https://api.cloudmastershub.com/images/courses/aws-practitioner.svg',
     objectives: [
       'Understand AWS cloud concepts and global infrastructure',
       'Learn core AWS services and their use cases',
