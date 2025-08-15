@@ -99,9 +99,16 @@ export const getAllCourses = async (
         total
       });
 
+      // Transform courses to include 'id' field for frontend compatibility
+      const transformedCourses = courses.map(course => ({
+        ...course,
+        id: course._id.toString(),
+        courseId: course._id.toString()
+      }));
+
       res.json({
         success: true,
-        data: courses,
+        data: transformedCourses,
         pagination: {
           page: Number(page),
           limit: Number(limit),
@@ -204,6 +211,8 @@ export const getCourseById = async (
 
       const courseWithEnrollment = {
         ...course,
+        id: course._id.toString(),
+        courseId: course._id.toString(),
         isEnrolled
       };
 
@@ -359,9 +368,16 @@ export const createCourse = async (
       price: savedCourse.price
     });
 
+    // Transform course to include 'id' field for frontend compatibility
+    const transformedCourse = {
+      ...savedCourse.toObject(),
+      id: savedCourse._id.toString(),
+      courseId: savedCourse._id.toString()
+    };
+
     res.status(201).json({
       success: true,
-      data: savedCourse,
+      data: transformedCourse,
       message: 'Course created successfully'
     });
   } catch (error: any) {
@@ -461,6 +477,15 @@ export const updateCourse = async (
     const { id: slug } = req.params;
     const updates = req.body;
     
+    // Log incoming update request for debugging
+    logger.info('Course update request received', {
+      slug,
+      instructorId: (req as any).userId,
+      updateFields: Object.keys(updates),
+      method: req.method,
+      originalUrl: req.originalUrl
+    });
+    
     // Validate slug format
     if (!isValidSlug(slug)) {
       if (isLegacyId(slug)) {
@@ -490,15 +515,48 @@ export const updateCourse = async (
     const authReq = req as any; // AuthRequest interface
     const instructorId = authReq.userId;
 
+    // Try to find course with detailed logging
+    logger.info('Searching for course to update', { slug, instructorId });
     const course = await Course.findOne({ slug });
 
     if (!course) {
+      // Try to find courses by this instructor to help debug
+      const instructorCourses = await Course.find({ 'instructor.id': instructorId })
+        .select('slug title _id')
+        .limit(10)
+        .lean();
+      
+      // Try to find a course with similar slug
+      const similarCourse = await Course.findOne({
+        slug: { $regex: new RegExp(slug.substring(0, Math.min(10, slug.length)), 'i') }
+      }).select('slug title instructor.id').lean();
+      
+      logger.error('Course not found for update', {
+        searchedSlug: slug,
+        instructorId,
+        instructorCourses: instructorCourses.map(c => ({ slug: c.slug, title: c.title })),
+        similarCourse: similarCourse ? {
+          slug: similarCourse.slug,
+          title: similarCourse.title,
+          isOwner: similarCourse.instructor.id === instructorId
+        } : null
+      });
+      
       res.status(404).json({
         success: false,
         message: 'Course not found',
         error: {
           code: 'COURSE_NOT_FOUND',
-          details: `No course found with slug: ${slug}`
+          details: `No course found with slug: ${slug}`,
+          debug: {
+            searchedSlug: slug,
+            instructorCourses: instructorCourses.length > 0 ? 
+              `Your courses: ${instructorCourses.map(c => c.slug).join(', ')}` : 
+              'You have no courses',
+            similarCourse: similarCourse ? 
+              `Similar course found: "${similarCourse.slug}" (${similarCourse.title})` : 
+              null
+          }
         }
       });
       return;
@@ -548,9 +606,16 @@ export const updateCourse = async (
       }
     }
 
+    // Transform course to include 'id' field for frontend compatibility
+    const transformedCourse = {
+      ...updatedCourse.toObject(),
+      id: updatedCourse._id.toString(),
+      courseId: updatedCourse._id.toString()
+    };
+
     res.json({
       success: true,
-      data: updatedCourse,
+      data: transformedCourse,
       message: 'Course updated successfully'
     });
   } catch (error: any) {
