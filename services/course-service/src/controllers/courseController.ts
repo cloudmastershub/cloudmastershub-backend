@@ -299,7 +299,7 @@ export const createCourse = async (
       category: courseData.category,
       level: courseData.level || DifficultyLevel.BEGINNER,
       duration: courseData.duration || 0,
-      thumbnail: courseData.thumbnail || 'https://api.cloudmastershub.com/images/courses/default-course.svg',
+      thumbnail: courseData.thumbnail || '/images/course-placeholder.svg',
       preview: courseData.preview || courseData.previewVideo || '',
       instructor: {
         id: instructorId,
