@@ -83,7 +83,7 @@ router.get('/:id/certificate', authenticate, (req: Request, res: Response, next:
 }, validatePathId, getLearningPathCertificate);
 
 // Learning path access check
-router.get('/:id/access', authenticate, validatePathId, (req, res) => {
+router.get('/:id/access', authenticate, validatePathId, (req: Request, res: Response) => {
   res.json({
     success: true,
     data: {
