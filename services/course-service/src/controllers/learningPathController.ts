@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
+import { isValidObjectId } from 'mongoose';
 import logger from '../utils/logger';
 import { LearningPath } from '../models';
+import { isValidSlug, isLegacyId } from '../utils/slugValidation';
 import {
   LearningPath as LearningPathType,
   LearningPathQueryParams,
@@ -187,57 +189,107 @@ export const getLearningPathById = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { id } = req.params;
-
-    logger.info('Fetching learning path by ID from database', { pathId: id });
-
-    // Query MongoDB for the learning path
-    const path = await LearningPath.findById(id).lean();
-
-    if (!path) {
-      res.status(404).json({
+    const { id: slug } = req.params;
+    
+    // Validate slug format before proceeding
+    if (!isValidSlug(slug)) {
+      if (isLegacyId(slug)) {
+        logger.warn('Legacy ID usage detected in getLearningPathById', { legacyId: slug });
+        res.status(410).json({
+          success: false,
+          message: 'Legacy learning path identifiers are no longer supported',
+          error: {
+            code: 'LEGACY_ID_NOT_SUPPORTED',
+            details: 'Please use the learning path slug (e.g., "cloud-architect-journey") instead of legacy IDs',
+            legacyId: slug,
+            migrationRequired: true
+          }
+        });
+        return;
+      }
+      
+      res.status(400).json({
         success: false,
-        message: 'Learning path not found',
+        message: 'Invalid learning path identifier format',
         error: {
-          code: 'PATH_NOT_FOUND',
-          details: `No learning path found with ID: ${id}`
+          code: 'INVALID_SLUG_FORMAT',
+          details: 'Learning path identifiers must be lowercase, alphanumeric with hyphens (e.g., "cloud-architect-journey")',
+          provided: slug,
+          expectedFormat: 'lowercase-slug-format'
         }
       });
       return;
     }
+    
+    logger.info('Fetching learning path by slug from MongoDB', { slug });
+    
+    try {
+      // Only look up by slug - no legacy ID support
+      const path = await LearningPath.findOne({ slug }).select('-__v').lean().maxTimeMS(5000);
+      
+      if (!path) {
+        logger.warn('Learning path not found', { slug });
+        res.status(404).json({
+          success: false,
+          message: 'Learning path not found',
+          error: {
+            code: 'PATH_NOT_FOUND',
+            details: `No learning path found with slug: ${slug}`
+          }
+        });
+        return;
+      }
 
-    // Transform path data to match frontend expectations
-    const transformedPath = {
-      ...path,
-      id: path._id.toString(),
-      totalSteps: path.pathway?.length || 0,
-      totalCourses: path.pathway?.filter((step: any) => step.type === 'course').length || 0,
-      totalLabs: path.pathway?.filter((step: any) => step.type === 'lab').length || 0,
-      pathway: path.pathway || []
-    };
+      // Transform path data to match frontend expectations
+      const transformedPath = {
+        ...path,
+        id: path.slug, // Use slug as the public ID
+        totalSteps: path.pathway?.length || 0,
+        totalCourses: path.pathway?.filter((step: any) => step.type === 'course').length || 0,
+        totalLabs: path.pathway?.filter((step: any) => step.type === 'lab').length || 0,
+        pathway: path.pathway || []
+      };
 
-    const response: LearningPathDetailsResponse = {
-      ...transformedPath,
-      instructor: {
-        id: path.instructorId || 'default-instructor',
-        name: 'Learning Path Instructor',
-        bio: 'Expert instructor for this learning path',
-        avatar: '',
-        expertise: [],
-        rating: 0
-      },
-      prerequisites: [],
-      recommendations: [], // Will be populated with actual data when needed
-      reviews: [] // Will be populated with actual review data when implemented
-    };
+      const response: LearningPathDetailsResponse = {
+        ...transformedPath,
+        instructor: {
+          id: path.instructorId || 'default-instructor',
+          name: 'Learning Path Instructor',
+          bio: 'Expert instructor for this learning path',
+          avatar: '',
+          expertise: [],
+          rating: 0
+        },
+        prerequisites: [],
+        recommendations: [], // Will be populated with actual data when needed
+        reviews: [] // Will be populated with actual review data when implemented
+      };
 
-    res.status(200).json({
-      success: true,
-      data: response,
-    });
+      res.status(200).json({
+        success: true,
+        data: response,
+      });
+    } catch (dbError: any) {
+      logger.error('Database error fetching learning path by slug:', { slug, error: dbError.message });
+      res.status(500).json({
+        success: false,
+        message: 'Database error occurred while fetching learning path',
+        error: {
+          code: 'DATABASE_ERROR',
+          details: 'Unable to retrieve learning path from database'
+        }
+      });
+      return;
+    }
   } catch (error: any) {
-    logger.error('Error fetching learning path by ID:', error);
-    next(error);
+    logger.error('Error fetching learning path by slug:', { slug, error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: {
+        code: 'INTERNAL_ERROR'
+      }
+    });
   }
 };
 

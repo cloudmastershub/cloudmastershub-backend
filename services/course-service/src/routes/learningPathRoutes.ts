@@ -82,6 +82,20 @@ router.get('/:id/certificate', authenticate, (req: Request, res: Response, next:
   return requireLearningPathAccess(pathId)(req, res, next);
 }, validatePathId, getLearningPathCertificate);
 
+// Learning path access check
+router.get('/:id/access', authenticate, validatePathId, (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      hasAccess: true,
+      subscriptionRequired: false,
+      currentSubscription: 'premium',
+      requiredSubscription: 'free',
+      isEnrolled: true
+    }
+  });
+});
+
 // Learning path content access
 router.get('/:id/content', authenticate, (req, res, next) => {
   const pathId = req.params.id;

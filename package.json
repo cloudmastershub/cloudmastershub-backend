@@ -29,6 +29,7 @@
     "test:frontend-api": "npx ts-node scripts/test-frontend-api.ts",
     "simulate:frontend": "npx ts-node scripts/simulate-frontend-processing.ts",
     "test:auth-public": "npx ts-node scripts/test-auth-vs-public.ts",
+    "test:direct-fetch": "npx ts-node scripts/test-direct-fetch.ts",
     "start:api-gateway": "npm run start --workspace=@cloudmastershub/api-gateway",
     "start:user-service": "npm run start --workspace=@cloudmastershub/user-service",
     "start:course-service": "npm run start --workspace=@cloudmastershub/course-service",
