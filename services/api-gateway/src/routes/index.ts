@@ -59,15 +59,6 @@ const serviceRoutes = {
       '^/api/paths': '/paths'
     }
   },
-  '/learning-paths': {
-    target: process.env.COURSE_SERVICE_URL || 'http://course-service:3002',
-    changeOrigin: true,
-    timeout: 30000,
-    proxyTimeout: 30000,
-    pathRewrite: {
-      '^/api/learning-paths': '/paths'
-    }
-  },
   '/labs': {
     target: process.env.LAB_SERVICE_URL || 'http://lab-service:3003',
     changeOrigin: true,
@@ -141,15 +132,7 @@ const serviceRoutes = {
       '^/api/admin/courses': '/admin/courses'
     }
   },
-  '/admin/paths': {
-    target: process.env.COURSE_SERVICE_URL || 'http://course-service:3002',
-    changeOrigin: true,
-    timeout: 30000,
-    proxyTimeout: 30000,
-    pathRewrite: {
-      '^/api/admin/paths': '/admin/paths'
-    }
-  },
+  // Removed /admin/paths - learning paths are now managed by course service only
   '/admin/users': {
     target: process.env.USER_SERVICE_URL || 'http://user-service:3001',
     changeOrigin: true,
@@ -359,48 +342,14 @@ router.use('/admin/courses', createProxyMiddleware({
   },
 }));
 
-// Admin paths route - must go to course-service
-router.use('/admin/paths', createProxyMiddleware({
-  target: process.env.COURSE_SERVICE_URL || 'http://course-service:3002',
-  changeOrigin: true,
-  timeout: 30000,
-  proxyTimeout: 30000,
-  pathRewrite: {
-    '^/api/admin/paths': '/admin/paths'
-  },
-  secure: false,
-  ws: true,
-  logLevel: 'debug',
-  onError: (err, req, res) => {
-    logger.error(`Proxy error for /admin/paths:`, err);
-    if (!res.headersSent) {
-      res.status(502).json({
-        success: false,
-        error: {
-          message: 'Service temporarily unavailable',
-          service: 'course-service',
-        },
-      });
-    }
-  },
-  onProxyReq: (proxyReq, req, res) => {
-    logger.debug(`Proxying EXACT ${req.method} ${req.originalUrl} to course-service:3002${req.path}`);
-    if (req.body && Object.keys(req.body).length > 0) {
-      const bodyData = JSON.stringify(req.body);
-      proxyReq.setHeader('Content-Type', 'application/json');
-      proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
-      proxyReq.write(bodyData);
-    }
-  },
-  onProxyRes: (proxyRes, req, res) => {
-    logger.debug(`Received response ${proxyRes.statusCode} for EXACT ${req.method} ${req.originalUrl}`);
-  },
-}));
+// Learning paths are now handled by course service with admin role restrictions
+
+// Removed /admin/paths routing - learning paths are managed by course service only
 
 // Handle general routes with prefix matching
 Object.entries(serviceRoutes).forEach(([path, config]) => {
   // Skip specific admin routes as they're handled above
-  if (['/admin/stats', '/admin/users', '/admin/instructors', '/admin/courses', '/admin/paths'].includes(path)) return;
+  if (['/admin/stats', '/admin/users', '/admin/instructors', '/admin/courses'].includes(path)) return;
   
   router.use(
     path,

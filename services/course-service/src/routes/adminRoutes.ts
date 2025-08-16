@@ -367,6 +367,8 @@ router.get('/stats', async (req: AuthRequest, res: Response, next: NextFunction)
  * Admins can manage all learning paths
  */
 
+// REMOVED: Learning paths now managed by admin service only
+/*
 // Get all learning paths (admin view)
 router.get('/paths', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -543,5 +545,6 @@ router.delete('/paths/:id/courses/:courseId', async (req: AuthRequest, res: Resp
     });
   }
 });
+*/
 
 export default router;

@@ -372,8 +372,24 @@ router.get('/stats', async (req: AuthRequest, res: Response, next: NextFunction)
   try {
     const instructorId = req.userId;
     
+    logger.info('🔍 Instructor stats request received:', {
+      instructorId,
+      userEmail: req.userEmail,
+      userRoles: req.userRoles,
+      url: req.url,
+      timestamp: new Date().toISOString()
+    });
+    
     // Get real instructor statistics
     const instructorCourses = await Course.find({ 'instructor.id': instructorId }).lean();
+    
+    logger.info('📊 Instructor courses query result:', {
+      instructorId,
+      queryFilter: { 'instructor.id': instructorId },
+      foundCourses: instructorCourses.length,
+      courseIds: instructorCourses.map(c => c._id),
+      courseTitles: instructorCourses.map(c => c.title)
+    });
     const publishedCourses = instructorCourses.filter(c => c.status === CourseStatus.PUBLISHED);
     const draftCourses = instructorCourses.filter(c => c.status === CourseStatus.DRAFT);
     

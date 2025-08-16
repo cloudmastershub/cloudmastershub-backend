@@ -39,43 +39,38 @@ import {
 
 const router = Router();
 
+// Admin role check middleware
+const requireAdminRole = (req: any, res: any, next: any) => {
+  // Check if user has admin role
+  if (!req.userRoles || !req.userRoles.includes('admin')) {
+    return res.status(403).json({
+      success: false,
+      message: 'Admin role required for this operation',
+      error: {
+        code: 'ADMIN_ROLE_REQUIRED',
+        details: 'Learning path creation, updating, and deletion requires admin privileges.'
+      }
+    });
+  }
+  next();
+};
+
 // Public routes (no authentication required)
 router.get('/', validateLearningPathQuery, getAllLearningPaths);
 router.get('/:id', validatePathId, getLearningPathById);
 
 // Protected routes (authentication required)
 
-// Admin bypass middleware for premium subscription requirement
-const adminOrPremiumSubscription = (req: any, res: any, next: any) => {
-  console.log('🔐 Learning Path Creation - User Info:', {
-    userId: req.user?.id,
-    email: req.user?.email,
-    roles: req.user?.roles,
-    isAdmin: req.user?.roles?.includes('admin')
-  });
-  
-  // Check if user is admin
-  if (req.user?.roles?.includes('admin')) {
-    console.log('✅ Admin bypass - skipping premium subscription check');
-    return next(); // Skip subscription check for admins
-  }
-  
-  console.log('🔒 Non-admin user - requiring premium subscription');
-  // Otherwise, require premium subscription
-  return requirePremiumSubscription()(req, res, next);
-};
+// Admin-only CRUD operations (create, update, delete)
+router.post('/', authenticate, requireAdminRole, validateCreateLearningPath, validateBusinessRules, createLearningPath);
+router.put('/:id', authenticate, requireAdminRole, validateUpdateLearningPath, validateBusinessRules, updateLearningPath);
+router.delete('/:id', authenticate, requireAdminRole, validatePathId, deleteLearningPath);
 
-// Instructor/Admin routes for managing learning paths
-// Temporarily disable validation middleware to see Mongoose validation errors directly
-router.post('/', authenticate, adminOrPremiumSubscription, createLearningPath);
-router.put('/:id', authenticate, validateUpdateLearningPath, validateBusinessRules, updateLearningPath);
-router.delete('/:id', authenticate, validatePathId, deleteLearningPath); // Admin only
+// Admin-only pathway step management
+router.post('/:id/steps', authenticate, requireAdminRole, validateAddPathwayStep, validateBusinessRules, addPathwayStep);
+router.delete('/:id/steps/:stepId', authenticate, requireAdminRole, validatePathId, removePathwayStep);
 
-// Pathway step management
-router.post('/:id/steps', authenticate, validateAddPathwayStep, validateBusinessRules, addPathwayStep);
-router.delete('/:id/steps/:stepId', authenticate, validatePathId, removePathwayStep);
-
-// Progress tracking and enrollment (user-specific)
+// Progress tracking and enrollment (user-specific, no admin restriction)
 router.get('/:id/progress', authenticate, validatePathId, getLearningPathProgress);
 router.post('/:id/enroll', authenticate, validateEnrollment, validateBusinessRules, enrollInLearningPath);
 router.post('/:id/steps/:stepId/progress', authenticate, (req: Request, res: Response, next: NextFunction) => {
@@ -99,7 +94,7 @@ router.get('/:id/content', authenticate, (req, res, next) => {
   });
 });
 
-// User dashboard and analytics
+// User dashboard and analytics (no admin restriction)
 router.get('/user/paths', authenticate, validateUserStatusQuery, getUserLearningPaths);
 router.get('/user/recommendations', authenticate, validateRecommendationsQuery, getRecommendations);
 router.get('/user/analytics', authenticate, validateAnalyticsQuery, getLearningAnalytics);

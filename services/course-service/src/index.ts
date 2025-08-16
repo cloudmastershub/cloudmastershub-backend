@@ -74,6 +74,7 @@ app.use('/instructor', instructorRoutes);
 app.use('/admin', adminRoutes);
 app.use('/courses/:courseId/lessons', lessonRoutes);
 app.use('/progress', progressRoutes);
+// Learning paths with admin role restrictions for CRUD operations
 app.use('/paths', learningPathRoutes);
 app.use('/curriculum', curriculumRoutes);
 
