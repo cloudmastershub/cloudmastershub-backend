@@ -71,13 +71,28 @@ router.delete(
   deletePath
 );
 
-// Path step management
+// Path step management - support both /steps and /courses endpoints for compatibility
+router.post(
+  '/:pathId/steps',
+  requirePermission(AdminPermission.MODERATE_CONTENT),
+  validatePathAction,
+  logAdminAction('ADD_COURSE_TO_PATH'),
+  addCourseToPath
+);
+
 router.post(
   '/:pathId/courses',
   requirePermission(AdminPermission.MODERATE_CONTENT),
   validatePathAction,
   logAdminAction('ADD_COURSE_TO_PATH'),
   addCourseToPath
+);
+
+router.delete(
+  '/:pathId/steps/:courseId',
+  requirePermission(AdminPermission.MODERATE_CONTENT),
+  logAdminAction('REMOVE_COURSE_FROM_PATH'),
+  removeCourseFromPath
 );
 
 router.delete(
