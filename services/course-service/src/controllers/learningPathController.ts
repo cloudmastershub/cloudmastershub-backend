@@ -282,7 +282,7 @@ export const getLearningPathById = async (
       return;
     }
   } catch (error: any) {
-    logger.error('Error fetching learning path by slug:', { slug: slug, error: error.message });
+    logger.error('Error fetching learning path by slug:', { slug: req.params.id, error: error.message });
     res.status(500).json({
       success: false,
       message: 'Internal server error',
