@@ -19,6 +19,8 @@ export enum BlockType {
   SPACER = 'spacer',
   TEXT = 'text',
   DIVIDER = 'divider',
+  SECTION = 'section',
+  COLUMNS = 'columns',
 }
 
 // Landing page status
@@ -34,6 +36,8 @@ export interface IBlock {
   type: BlockType;
   data: Record<string, any>;
   position: number;
+  children?: IBlock[]; // For section and columns blocks with nested content
+  transparent?: boolean; // Optional transparency setting
 }
 
 // Landing Page interface
@@ -67,7 +71,9 @@ const BlockSchema = new Schema<IBlock>({
     enum: Object.values(BlockType)
   },
   data: { type: Schema.Types.Mixed, required: true, default: {} },
-  position: { type: Number, required: true, min: 0 }
+  position: { type: Number, required: true, min: 0 },
+  children: { type: Schema.Types.Mixed, default: undefined }, // For nested blocks in section/columns
+  transparent: { type: Boolean, default: undefined }
 }, { _id: false });
 
 // Landing Page schema
