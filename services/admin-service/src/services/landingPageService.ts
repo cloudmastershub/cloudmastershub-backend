@@ -210,8 +210,13 @@ class LandingPageService {
         return null;
       }
 
-      // Update fields
-      Object.assign(landingPage, input);
+      // Filter out undefined values to avoid overwriting required fields with undefined
+      const filteredInput = Object.fromEntries(
+        Object.entries(input).filter(([_, value]) => value !== undefined)
+      );
+
+      // Update only defined fields
+      Object.assign(landingPage, filteredInput);
 
       await landingPage.save();
 
