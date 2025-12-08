@@ -84,7 +84,7 @@ const LandingPageSchema = new Schema<ILandingPage>({
     unique: true,
     trim: true,
     lowercase: true,
-    index: true,
+    // Note: index is created separately below with unique constraint
     match: [/^[a-z0-9-]+$/, 'Slug can only contain lowercase letters, numbers, and hyphens']
   },
   description: {

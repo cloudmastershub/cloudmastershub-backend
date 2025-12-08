@@ -175,8 +175,15 @@ class LandingPageService {
         LandingPage.countDocuments(query)
       ]);
 
+      // Transform _id to id for each landing page (lean() bypasses Mongoose transforms)
+      const transformedPages = landingPages.map((page: any) => ({
+        ...page,
+        id: page._id.toString(),
+        _id: undefined
+      }));
+
       return {
-        data: landingPages as ILandingPage[],
+        data: transformedPages as ILandingPage[],
         pagination: {
           page,
           limit,
