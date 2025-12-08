@@ -72,13 +72,8 @@ pipeline {
         }
         
         stage('Install Dependencies') {
-            agent {
-                docker {
-                    image 'node:20-alpine'
-                    args '-u root:root'
-                    reuseNode true
-                }
-            }
+            // Run on Jenkins host directly - Node.js v20 is available
+            // Removed Docker agent due to Alpine/durable-task-plugin compatibility issues
             steps {
                 script {
                     echo "📦 Installing dependencies for all services..."
@@ -134,15 +129,10 @@ pipeline {
         }
         
         stage('Code Quality') {
+            // Run on Jenkins host directly - Node.js v20 is available
+            // Removed Docker agents due to Alpine/durable-task-plugin compatibility issues
             parallel {
                 stage('Lint') {
-                    agent {
-                        docker {
-                            image 'node:20-alpine'
-                            args '-u root:root'
-                            reuseNode true
-                        }
-                    }
                     steps {
                         script {
                             echo "🔍 Running linting for all services..."
@@ -180,13 +170,6 @@ pipeline {
                 }
                 
                 stage('Test') {
-                    agent {
-                        docker {
-                            image 'node:20-alpine'
-                            args '-u root:root'
-                            reuseNode true
-                        }
-                    }
                     steps {
                         script {
                             echo "🧪 Running tests for all services..."
@@ -226,13 +209,8 @@ pipeline {
         }
         
         stage('Build') {
-            agent {
-                docker {
-                    image 'node:20-alpine'
-                    args '-u root:root'
-                    reuseNode true
-                }
-            }
+            // Run on Jenkins host directly - Node.js v20 is available
+            // Removed Docker agent due to Alpine/durable-task-plugin compatibility issues
             steps {
                 script {
                     echo "🏗️  Building all services..."
