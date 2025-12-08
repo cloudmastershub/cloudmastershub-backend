@@ -60,7 +60,7 @@ const corsMiddleware = cors({
 // Apply CORS only to non-proxied routes
 app.use((req, res, next) => {
   // Skip CORS for proxied routes - let backend services handle CORS
-  const proxiedPaths = ['/api/instructor', '/api/courses', '/api/users', '/api/referrals', '/api/auth', '/api/admin'];
+  const proxiedPaths = ['/api/instructor', '/api/courses', '/api/users', '/api/referrals', '/api/auth', '/api/admin', '/api/pages'];
   const isProxiedRoute = proxiedPaths.some(path => req.path.startsWith(path));
   
   if (isProxiedRoute) {

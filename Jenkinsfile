@@ -54,7 +54,7 @@ pipeline {
                         branches: [[name: '*/main']],
                         userRemoteConfigs: [[
                             url: 'https://github.com/cloudmastershub/cloudmastershub-backend.git',
-                            credentialsId: 'cloudmastershub-github-userpass'
+                            credentialsId: 'github-credentials'
                         ]]
                     ])
                     
@@ -334,8 +334,8 @@ pipeline {
                     sh 'rm -rf gitops-temp || true'
                     
                     // Clone gitops repository with credentials
-                    withCredentials([usernamePassword(credentialsId: 'cloudmastershub-github-userpass', 
-                                                    usernameVariable: 'GIT_USERNAME', 
+                    withCredentials([usernamePassword(credentialsId: 'github-credentials',
+                                                    usernameVariable: 'GIT_USERNAME',
                                                     passwordVariable: 'GIT_PASSWORD')]) {
                         sh """
                             git clone https://\${GIT_USERNAME}:\${GIT_PASSWORD}@github.com/${GITOPS_REPO}.git gitops-temp
@@ -357,8 +357,8 @@ pipeline {
                     """
                     
                     // Commit and push changes
-                    withCredentials([usernamePassword(credentialsId: 'cloudmastershub-github-userpass', 
-                                                    usernameVariable: 'GIT_USERNAME', 
+                    withCredentials([usernamePassword(credentialsId: 'github-credentials',
+                                                    usernameVariable: 'GIT_USERNAME',
                                                     passwordVariable: 'GIT_PASSWORD')]) {
                         sh """
                             cd gitops-temp

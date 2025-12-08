@@ -178,6 +178,15 @@ const serviceRoutes = {
       '^/api/admin/security': '/admin/security'
     }
   },
+  '/admin/landing-pages': {
+    target: process.env.ADMIN_SERVICE_URL || 'http://admin-service:3005',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/admin/landing-pages': '/admin/landing-pages'
+    }
+  },
   '/admin': {
     target: process.env.ADMIN_SERVICE_URL || 'http://admin-service:3005',
     changeOrigin: true,
@@ -185,6 +194,16 @@ const serviceRoutes = {
     proxyTimeout: 30000,
     pathRewrite: {
       '^/api/admin': '/admin'
+    }
+  },
+  // Public landing pages (no authentication required)
+  '/pages': {
+    target: process.env.ADMIN_SERVICE_URL || 'http://admin-service:3005',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/pages': '/pages'
     }
   },
 };
