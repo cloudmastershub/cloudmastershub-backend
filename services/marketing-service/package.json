@@ -1,0 +1,48 @@
+{
+  "name": "@cloudmastershub/marketing-service",
+  "version": "1.0.0",
+  "description": "CloudMastersHub Marketing Service - Funnels, Challenges, Email Sequences, and Lead Management",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "nodemon --exec ts-node src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "jest --passWithNoTests",
+    "lint": "eslint src/**/*.ts",
+    "typecheck": "tsc --noEmit",
+    "seed": "ts-node src/scripts/seed.ts"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "helmet": "^7.1.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "winston": "^3.11.0",
+    "express-validator": "^7.0.1",
+    "mongoose": "^8.0.3",
+    "redis": "^4.6.12",
+    "bull": "^4.11.0",
+    "jsonwebtoken": "^9.0.2",
+    "@sendgrid/mail": "^7.7.0",
+    "handlebars": "^4.7.8",
+    "uuid": "^9.0.0",
+    "@cloudmastershub/types": "file:../../shared/types",
+    "@cloudmastershub/middleware": "file:../../shared/middleware",
+    "@cloudmastershub/utils": "file:../../shared/utils"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/cors": "^2.8.17",
+    "@types/node": "^20.10.0",
+    "@types/jsonwebtoken": "^9.0.5",
+    "@types/uuid": "^9.0.7",
+    "nodemon": "^3.0.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.2",
+    "jest": "^29.7.0",
+    "@types/jest": "^29.5.11",
+    "ts-jest": "^29.1.1",
+    "supertest": "^6.3.3",
+    "@types/supertest": "^2.0.16"
+  }
+}
