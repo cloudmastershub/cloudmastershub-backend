@@ -9,8 +9,8 @@ import MongoConnection from './database/mongoConnection';
 // Import routes
 import healthRoutes from './routes/healthRoutes';
 import funnelRoutes, { publicFunnelRouter } from './routes/funnelRoutes';
+import challengeRoutes, { publicChallengeRouter } from './routes/challengeRoutes';
 // Future route imports will be added here:
-// import challengeRoutes from './routes/challengeRoutes';
 // import emailRoutes from './routes/emailRoutes';
 // import leadRoutes from './routes/leadRoutes';
 // import analyticsRoutes from './routes/analyticsRoutes';
@@ -80,8 +80,8 @@ app.use('/health', healthRoutes);
 // Admin Routes (require authentication)
 // ============================================
 app.use('/admin/funnels', funnelRoutes);
+app.use('/admin/challenges', challengeRoutes);
 // These will be implemented in subsequent phases:
-// app.use('/admin/challenges', challengeRoutes);
 // app.use('/admin/email-sequences', emailSequenceRoutes);
 // app.use('/admin/email-templates', emailTemplateRoutes);
 // app.use('/admin/leads', leadRoutes);
@@ -91,8 +91,8 @@ app.use('/admin/funnels', funnelRoutes);
 // Public Routes (no auth required)
 // ============================================
 app.use('/f', publicFunnelRouter);             // /f/:funnelSlug
+app.use('/challenge', publicChallengeRouter);  // /challenge/:slug
 // These will be implemented for public funnel pages:
-// app.use('/challenge', publicChallengeRoutes); // /challenge/:slug
 // app.use('/leads', publicLeadRoutes);         // Lead capture endpoints
 // app.use('/track', trackingRoutes);           // Conversion tracking
 
@@ -123,7 +123,21 @@ app.get('/', (req, res) => {
           reorderSteps: 'POST /admin/funnels/:id/steps/reorder',
           analytics: 'GET /admin/funnels/:id/analytics',
         },
-        challenges: '/admin/challenges (coming soon)',
+        challenges: {
+          list: 'GET /admin/challenges',
+          create: 'POST /admin/challenges',
+          get: 'GET /admin/challenges/:id',
+          update: 'PUT /admin/challenges/:id',
+          delete: 'DELETE /admin/challenges/:id',
+          publish: 'POST /admin/challenges/:id/publish',
+          pause: 'POST /admin/challenges/:id/pause',
+          upsertDay: 'PUT /admin/challenges/:id/days/:dayNumber',
+          removeDay: 'DELETE /admin/challenges/:id/days/:dayNumber',
+          setPitchDay: 'PUT /admin/challenges/:id/pitch-day',
+          participants: 'GET /admin/challenges/:id/participants',
+          stats: 'GET /admin/challenges/:id/stats',
+          leaderboard: 'GET /admin/challenges/:id/leaderboard',
+        },
         emailSequences: '/admin/email-sequences (coming soon)',
         emailTemplates: '/admin/email-templates (coming soon)',
         leads: '/admin/leads (coming soon)',
@@ -131,7 +145,13 @@ app.get('/', (req, res) => {
       },
       public: {
         funnels: 'GET /f/:slug',
-        challenges: '/challenge/:slug (coming soon)',
+        challenges: {
+          getChallenge: 'GET /challenge/:slug',
+          register: 'POST /challenge/:slug/register',
+          progress: 'GET /challenge/:slug/progress?email=...',
+          completeDay: 'POST /challenge/:slug/days/:dayNumber/complete',
+          leaderboard: 'GET /challenge/:slug/leaderboard',
+        },
         leadCapture: '/leads/capture (coming soon)',
         tracking: '/track (coming soon)',
       },

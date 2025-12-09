@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document, Model } from 'mongoose';
 
 /**
  * Participant Status
@@ -99,6 +99,25 @@ export interface IChallengeParticipant extends Document {
 
   createdAt: Date;
   updatedAt: Date;
+}
+
+/**
+ * Challenge Participant Statics Interface
+ */
+interface IChallengeParticipantStatics extends Model<IChallengeParticipant> {
+  findByChallenge(challengeId: string): Promise<IChallengeParticipant[]>;
+  findByEmail(email: string): Promise<IChallengeParticipant[]>;
+  findActive(challengeId: string): Promise<IChallengeParticipant[]>;
+  getLeaderboard(challengeId: string, limit?: number): Promise<IChallengeParticipant[]>;
+  getChallengeStats(challengeId: string): Promise<{
+    totalParticipants: number;
+    activeParticipants: number;
+    completedParticipants: number;
+    convertedParticipants: number;
+    totalRevenue: number;
+    avgCompletedDays: number;
+    totalPoints: number;
+  }>;
 }
 
 /**
@@ -408,7 +427,7 @@ ChallengeParticipantSchema.statics.getChallengeStats = async function(challengeI
   };
 };
 
-const ChallengeParticipantModel = mongoose.model<IChallengeParticipant>(
+const ChallengeParticipantModel = mongoose.model<IChallengeParticipant, IChallengeParticipantStatics>(
   'ChallengeParticipant',
   ChallengeParticipantSchema
 );
