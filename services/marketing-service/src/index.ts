@@ -10,8 +10,8 @@ import MongoConnection from './database/mongoConnection';
 import healthRoutes from './routes/healthRoutes';
 import funnelRoutes, { publicFunnelRouter } from './routes/funnelRoutes';
 import challengeRoutes, { publicChallengeRouter } from './routes/challengeRoutes';
+import emailRoutes from './routes/emailRoutes';
 // Future route imports will be added here:
-// import emailRoutes from './routes/emailRoutes';
 // import leadRoutes from './routes/leadRoutes';
 // import analyticsRoutes from './routes/analyticsRoutes';
 
@@ -81,9 +81,8 @@ app.use('/health', healthRoutes);
 // ============================================
 app.use('/admin/funnels', funnelRoutes);
 app.use('/admin/challenges', challengeRoutes);
+app.use('/admin/email', emailRoutes);
 // These will be implemented in subsequent phases:
-// app.use('/admin/email-sequences', emailSequenceRoutes);
-// app.use('/admin/email-templates', emailTemplateRoutes);
 // app.use('/admin/leads', leadRoutes);
 // app.use('/admin/analytics', analyticsRoutes);
 
@@ -138,8 +137,24 @@ app.get('/', (req, res) => {
           stats: 'GET /admin/challenges/:id/stats',
           leaderboard: 'GET /admin/challenges/:id/leaderboard',
         },
-        emailSequences: '/admin/email-sequences (coming soon)',
-        emailTemplates: '/admin/email-templates (coming soon)',
+        email: {
+          templates: {
+            list: 'GET /admin/email/templates',
+            create: 'POST /admin/email/templates',
+            get: 'GET /admin/email/templates/:id',
+            update: 'PUT /admin/email/templates/:id',
+            delete: 'DELETE /admin/email/templates/:id',
+            preview: 'POST /admin/email/templates/:id/preview',
+            test: 'POST /admin/email/templates/:id/test',
+          },
+          sequences: {
+            list: 'GET /admin/email/sequences',
+            create: 'POST /admin/email/sequences',
+            get: 'GET /admin/email/sequences/:id',
+          },
+          send: 'POST /admin/email/send',
+          bulk: 'POST /admin/email/bulk',
+        },
         leads: '/admin/leads (coming soon)',
         analytics: '/admin/analytics (coming soon)',
       },
