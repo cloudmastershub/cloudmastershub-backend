@@ -206,6 +206,61 @@ const serviceRoutes = {
       '^/api/pages': '/pages'
     }
   },
+  // Marketing Service routes - Funnels, Challenges, Email
+  '/marketing/admin/funnels': {
+    target: process.env.MARKETING_SERVICE_URL || 'http://marketing-service:3006',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/marketing/admin/funnels': '/admin/funnels'
+    }
+  },
+  '/marketing/admin/challenges': {
+    target: process.env.MARKETING_SERVICE_URL || 'http://marketing-service:3006',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/marketing/admin/challenges': '/admin/challenges'
+    }
+  },
+  '/marketing/admin/email': {
+    target: process.env.MARKETING_SERVICE_URL || 'http://marketing-service:3006',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/marketing/admin/email': '/admin/email'
+    }
+  },
+  '/marketing/f': {
+    target: process.env.MARKETING_SERVICE_URL || 'http://marketing-service:3006',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/marketing/f': '/f'
+    }
+  },
+  '/marketing/challenge': {
+    target: process.env.MARKETING_SERVICE_URL || 'http://marketing-service:3006',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/marketing/challenge': '/challenge'
+    }
+  },
+  '/marketing/health': {
+    target: process.env.MARKETING_SERVICE_URL || 'http://marketing-service:3006',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/marketing/health': '/health'
+    }
+  },
 };
 
 // Handle specific routes first with exact path matching
