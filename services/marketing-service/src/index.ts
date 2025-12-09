@@ -8,12 +8,15 @@ import MongoConnection from './database/mongoConnection';
 
 // Import routes
 import healthRoutes from './routes/healthRoutes';
+import funnelRoutes, { publicFunnelRouter } from './routes/funnelRoutes';
 // Future route imports will be added here:
-// import funnelRoutes from './routes/funnelRoutes';
 // import challengeRoutes from './routes/challengeRoutes';
 // import emailRoutes from './routes/emailRoutes';
 // import leadRoutes from './routes/leadRoutes';
 // import analyticsRoutes from './routes/analyticsRoutes';
+
+// Import middleware
+import { authenticate, requireAdmin } from './middleware/auth';
 
 dotenv.config();
 
@@ -76,19 +79,19 @@ app.use('/health', healthRoutes);
 // ============================================
 // Admin Routes (require authentication)
 // ============================================
+app.use('/admin/funnels', funnelRoutes);
 // These will be implemented in subsequent phases:
-// app.use('/admin/funnels', authenticate, requireAdmin, funnelRoutes);
-// app.use('/admin/challenges', authenticate, requireAdmin, challengeRoutes);
-// app.use('/admin/email-sequences', authenticate, requireAdmin, emailSequenceRoutes);
-// app.use('/admin/email-templates', authenticate, requireAdmin, emailTemplateRoutes);
-// app.use('/admin/leads', authenticate, requireAdmin, leadRoutes);
-// app.use('/admin/analytics', authenticate, requireAdmin, analyticsRoutes);
+// app.use('/admin/challenges', challengeRoutes);
+// app.use('/admin/email-sequences', emailSequenceRoutes);
+// app.use('/admin/email-templates', emailTemplateRoutes);
+// app.use('/admin/leads', leadRoutes);
+// app.use('/admin/analytics', analyticsRoutes);
 
 // ============================================
 // Public Routes (no auth required)
 // ============================================
+app.use('/f', publicFunnelRouter);             // /f/:funnelSlug
 // These will be implemented for public funnel pages:
-// app.use('/f', publicFunnelRoutes);           // /f/:funnelSlug
 // app.use('/challenge', publicChallengeRoutes); // /challenge/:slug
 // app.use('/leads', publicLeadRoutes);         // Lead capture endpoints
 // app.use('/track', trackingRoutes);           // Conversion tracking
@@ -104,7 +107,22 @@ app.get('/', (req, res) => {
     endpoints: {
       health: '/health',
       admin: {
-        funnels: '/admin/funnels (coming soon)',
+        funnels: {
+          list: 'GET /admin/funnels',
+          create: 'POST /admin/funnels',
+          get: 'GET /admin/funnels/:id',
+          update: 'PUT /admin/funnels/:id',
+          delete: 'DELETE /admin/funnels/:id',
+          publish: 'POST /admin/funnels/:id/publish',
+          unpublish: 'POST /admin/funnels/:id/unpublish',
+          archive: 'POST /admin/funnels/:id/archive',
+          duplicate: 'POST /admin/funnels/:id/duplicate',
+          steps: 'PUT /admin/funnels/:id/steps',
+          addStep: 'POST /admin/funnels/:id/steps',
+          removeStep: 'DELETE /admin/funnels/:id/steps/:stepId',
+          reorderSteps: 'POST /admin/funnels/:id/steps/reorder',
+          analytics: 'GET /admin/funnels/:id/analytics',
+        },
         challenges: '/admin/challenges (coming soon)',
         emailSequences: '/admin/email-sequences (coming soon)',
         emailTemplates: '/admin/email-templates (coming soon)',
@@ -112,7 +130,7 @@ app.get('/', (req, res) => {
         analytics: '/admin/analytics (coming soon)',
       },
       public: {
-        funnels: '/f/:slug (coming soon)',
+        funnels: 'GET /f/:slug',
         challenges: '/challenge/:slug (coming soon)',
         leadCapture: '/leads/capture (coming soon)',
         tracking: '/track (coming soon)',
