@@ -59,13 +59,17 @@ app.use(cors({
   optionsSuccessStatus: 200 // For legacy browser support
 }));
 
-// Rate limiting
+// Rate limiting - exclude health endpoints to prevent k8s probe failures
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each IP to 100 requests per windowMs
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => {
+    // Skip rate limiting for health check endpoints (k8s probes)
+    return req.path.startsWith('/health');
+  },
 });
 app.use(limiter);
 
