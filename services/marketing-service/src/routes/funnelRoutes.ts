@@ -102,9 +102,8 @@ const stepsArrayValidation = [
     .isArray()
     .withMessage('Steps must be an array'),
   body('steps.*.id')
-    .optional()  // Auto-generated if not provided
-    .isString()
-    .withMessage('Step ID must be a string'),
+    .notEmpty()
+    .withMessage('Step ID is required'),
   body('steps.*.name')
     .notEmpty()
     .withMessage('Step name is required'),
@@ -112,9 +111,8 @@ const stepsArrayValidation = [
     .isIn(stepTypeValues)
     .withMessage(`Step type must be one of: ${stepTypeValues.join(', ')}`),
   body('steps.*.landingPageId')
-    .optional()  // Can be linked later
-    .isString()
-    .withMessage('Landing page ID must be a string'),
+    .notEmpty()
+    .withMessage('Landing page ID is required'),
   body('steps.*.order')
     .isInt({ min: 0 })
     .withMessage('Order must be a non-negative integer'),
