@@ -56,6 +56,19 @@ export interface FunnelStepInput {
   type: string;
   landingPageId?: string;  // Optional - can be linked later
   order?: number;  // Auto-calculated if not provided
+  pageContent?: {
+    headline?: string;
+    subheadline?: string;
+    description?: string;
+    ctaText?: string;
+    ctaUrl?: string;
+    imageUrl?: string;
+    videoUrl?: string;
+    formFields?: any[];
+    testimonials?: any[];
+    features?: any[];
+    productInfo?: any;
+  };
   conditions?: {
     afterStepId?: string;
     delayHours?: number;
@@ -67,6 +80,14 @@ export interface FunnelStepInput {
     trackCompletion?: boolean;
     emailOnComplete?: string;
     redirectOnComplete?: string;
+    showCountdownTimer?: boolean;
+    timerDuration?: number;
+    timerRedirectUrl?: string;
+    showExitPopup?: boolean;
+    exitPopupDelay?: number;
+    facebookPixelEvent?: string;
+    googleAnalyticsEvent?: string;
+    customTrackingCode?: string;
   };
 }
 
@@ -536,6 +557,12 @@ class FunnelService {
     if (stepData.name !== undefined) existingStep.name = stepData.name;
     if (stepData.type !== undefined) existingStep.type = stepData.type as any;
     if (stepData.landingPageId !== undefined) existingStep.landingPageId = stepData.landingPageId;
+    if (stepData.pageContent !== undefined) {
+      existingStep.pageContent = {
+        ...existingStep.pageContent,
+        ...stepData.pageContent,
+      };
+    }
     if (stepData.conditions !== undefined) {
       existingStep.conditions = {
         ...existingStep.conditions,

@@ -41,6 +41,45 @@ export enum DeliveryMode {
 }
 
 /**
+ * Step Page Content - Inline content for the step page
+ */
+export interface IStepPageContent {
+  headline?: string;
+  subheadline?: string;
+  description?: string;
+  ctaText?: string;
+  ctaUrl?: string;
+  imageUrl?: string;
+  videoUrl?: string;
+  formFields?: Array<{
+    name: string;
+    type: 'text' | 'email' | 'phone' | 'select' | 'checkbox';
+    label: string;
+    required: boolean;
+    placeholder?: string;
+    options?: string[];
+  }>;
+  testimonials?: Array<{
+    name: string;
+    title?: string;
+    quote: string;
+    imageUrl?: string;
+  }>;
+  features?: Array<{
+    title: string;
+    description: string;
+    icon?: string;
+  }>;
+  productInfo?: {
+    name: string;
+    price: number;
+    originalPrice?: number;
+    currency: string;
+    description?: string;
+  };
+}
+
+/**
  * Funnel Step - A single page/step in the funnel
  */
 export interface IFunnelStep {
@@ -49,6 +88,9 @@ export interface IFunnelStep {
   type: FunnelStepType;
   landingPageId: string;         // Reference to LandingPage in admin-service
   order: number;
+
+  // Inline page content (alternative to landingPageId)
+  pageContent?: IStepPageContent;
 
   // Conditional display settings
   conditions: {
@@ -64,6 +106,17 @@ export interface IFunnelStep {
     trackCompletion?: boolean;   // Track when user completes this step
     emailOnComplete?: string;    // Email template ID to send on completion
     redirectOnComplete?: string; // Next step ID to redirect to
+    // Urgency/Timer settings
+    showCountdownTimer?: boolean;
+    timerDuration?: number;      // Timer duration in seconds
+    timerRedirectUrl?: string;
+    // Popup settings
+    showExitPopup?: boolean;
+    exitPopupDelay?: number;
+    // Tracking
+    facebookPixelEvent?: string;
+    googleAnalyticsEvent?: string;
+    customTrackingCode?: string;
   };
 }
 
@@ -137,6 +190,42 @@ const FunnelStepSchema = new Schema<IFunnelStep>({
   },
   landingPageId: { type: String, default: null },  // Can be linked later to a landing page
   order: { type: Number, required: true, min: 0 },
+  // Inline page content
+  pageContent: {
+    headline: { type: String },
+    subheadline: { type: String },
+    description: { type: String },
+    ctaText: { type: String },
+    ctaUrl: { type: String },
+    imageUrl: { type: String },
+    videoUrl: { type: String },
+    formFields: [{
+      name: { type: String },
+      type: { type: String, enum: ['text', 'email', 'phone', 'select', 'checkbox'] },
+      label: { type: String },
+      required: { type: Boolean },
+      placeholder: { type: String },
+      options: [{ type: String }],
+    }],
+    testimonials: [{
+      name: { type: String },
+      title: { type: String },
+      quote: { type: String },
+      imageUrl: { type: String },
+    }],
+    features: [{
+      title: { type: String },
+      description: { type: String },
+      icon: { type: String },
+    }],
+    productInfo: {
+      name: { type: String },
+      price: { type: Number },
+      originalPrice: { type: Number },
+      currency: { type: String },
+      description: { type: String },
+    },
+  },
   conditions: {
     afterStepId: { type: String },
     delayHours: { type: Number, min: 0 },
@@ -148,6 +237,17 @@ const FunnelStepSchema = new Schema<IFunnelStep>({
     trackCompletion: { type: Boolean, default: true },
     emailOnComplete: { type: String },
     redirectOnComplete: { type: String },
+    // Timer/Urgency settings
+    showCountdownTimer: { type: Boolean, default: false },
+    timerDuration: { type: Number },
+    timerRedirectUrl: { type: String },
+    // Popup settings
+    showExitPopup: { type: Boolean, default: false },
+    exitPopupDelay: { type: Number },
+    // Tracking
+    facebookPixelEvent: { type: String },
+    googleAnalyticsEvent: { type: String },
+    customTrackingCode: { type: String },
   },
 }, { _id: false });
 
