@@ -558,10 +558,14 @@ class FunnelService {
     if (stepData.type !== undefined) existingStep.type = stepData.type as any;
     if (stepData.landingPageId !== undefined) existingStep.landingPageId = stepData.landingPageId;
     if (stepData.pageContent !== undefined) {
-      existingStep.pageContent = {
-        ...existingStep.pageContent,
-        ...stepData.pageContent,
-      };
+      // Merge pageContent, filtering out undefined values to avoid MongoDB validation errors
+      const mergedPageContent: Record<string, any> = { ...existingStep.pageContent };
+      Object.entries(stepData.pageContent).forEach(([key, value]) => {
+        if (value !== undefined) {
+          mergedPageContent[key] = value;
+        }
+      });
+      existingStep.pageContent = mergedPageContent as any;
     }
     if (stepData.conditions !== undefined) {
       existingStep.conditions = {
