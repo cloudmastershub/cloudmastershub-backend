@@ -41,9 +41,60 @@ export enum DeliveryMode {
 }
 
 /**
+ * Block types for the step page builder
+ */
+export enum StepBlockType {
+  // Content blocks
+  HERO = 'hero',
+  VSL = 'vsl',
+  TEXT = 'text',
+  CTA = 'cta',
+  BENEFITS = 'benefits',
+  FEATURES = 'features',
+  TESTIMONIALS = 'testimonials',
+  FAQ = 'faq',
+  PRICING = 'pricing',
+  GUARANTEE = 'guarantee',
+  STATS = 'stats',
+  INSTRUCTOR = 'instructor',
+  COUNTDOWN = 'countdown',
+  SCHEDULE = 'schedule',
+  STICKY_BAR = 'sticky_bar',
+  // Layout blocks
+  SPACER = 'spacer',
+  DIVIDER = 'divider',
+  SECTION = 'section',
+  COLUMNS = 'columns',
+  // Funnel-specific blocks
+  OPTIN_FORM = 'optin_form',
+  CHECKOUT = 'checkout',
+  ORDER_SUMMARY = 'order_summary',
+  ORDER_BUMP = 'order_bump',
+  BOOKING_WIDGET = 'booking_widget',
+  APPLICATION_FORM = 'application_form',
+  WEBINAR_REGISTRATION = 'webinar_registration',
+  PROGRESS_INDICATOR = 'progress_indicator',
+}
+
+/**
+ * Block interface for step page builder
+ */
+export interface IStepBlock {
+  id: string;
+  type: StepBlockType;
+  data: Record<string, any>;
+  position: number;
+  children?: IStepBlock[];
+}
+
+/**
  * Step Page Content - Inline content for the step page
  */
 export interface IStepPageContent {
+  // Block-based content (new)
+  blocks?: IStepBlock[];
+
+  // Legacy fields (kept for backward compatibility)
   headline?: string;
   subheadline?: string;
   description?: string;
@@ -192,6 +243,15 @@ const FunnelStepSchema = new Schema<IFunnelStep>({
   order: { type: Number, required: true, min: 0 },
   // Inline page content
   pageContent: {
+    // Block-based content (new)
+    blocks: [{
+      id: { type: String, required: true },
+      type: { type: String, required: true, enum: Object.values(StepBlockType) },
+      data: { type: Schema.Types.Mixed, required: true, default: {} },
+      position: { type: Number, required: true, min: 0 },
+      children: { type: Schema.Types.Mixed, default: undefined },
+    }],
+    // Legacy fields (kept for backward compatibility)
     headline: { type: String },
     subheadline: { type: String },
     description: { type: String },
