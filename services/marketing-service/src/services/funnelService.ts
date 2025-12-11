@@ -514,6 +514,49 @@ class FunnelService {
   }
 
   /**
+   * Update a single step in funnel
+   */
+  async updateStep(id: string, stepId: string, stepData: Partial<FunnelStepInput>, updatedBy: string): Promise<IFunnel | null> {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw ApiError.badRequest('Invalid funnel ID');
+    }
+
+    const funnel = await Funnel.findById(id);
+    if (!funnel) {
+      return null;
+    }
+
+    const stepIndex = funnel.steps.findIndex(s => s.id === stepId);
+    if (stepIndex === -1) {
+      throw ApiError.notFound('Step not found in funnel');
+    }
+
+    // Update step properties
+    const existingStep = funnel.steps[stepIndex];
+    if (stepData.name !== undefined) existingStep.name = stepData.name;
+    if (stepData.type !== undefined) existingStep.type = stepData.type as any;
+    if (stepData.landingPageId !== undefined) existingStep.landingPageId = stepData.landingPageId;
+    if (stepData.conditions !== undefined) {
+      existingStep.conditions = {
+        ...existingStep.conditions,
+        ...stepData.conditions,
+      };
+    }
+    if (stepData.settings !== undefined) {
+      existingStep.settings = {
+        ...existingStep.settings,
+        ...stepData.settings,
+      };
+    }
+
+    funnel.updatedBy = updatedBy;
+
+    await funnel.save();
+    logger.info(`Step updated in funnel: ${funnel.name} (${funnel.id}) - Step ID: ${stepId}`);
+    return funnel;
+  }
+
+  /**
    * Reorder steps
    */
   async reorderSteps(id: string, stepIds: string[], updatedBy: string): Promise<IFunnel | null> {

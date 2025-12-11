@@ -292,6 +292,31 @@ router.post(
   funnelController.addFunnelStep
 );
 
+// Update step in funnel
+router.put(
+  '/:id/steps/:stepId',
+  authenticate,
+  requireAdmin,
+  logAdminAction('UPDATE_FUNNEL_STEP'),
+  idParamValidation,
+  param('stepId').notEmpty().withMessage('Step ID is required'),
+  [
+    body('name')
+      .optional()
+      .isLength({ max: 200 })
+      .withMessage('Step name must be less than 200 characters'),
+    body('type')
+      .optional()
+      .isIn(stepTypeValues)
+      .withMessage(`Step type must be one of: ${stepTypeValues.join(', ')}`),
+    body('landingPageId')
+      .optional()
+      .isString()
+      .withMessage('Landing page ID must be a string'),
+  ],
+  funnelController.updateFunnelStep
+);
+
 // Remove step from funnel
 router.delete(
   '/:id/steps/:stepId',

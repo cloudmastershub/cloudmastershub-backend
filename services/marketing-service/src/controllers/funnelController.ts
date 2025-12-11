@@ -473,6 +473,47 @@ export const removeFunnelStep = async (
 };
 
 /**
+ * Update a step in funnel
+ * PUT /admin/funnels/:id/steps/:stepId
+ */
+export const updateFunnelStep = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Validation failed', details: errors.array() },
+      });
+      return;
+    }
+
+    const { id, stepId } = req.params;
+    const stepData = req.body;
+
+    const funnel = await funnelService.updateStep(id, stepId, stepData, req.userId || 'system');
+    if (!funnel) {
+      res.status(404).json({
+        success: false,
+        error: { message: 'Funnel not found' },
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      data: funnel,
+      message: 'Step updated successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * Reorder funnel steps
  * POST /admin/funnels/:id/steps/reorder
  */
@@ -605,6 +646,7 @@ export default {
   updateFunnelSteps,
   addFunnelStep,
   removeFunnelStep,
+  updateFunnelStep,
   reorderFunnelSteps,
   getFunnelAnalytics,
   getPublicFunnel,
