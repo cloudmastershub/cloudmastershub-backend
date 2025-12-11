@@ -432,7 +432,7 @@ class FunnelService {
       return null;
     }
 
-    // Validate step order is sequential
+    // Validate step order is sequential (handle possibly undefined order with nullish coalescing)
     const sortedSteps = [...steps].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     for (let i = 0; i < sortedSteps.length; i++) {
       if ((sortedSteps[i].order ?? i) !== i) {
