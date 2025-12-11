@@ -559,12 +559,25 @@ class FunnelService {
     if (stepData.landingPageId !== undefined) existingStep.landingPageId = stepData.landingPageId;
     if (stepData.pageContent !== undefined) {
       // Merge pageContent, filtering out undefined values to avoid MongoDB validation errors
-      const mergedPageContent: Record<string, any> = { ...existingStep.pageContent };
+      const mergedPageContent: Record<string, any> = {};
+
+      // First, copy existing values that are defined
+      if (existingStep.pageContent) {
+        const existingObj = existingStep.pageContent.toObject ? existingStep.pageContent.toObject() : existingStep.pageContent;
+        Object.entries(existingObj).forEach(([key, value]) => {
+          if (value !== undefined && value !== null) {
+            mergedPageContent[key] = value;
+          }
+        });
+      }
+
+      // Then, apply new values that are defined
       Object.entries(stepData.pageContent).forEach(([key, value]) => {
-        if (value !== undefined) {
+        if (value !== undefined && value !== null) {
           mergedPageContent[key] = value;
         }
       });
+
       existingStep.pageContent = mergedPageContent as any;
     }
     if (stepData.conditions !== undefined) {
