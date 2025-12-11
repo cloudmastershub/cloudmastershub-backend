@@ -432,10 +432,10 @@ class FunnelService {
       return null;
     }
 
-    // Validate step order is sequential (handle possibly undefined order with nullish coalescing)
-    const sortedSteps = [...steps].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    // Validate step order is sequential
+    const sortedSteps = [...steps].sort((a, b) => a.order - b.order);
     for (let i = 0; i < sortedSteps.length; i++) {
-      if ((sortedSteps[i].order ?? i) !== i) {
+      if (sortedSteps[i].order !== i) {
         throw ApiError.badRequest('Step order must be sequential starting from 0');
       }
     }
@@ -461,42 +461,13 @@ class FunnelService {
       return null;
     }
 
-    // Auto-generate step ID if not provided
-    if (!step.id) {
-      step.id = new mongoose.Types.ObjectId().toString();
-    }
-
     // Set order to end of list if not specified
     if (step.order === undefined || step.order === null) {
       step.order = funnel.steps.length;
     }
 
-    // Generate slug from name for the step
-    const stepSlug = step.name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '');
-
-    // Create the step object with all required fields
-    const newStep = {
-      id: step.id,
-      name: step.name,
-      slug: stepSlug,
-      type: step.type,
-      landingPageId: step.landingPageId || null,  // Can be null initially
-      order: step.order,
-      conditions: step.conditions || {},
-      settings: step.settings || {},
-      analytics: {
-        views: 0,
-        uniqueVisitors: 0,
-        conversions: 0,
-        conversionRate: 0,
-      },
-    };
-
     // Insert step at correct position and reorder
-    funnel.steps.splice(step.order, 0, newStep as any);
+    funnel.steps.splice(step.order, 0, step as any);
 
     // Reindex orders
     funnel.steps.forEach((s, index) => {
