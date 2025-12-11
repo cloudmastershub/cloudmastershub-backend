@@ -51,11 +51,11 @@ export interface UpdateFunnelInput {
 }
 
 export interface FunnelStepInput {
-  id: string;
+  id?: string;  // Auto-generated if not provided
   name: string;
   type: string;
-  landingPageId: string;
-  order: number;
+  landingPageId?: string;  // Optional - can be linked later
+  order?: number;  // Auto-calculated if not provided
   conditions?: {
     afterStepId?: string;
     delayHours?: number;
@@ -461,13 +461,42 @@ class FunnelService {
       return null;
     }
 
+    // Auto-generate step ID if not provided
+    if (!step.id) {
+      step.id = new mongoose.Types.ObjectId().toString();
+    }
+
     // Set order to end of list if not specified
     if (step.order === undefined || step.order === null) {
       step.order = funnel.steps.length;
     }
 
+    // Generate slug from name for the step
+    const stepSlug = step.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+
+    // Create the step object with all required fields
+    const newStep = {
+      id: step.id,
+      name: step.name,
+      slug: stepSlug,
+      type: step.type,
+      landingPageId: step.landingPageId || null,  // Can be null initially
+      order: step.order,
+      conditions: step.conditions || {},
+      settings: step.settings || {},
+      analytics: {
+        views: 0,
+        uniqueVisitors: 0,
+        conversions: 0,
+        conversionRate: 0,
+      },
+    };
+
     // Insert step at correct position and reorder
-    funnel.steps.splice(step.order, 0, step as any);
+    funnel.steps.splice(step.order, 0, newStep as any);
 
     // Reindex orders
     funnel.steps.forEach((s, index) => {

@@ -45,8 +45,9 @@ export enum DeliveryMode {
 export interface IFunnelStep {
   id: string;
   name: string;                  // "Registration", "Day 1", "Sales Page"
+  slug?: string;                 // URL-friendly slug
   type: FunnelStepType;
-  landingPageId: string;         // Reference to LandingPage in admin-service
+  landingPageId?: string | null; // Reference to LandingPage in admin-service (can be linked later)
   order: number;
 
   // Conditional display settings
@@ -129,12 +130,13 @@ export interface IFunnel extends Document {
 const FunnelStepSchema = new Schema<IFunnelStep>({
   id: { type: String, required: true },
   name: { type: String, required: true, trim: true },
+  slug: { type: String, trim: true },  // URL-friendly slug for the step
   type: {
     type: String,
     required: true,
     enum: Object.values(FunnelStepType),
   },
-  landingPageId: { type: String, required: true },
+  landingPageId: { type: String, default: null },  // Can be linked later to a landing page
   order: { type: Number, required: true, min: 0 },
   conditions: {
     afterStepId: { type: String },

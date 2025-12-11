@@ -74,8 +74,9 @@ const updateFunnelValidation = [
 
 const stepValidation = [
   body('id')
-    .notEmpty()
-    .withMessage('Step ID is required'),
+    .optional()  // Auto-generated if not provided
+    .isString()
+    .withMessage('Step ID must be a string'),
   body('name')
     .notEmpty()
     .withMessage('Step name is required')
@@ -87,8 +88,9 @@ const stepValidation = [
     .isIn(stepTypeValues)
     .withMessage(`Step type must be one of: ${stepTypeValues.join(', ')}`),
   body('landingPageId')
-    .notEmpty()
-    .withMessage('Landing page ID is required'),
+    .optional()  // Can be linked later via landing page builder
+    .isString()
+    .withMessage('Landing page ID must be a string'),
   body('order')
     .optional()
     .isInt({ min: 0 })
@@ -100,8 +102,9 @@ const stepsArrayValidation = [
     .isArray()
     .withMessage('Steps must be an array'),
   body('steps.*.id')
-    .notEmpty()
-    .withMessage('Step ID is required'),
+    .optional()  // Auto-generated if not provided
+    .isString()
+    .withMessage('Step ID must be a string'),
   body('steps.*.name')
     .notEmpty()
     .withMessage('Step name is required'),
@@ -109,8 +112,9 @@ const stepsArrayValidation = [
     .isIn(stepTypeValues)
     .withMessage(`Step type must be one of: ${stepTypeValues.join(', ')}`),
   body('steps.*.landingPageId')
-    .notEmpty()
-    .withMessage('Landing page ID is required'),
+    .optional()  // Can be linked later
+    .isString()
+    .withMessage('Landing page ID must be a string'),
   body('steps.*.order')
     .isInt({ min: 0 })
     .withMessage('Order must be a non-negative integer'),
