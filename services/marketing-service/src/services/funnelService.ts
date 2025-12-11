@@ -433,7 +433,7 @@ class FunnelService {
     }
 
     // Validate step order is sequential
-    const sortedSteps = [...steps].sort((a, b) => a.order - b.order);
+    const sortedSteps = [...steps].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     for (let i = 0; i < sortedSteps.length; i++) {
       if (sortedSteps[i].order !== i) {
         throw ApiError.badRequest('Step order must be sequential starting from 0');
