@@ -563,7 +563,10 @@ class FunnelService {
 
       // First, copy existing values that are defined
       if (existingStep.pageContent) {
-        const existingObj = existingStep.pageContent.toObject ? existingStep.pageContent.toObject() : existingStep.pageContent;
+        // Convert to plain object - handle both Mongoose documents and plain objects
+        const existingObj = typeof (existingStep.pageContent as any).toObject === 'function'
+          ? (existingStep.pageContent as any).toObject()
+          : { ...existingStep.pageContent };
         Object.entries(existingObj).forEach(([key, value]) => {
           if (value !== undefined && value !== null) {
             mergedPageContent[key] = value;
