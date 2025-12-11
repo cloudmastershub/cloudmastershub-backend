@@ -35,14 +35,43 @@ export const authenticate = async (
   try {
     const authHeader = req.headers.authorization;
 
+    // Debug logging for auth issues
+    logger.debug('Auth middleware called', {
+      path: req.path,
+      method: req.method,
+      hasAuthHeader: !!authHeader,
+      authHeaderPrefix: authHeader?.substring(0, 20)
+    });
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      logger.warn('No Bearer token in Authorization header', {
+        path: req.path,
+        headers: Object.keys(req.headers)
+      });
       throw ApiError.unauthorized('No token provided');
     }
 
     const token = authHeader.split(' ')[1];
     const secret = process.env.JWT_SECRET || 'cloudmastershub-jwt-secret-2024-production-key';
 
+    logger.debug('Verifying JWT token', {
+      path: req.path,
+      tokenLength: token.length,
+      tokenPrefix: token.substring(0, 30),
+      secretLength: secret.length,
+      secretPrefix: secret.substring(0, 10)
+    });
+
     const decoded = jwt.verify(token, secret) as JWTPayload;
+
+    logger.debug('JWT verified successfully', {
+      path: req.path,
+      userId: decoded.userId,
+      email: decoded.email,
+      roles: decoded.roles,
+      exp: decoded.exp,
+      iat: decoded.iat
+    });
 
     req.userId = decoded.userId;
     req.userEmail = decoded.email;
@@ -51,6 +80,15 @@ export const authenticate = async (
 
     next();
   } catch (error: any) {
+    logger.error('JWT verification failed', {
+      path: req.path,
+      method: req.method,
+      errorName: error.name,
+      errorMessage: error.message,
+      hasAuthHeader: !!req.headers.authorization,
+      authHeaderLength: req.headers.authorization?.length
+    });
+
     if (error.name === 'JsonWebTokenError') {
       next(ApiError.unauthorized('Invalid token'));
     } else if (error.name === 'TokenExpiredError') {
