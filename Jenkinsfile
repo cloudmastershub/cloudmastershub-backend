@@ -34,10 +34,12 @@ pipeline {
         GITOPS_REPO = "cloudmastershub/cloudmastershub-gitop"
         GITOPS_BRANCH = "main"
         
-        // Optimize npm
+        // Optimize npm - use workspace cache to avoid permission issues
         NPM_CONFIG_LOGLEVEL = 'error'
         NPM_CONFIG_AUDIT = 'false'
         NPM_CONFIG_FUND = 'false'
+        NPM_CONFIG_CACHE = "${WORKSPACE}/.npm-cache"
+        HOME = "${WORKSPACE}"
     }
     
     stages {
