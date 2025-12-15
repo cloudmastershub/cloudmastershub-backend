@@ -219,13 +219,11 @@ class FunnelParticipantService {
 
     // Build steps with access information
     const stepsWithAccess = sortedSteps.map((step, index) => {
-      const isRegistered = !!participant;
-
       // Determine accessibility
       let isAccessible = false;
       let isCompleted = false;
 
-      if (!isRegistered) {
+      if (participant === null) {
         // Not registered - only first step (optin) is accessible
         isAccessible = index === 0;
       } else {
@@ -474,14 +472,17 @@ class FunnelParticipantService {
         lead.lastName = input.lastName || lead.lastName;
         lead.phone = input.phone || lead.phone;
         lead.lastActivityAt = new Date();
-        lead.activityHistory.push({
-          type: 'funnel_registration',
-          timestamp: new Date(),
-          metadata: {
-            funnelId: funnel._id.toString(),
-            funnelName: funnel.name,
-          },
-        } as any);
+        // Add activity to history if the property exists
+        if ((lead as any).activityHistory) {
+          (lead as any).activityHistory.push({
+            type: 'funnel_registration',
+            timestamp: new Date(),
+            metadata: {
+              funnelId: funnel._id.toString(),
+              funnelName: funnel.name,
+            },
+          });
+        }
 
         await lead.save();
         participant.leadId = lead._id;
