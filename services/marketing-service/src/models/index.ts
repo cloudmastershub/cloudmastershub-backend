@@ -2,6 +2,9 @@
 export { Funnel, FunnelType, FunnelStatus, FunnelStepType, DeliveryMode } from './Funnel';
 export type { IFunnel, IFunnelStep, IFunnelMetrics } from './Funnel';
 
+export { FunnelParticipant, FunnelParticipantStatus } from './FunnelParticipant';
+export type { IFunnelParticipant, IStepProgress } from './FunnelParticipant';
+
 export { Challenge, ChallengeStatus } from './Challenge';
 export type { IChallenge, IChallengeDay, IChallengeDayContent, IChallengePitchDay } from './Challenge';
 

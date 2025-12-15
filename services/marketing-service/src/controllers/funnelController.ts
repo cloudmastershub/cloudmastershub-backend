@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { validationResult } from 'express-validator';
 import funnelService from '../services/funnelService';
+import funnelParticipantService from '../services/funnelParticipantService';
 import { FunnelStatus, FunnelType } from '../models';
 import logger from '../utils/logger';
 import { ApiError } from '../middleware/errorHandler';
@@ -585,7 +586,7 @@ export const getFunnelAnalytics = async (
 };
 
 /**
- * Get public funnel by slug
+ * Get public funnel by slug with access control
  * GET /f/:slug
  */
 export const getPublicFunnel = async (
@@ -596,35 +597,227 @@ export const getPublicFunnel = async (
   try {
     const { slug } = req.params;
 
-    const funnel = await funnelService.getPublishedBySlug(slug);
-    if (!funnel) {
-      res.status(404).json({
+    // Get session token from cookie or header
+    const sessionToken = req.cookies?.funnel_session || req.headers['x-funnel-session'] as string;
+    const email = req.query.email as string;
+
+    // Get funnel with access control
+    const result = await funnelParticipantService.getPublicFunnelWithAccess(
+      slug,
+      (sessionToken || email) ? { sessionToken, email } : undefined
+    );
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Register for a funnel (create participant)
+ * POST /f/:slug/register
+ */
+export const registerForFunnel = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      res.status(400).json({
         success: false,
-        error: { message: 'Funnel not found or not published' },
+        error: { message: 'Validation failed', details: errors.array() },
       });
       return;
     }
 
-    // Return limited public data
+    const { slug } = req.params;
+    const {
+      email,
+      firstName,
+      lastName,
+      phone,
+      customFields,
+      source,
+      emailConsent,
+    } = req.body;
+
+    const result = await funnelParticipantService.register(slug, {
+      email,
+      firstName,
+      lastName,
+      phone,
+      customFields,
+      source,
+      emailConsent,
+      ipAddress: req.ip || req.connection?.remoteAddress,
+      userAgent: req.headers['user-agent'],
+      timezone: req.headers['x-timezone'] as string,
+    });
+
+    // Set session cookie
+    res.cookie('funnel_session', result.sessionToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+    });
+
+    res.status(201).json({
+      success: true,
+      data: {
+        registered: true,
+        sessionToken: result.sessionToken,
+        nextStepId: result.nextStepId,
+        participant: {
+          email: result.participant.email,
+          firstName: result.participant.firstName,
+          currentStepId: result.participant.currentStepId,
+          currentStepOrder: result.participant.currentStepOrder,
+          completedStepIds: result.participant.completedStepIds,
+        },
+      },
+      message: 'Successfully registered for funnel',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get participant progress
+ * GET /f/:slug/progress
+ */
+export const getParticipantProgress = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { slug } = req.params;
+    const sessionToken = req.cookies?.funnel_session || req.headers['x-funnel-session'] as string;
+    const email = req.query.email as string;
+
+    if (!sessionToken && !email) {
+      res.status(401).json({
+        success: false,
+        error: { message: 'No session token or email provided' },
+      });
+      return;
+    }
+
+    const participant = await funnelParticipantService.getParticipant(slug, { sessionToken, email });
+    if (!participant) {
+      res.status(404).json({
+        success: false,
+        error: { message: 'Not registered for this funnel' },
+      });
+      return;
+    }
+
     res.json({
       success: true,
       data: {
-        id: funnel.id,
-        name: funnel.name,
-        slug: funnel.slug,
-        description: funnel.description,
-        type: funnel.type,
-        steps: funnel.steps.map(step => ({
-          id: step.id,
-          name: step.name,
-          type: step.type,
-          order: step.order,
-          landingPageId: step.landingPageId,
-        })),
-        design: funnel.design,
-        settings: {
-          deliveryMode: funnel.settings.deliveryMode,
+        currentStepId: participant.currentStepId,
+        currentStepOrder: participant.currentStepOrder,
+        completedStepIds: participant.completedStepIds,
+        stepProgress: participant.stepProgress,
+        status: participant.status,
+        registeredAt: participant.registeredAt,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Complete a funnel step
+ * POST /f/:slug/steps/:stepId/complete
+ */
+export const completeFunnelStep = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { slug, stepId } = req.params;
+    const sessionToken = req.cookies?.funnel_session || req.headers['x-funnel-session'] as string;
+    const email = req.body.email || req.query.email as string;
+
+    if (!sessionToken && !email) {
+      res.status(401).json({
+        success: false,
+        error: { message: 'No session token or email provided' },
+      });
+      return;
+    }
+
+    const { videoWatchPercent, timeSpentSeconds } = req.body;
+
+    const result = await funnelParticipantService.completeStep(
+      slug,
+      stepId,
+      { sessionToken, email },
+      { videoWatchPercent, timeSpentSeconds }
+    );
+
+    res.json({
+      success: true,
+      data: result,
+      message: 'Step completed successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get step content with access check
+ * GET /f/:slug/steps/:stepId
+ */
+export const getStepContent = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { slug, stepId } = req.params;
+    const sessionToken = req.cookies?.funnel_session || req.headers['x-funnel-session'] as string;
+    const email = req.query.email as string;
+
+    const result = await funnelParticipantService.getStepContent(
+      slug,
+      stepId,
+      (sessionToken || email) ? { sessionToken, email } : undefined
+    );
+
+    if (!result.isAccessible) {
+      res.status(403).json({
+        success: false,
+        error: { message: 'Step is not accessible. Please complete previous steps first.' },
+        data: {
+          step: {
+            id: result.step.id,
+            name: result.step.name,
+            type: result.step.type,
+            order: result.step.order,
+          },
+          isAccessible: false,
         },
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      data: {
+        step: result.step,
+        isAccessible: true,
       },
     });
   } catch (error) {
@@ -650,4 +843,8 @@ export default {
   reorderFunnelSteps,
   getFunnelAnalytics,
   getPublicFunnel,
+  registerForFunnel,
+  getParticipantProgress,
+  completeFunnelStep,
+  getStepContent,
 };

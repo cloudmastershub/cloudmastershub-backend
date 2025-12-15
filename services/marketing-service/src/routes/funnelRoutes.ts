@@ -354,11 +354,76 @@ router.get(
 
 const publicRouter = Router();
 
-// Get published funnel by slug
+// Registration validation
+const registerValidation = [
+  body('email')
+    .notEmpty()
+    .withMessage('Email is required')
+    .isEmail()
+    .withMessage('Invalid email format')
+    .normalizeEmail(),
+  body('firstName')
+    .optional()
+    .isLength({ max: 100 })
+    .withMessage('First name must be less than 100 characters'),
+  body('lastName')
+    .optional()
+    .isLength({ max: 100 })
+    .withMessage('Last name must be less than 100 characters'),
+  body('phone')
+    .optional()
+    .isLength({ max: 20 })
+    .withMessage('Phone number must be less than 20 characters'),
+  body('emailConsent')
+    .optional()
+    .isBoolean()
+    .withMessage('Email consent must be a boolean'),
+];
+
+// Get published funnel by slug (with access control)
 publicRouter.get(
   '/:slug',
   slugParamValidation,
   funnelController.getPublicFunnel
+);
+
+// Register for a funnel
+publicRouter.post(
+  '/:slug/register',
+  slugParamValidation,
+  registerValidation,
+  funnelController.registerForFunnel
+);
+
+// Get participant progress
+publicRouter.get(
+  '/:slug/progress',
+  slugParamValidation,
+  funnelController.getParticipantProgress
+);
+
+// Get step content
+publicRouter.get(
+  '/:slug/steps/:stepId',
+  slugParamValidation,
+  param('stepId').notEmpty().withMessage('Step ID is required'),
+  funnelController.getStepContent
+);
+
+// Complete a step
+publicRouter.post(
+  '/:slug/steps/:stepId/complete',
+  slugParamValidation,
+  param('stepId').notEmpty().withMessage('Step ID is required'),
+  body('videoWatchPercent')
+    .optional()
+    .isFloat({ min: 0, max: 100 })
+    .withMessage('Video watch percent must be between 0 and 100'),
+  body('timeSpentSeconds')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Time spent must be a positive integer'),
+  funnelController.completeFunnelStep
 );
 
 export { publicRouter as publicFunnelRouter };
