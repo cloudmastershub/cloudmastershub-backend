@@ -131,6 +131,18 @@ export interface IStepPageContent {
 }
 
 /**
+ * Webinar-specific settings interface
+ */
+export interface IWebinarSettings {
+  scheduledDate?: string;        // ISO date string for scheduled webinars
+  scheduledTime?: string;        // Time in HH:MM format
+  timezone?: string;             // IANA timezone string
+  isLive?: boolean;              // Live vs replay
+  reminderEmails?: boolean;      // Send reminder emails
+  reminderIntervals?: number[];  // Hours before webinar to send reminders (e.g., [24, 1])
+}
+
+/**
  * Funnel Step - A single page/step in the funnel
  */
 export interface IFunnelStep {
@@ -142,6 +154,9 @@ export interface IFunnelStep {
 
   // Inline page content (alternative to landingPageId)
   pageContent?: IStepPageContent;
+
+  // Webinar-specific settings (for webinar steps)
+  webinarSettings?: IWebinarSettings;
 
   // Conditional display settings
   conditions: {
@@ -285,6 +300,15 @@ const FunnelStepSchema = new Schema<IFunnelStep>({
       currency: { type: String },
       description: { type: String },
     },
+  },
+  // Webinar-specific settings
+  webinarSettings: {
+    scheduledDate: { type: String },
+    scheduledTime: { type: String },
+    timezone: { type: String },
+    isLive: { type: Boolean, default: false },
+    reminderEmails: { type: Boolean, default: false },
+    reminderIntervals: [{ type: Number }],
   },
   conditions: {
     afterStepId: { type: String },
