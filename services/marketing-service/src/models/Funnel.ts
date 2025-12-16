@@ -179,6 +179,11 @@ export interface IFunnelStep {
     // Popup settings
     showExitPopup?: boolean;
     exitPopupDelay?: number;
+    // Video engagement settings (Mark as Watched button)
+    buttonDelayEnabled?: boolean;       // Enable delay for "Mark as Watched" button
+    buttonDelayMinutes?: number;        // Minutes to delay before showing button
+    buttonDelayTrigger?: 'page_load' | 'video_play'; // What triggers the delay countdown
+    autoPlayVideo?: boolean;            // Auto-play video when page loads
     // Tracking
     facebookPixelEvent?: string;
     googleAnalyticsEvent?: string;
@@ -328,6 +333,11 @@ const FunnelStepSchema = new Schema<IFunnelStep>({
     // Popup settings
     showExitPopup: { type: Boolean, default: false },
     exitPopupDelay: { type: Number },
+    // Video engagement settings (Mark as Watched button)
+    buttonDelayEnabled: { type: Boolean, default: false },
+    buttonDelayMinutes: { type: Number },
+    buttonDelayTrigger: { type: String, enum: ['page_load', 'video_play'] },
+    autoPlayVideo: { type: Boolean, default: false },
     // Tracking
     facebookPixelEvent: { type: String },
     googleAnalyticsEvent: { type: String },
