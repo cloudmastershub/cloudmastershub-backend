@@ -57,6 +57,8 @@ export interface PublicFunnelWithAccess {
     isAccessible: boolean;
     isCompleted: boolean;
     pageContent?: any;  // Only included if accessible
+    settings?: any;     // Step settings (timer, button delay, auto-play, etc.)
+    webinarSettings?: any; // Webinar-specific settings
   }>;
   registration: {
     isRegistered: boolean;
@@ -241,6 +243,10 @@ class FunnelParticipantService {
         isCompleted,
         // Only include pageContent if step is accessible
         pageContent: isAccessible ? step.pageContent : undefined,
+        // Include settings for step behavior (timer, button delay, auto-play, etc.)
+        settings: isAccessible ? step.settings : undefined,
+        // Include webinar settings if applicable
+        webinarSettings: isAccessible ? step.webinarSettings : undefined,
       };
     });
 
