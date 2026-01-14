@@ -374,19 +374,22 @@ pipeline {
         always {
             script {
                 echo "🧹 Cleaning up workspace..."
-                
-                // Clean up Docker images if they exist
+
+                // Clean up Docker images (only if Docker is available)
                 sh '''
-                    docker rmi ${IMAGE_NAME}:${IMAGE_TAG} || true
-                    docker rmi ${IMAGE_NAME}:${BUILD_VERSION} || true
-                    docker system prune -f || true
+                    if command -v docker > /dev/null; then
+                        docker rmi ${IMAGE_NAME}:${IMAGE_TAG} || true
+                        docker system prune -f || true
+                    else
+                        echo "Docker not available - skipping image cleanup"
+                    fi
                 '''
-                
-                // Clean workspace
-                cleanWs()
+
+                // Clean workspace using built-in deleteDir()
+                deleteDir()
             }
         }
-        
+
         success {
             script {
                 echo "✅ Backend CI pipeline completed successfully!"
@@ -394,7 +397,7 @@ pipeline {
                 echo "📝 Ready for GitOps deployment via ArgoCD"
             }
         }
-        
+
         failure {
             script {
                 echo "❌ Backend CI pipeline failed!"
