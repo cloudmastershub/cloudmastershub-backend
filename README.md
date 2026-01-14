@@ -107,13 +107,54 @@ make check                   # Run all quality checks (lint + typecheck + test)
 make docker-build           # Build production Docker image
 make docker-push            # Build and push to registry
 make docker-scan            # Security scan with Trivy
-
-# Kubernetes deployment
-make deploy ENVIRONMENT=dev IMAGE_TAG=v1.2.3    # Deploy to dev
-make deploy ENVIRONMENT=prod IMAGE_TAG=v1.2.3   # Deploy to production
-make deploy-status ENVIRONMENT=dev              # Check deployment status
-make logs SERVICE=api-gateway ENVIRONMENT=dev   # Get service logs
 ```
+
+## 🚀 Deployment (Jenkins GitOps Pipeline)
+
+CloudMastersHub uses a **Jenkins CI + ArgoCD GitOps** deployment workflow. For complete step-by-step instructions on setting up and deploying the backend, see:
+
+**[Jenkins GitOps Deployment Guide](./docs/JENKINS-GITOPS-DEPLOYMENT.md)**
+
+### Quick Deployment Overview
+
+```bash
+# 1. Push code to GitHub (triggers automatic build)
+git push origin main
+
+# 2. Jenkins CI automatically:
+#    - Builds all microservices
+#    - Runs tests and linting
+#    - Builds single Docker image (all services)
+#    - Pushes to Docker Hub (mbuaku/cloudmastershub-backend:build-XX)
+#    - Updates GitOps repository with new image tag
+
+# 3. ArgoCD automatically deploys to Kubernetes within 3 minutes
+#    - All services are updated atomically
+
+# 4. Manual deployment (if needed):
+cd /home/master/projects/cloudmastershub/gitops-repo
+sed -i 's|newTag: build-.*|newTag: build-NEW_NUMBER|' apps/backend/kustomization.yaml
+git add . && git commit -m "Deploy backend build-NEW_NUMBER" && git push
+```
+
+### Key URLs
+
+| Service | URL |
+|---------|-----|
+| Jenkins | `http://apollo.elitessystems.com` |
+| ArgoCD | `http://argocd.elitessystems.com` |
+| API Gateway | `https://api.cloudmastershub.com` |
+
+### Creating Jenkins Job (One-Time Setup)
+
+1. **Access Jenkins**: `http://apollo.elitessystems.com` (admin/admin123)
+2. **New Item** → Pipeline → Name: `cloudmastershub-backend`
+3. **Pipeline Definition**: Pipeline script from SCM
+4. **SCM**: Git → `https://github.com/cloudmastershub/cloudmastershub-backend.git`
+5. **Credentials**: `github-credentials`
+6. **Script Path**: `Jenkinsfile`
+
+For detailed setup including ArgoCD configuration, see the [full deployment guide](./docs/JENKINS-GITOPS-DEPLOYMENT.md).
 
 ### Service-specific Commands
 ```bash
