@@ -84,6 +84,7 @@ export interface IStepBlock {
   type: StepBlockType;
   data: Record<string, any>;
   position: number;
+  transparent?: boolean;  // Remove block background styling
   children?: IStepBlock[];
 }
 
@@ -269,6 +270,7 @@ const FunnelStepSchema = new Schema<IFunnelStep>({
       type: { type: String, required: true, enum: Object.values(StepBlockType) },
       data: { type: Schema.Types.Mixed, required: true, default: {} },
       position: { type: Number, required: true, min: 0 },
+      transparent: { type: Boolean, default: false },  // Remove block background styling
       children: { type: Schema.Types.Mixed, default: undefined },
     }],
     // Legacy fields (kept for backward compatibility)
