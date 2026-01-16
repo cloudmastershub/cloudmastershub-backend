@@ -74,6 +74,11 @@ export enum StepBlockType {
   APPLICATION_FORM = 'application_form',
   WEBINAR_REGISTRATION = 'webinar_registration',
   PROGRESS_INDICATOR = 'progress_indicator',
+  // Composable element-based blocks (for drag-and-drop elements)
+  ELEMENT_SECTION = 'element_section',
+  ELEMENT_COLUMNS = 'element_columns',
+  ELEMENT_ROW = 'element_row',
+  ELEMENT_STACK = 'element_stack',
 }
 
 /**
@@ -86,6 +91,9 @@ export interface IStepBlock {
   position: number;
   transparent?: boolean;  // Remove block background styling
   children?: IStepBlock[];
+  // Composable elements support (for element-based blocks)
+  elements?: Array<Record<string, any>>;  // Element/Container tree
+  rootElement?: Record<string, any>;      // Legacy: single root element
 }
 
 /**
@@ -272,6 +280,9 @@ const FunnelStepSchema = new Schema<IFunnelStep>({
       position: { type: Number, required: true, min: 0 },
       transparent: { type: Boolean, default: false },  // Remove block background styling
       children: { type: Schema.Types.Mixed, default: undefined },
+      // Composable elements support (for element-based blocks)
+      elements: { type: Schema.Types.Mixed, default: undefined },  // Element/Container tree
+      rootElement: { type: Schema.Types.Mixed, default: undefined },  // Legacy: single root element
     }],
     // Legacy fields (kept for backward compatibility)
     headline: { type: String },
