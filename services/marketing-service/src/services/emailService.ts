@@ -137,7 +137,8 @@ class EmailService {
     }
 
     try {
-      const response = await mg.messages.create(MAILGUN_DOMAIN, messageData);
+      // Cast to any to handle Mailgun SDK's strict typing for custom options
+      const response = await mg.messages.create(MAILGUN_DOMAIN, messageData as any);
       logger.info(`Email sent successfully`, {
         to: options.to,
         subject: options.subject,
