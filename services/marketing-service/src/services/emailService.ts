@@ -1,4 +1,5 @@
-import sgMail, { MailDataRequired } from '@sendgrid/mail';
+import Mailgun from 'mailgun.js';
+import formData from 'form-data';
 import Handlebars from 'handlebars';
 import { v4 as uuidv4 } from 'uuid';
 import mongoose from 'mongoose';
@@ -6,16 +7,24 @@ import { EmailTemplate, IEmailTemplate, EmailSequence, IEmailSequence, Lead, ILe
 import logger from '../utils/logger';
 import { ApiError } from '../middleware/errorHandler';
 
-// Initialize SendGrid
-const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
+// Initialize Mailgun
+const MAILGUN_API_KEY = process.env.MAILGUN_API_KEY;
+const MAILGUN_DOMAIN = process.env.MAILGUN_DOMAIN;
 const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@cloudmastershub.com';
 const FROM_NAME = process.env.FROM_NAME || 'CloudMastersHub';
 
-if (SENDGRID_API_KEY) {
-  sgMail.setApiKey(SENDGRID_API_KEY);
-  logger.info('SendGrid initialized');
+// Mailgun client setup
+const mailgun = new Mailgun(formData);
+let mg: ReturnType<typeof mailgun.client> | null = null;
+
+if (MAILGUN_API_KEY && MAILGUN_DOMAIN) {
+  mg = mailgun.client({
+    username: 'api',
+    key: MAILGUN_API_KEY,
+  });
+  logger.info('Mailgun initialized', { domain: MAILGUN_DOMAIN });
 } else {
-  logger.warn('SENDGRID_API_KEY not set - emails will be logged only');
+  logger.warn('MAILGUN_API_KEY or MAILGUN_DOMAIN not set - emails will be logged only');
 }
 
 /**
@@ -51,7 +60,7 @@ interface TemplateContext {
 }
 
 /**
- * Email Service - Handles all email operations using SendGrid
+ * Email Service - Handles all email operations using Mailgun
  */
 class EmailService {
   private compiledTemplates: Map<string, Handlebars.TemplateDelegate> = new Map();
@@ -100,27 +109,26 @@ class EmailService {
   async sendEmail(options: SendEmailOptions): Promise<{ success: boolean; messageId?: string }> {
     const trackingId = options.trackingId || uuidv4();
 
-    const msg: MailDataRequired = {
-      to: options.toName ? { email: options.to, name: options.toName } : options.to,
-      from: { email: FROM_EMAIL, name: FROM_NAME },
+    const messageData = {
+      from: `${FROM_NAME} <${FROM_EMAIL}>`,
+      to: options.toName ? `${options.toName} <${options.to}>` : options.to,
       subject: options.subject,
       html: options.html,
       text: options.text || this.htmlToText(options.html),
-      trackingSettings: {
-        clickTracking: { enable: true, enableText: false },
-        openTracking: { enable: true },
-      },
-      customArgs: {
-        trackingId,
-        templateId: options.templateId || 'custom',
-        ...options.metadata,
-      },
-      categories: options.tags || ['marketing'],
+      'o:tracking': 'yes',
+      'o:tracking-clicks': 'yes',
+      'o:tracking-opens': 'yes',
+      'o:tag': options.tags || ['marketing'],
+      'v:trackingId': trackingId,
+      'v:templateId': options.templateId || 'custom',
+      ...(options.metadata ? Object.fromEntries(
+        Object.entries(options.metadata).map(([k, v]) => [`v:${k}`, v])
+      ) : {}),
     };
 
-    // If SendGrid is not configured, log the email instead
-    if (!SENDGRID_API_KEY) {
-      logger.info('Email would be sent (SendGrid not configured):', {
+    // If Mailgun is not configured, log the email instead
+    if (!mg || !MAILGUN_DOMAIN) {
+      logger.info('Email would be sent (Mailgun not configured):', {
         to: options.to,
         subject: options.subject,
         trackingId,
@@ -129,23 +137,23 @@ class EmailService {
     }
 
     try {
-      const [response] = await sgMail.send(msg);
+      const response = await mg.messages.create(MAILGUN_DOMAIN, messageData);
       logger.info(`Email sent successfully`, {
         to: options.to,
         subject: options.subject,
-        statusCode: response.statusCode,
+        messageId: response.id,
         trackingId,
       });
       return {
         success: true,
-        messageId: response.headers['x-message-id'] as string,
+        messageId: response.id,
       };
     } catch (error: any) {
       logger.error('Failed to send email:', {
         to: options.to,
         subject: options.subject,
         error: error.message,
-        response: error.response?.body,
+        details: error.details,
       });
       throw ApiError.internal(`Failed to send email: ${error.message}`);
     }
