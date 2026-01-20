@@ -11,9 +11,9 @@ import healthRoutes from './routes/healthRoutes';
 import funnelRoutes, { publicFunnelRouter } from './routes/funnelRoutes';
 import challengeRoutes, { publicChallengeRouter } from './routes/challengeRoutes';
 import emailRoutes from './routes/emailRoutes';
+import trackingRoutes from './routes/trackingRoutes';
 // Future route imports will be added here:
 // import leadRoutes from './routes/leadRoutes';
-// import analyticsRoutes from './routes/analyticsRoutes';
 
 // Import middleware
 import { authenticate, requireAdmin } from './middleware/auth';
@@ -91,9 +91,9 @@ app.use('/admin/email', emailRoutes);
 // ============================================
 app.use('/f', publicFunnelRouter);             // /f/:funnelSlug
 app.use('/challenge', publicChallengeRouter);  // /challenge/:slug
+app.use('/track', trackingRoutes);             // Conversion tracking
 // These will be implemented for public funnel pages:
 // app.use('/leads', publicLeadRoutes);         // Lead capture endpoints
-// app.use('/track', trackingRoutes);           // Conversion tracking
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -168,7 +168,14 @@ app.get('/', (req, res) => {
           leaderboard: 'GET /challenge/:slug/leaderboard',
         },
         leadCapture: '/leads/capture (coming soon)',
-        tracking: '/track (coming soon)',
+        tracking: {
+          event: 'POST /track/event',
+          pageview: 'POST /track/pageview',
+          batch: 'POST /track/batch',
+          pixel: 'GET /track/pixel.gif',
+          funnelAnalytics: 'GET /track/analytics/funnel/:funnelId (auth required)',
+          sessionJourney: 'GET /track/session/:sessionId (auth required)',
+        },
       },
     },
   });

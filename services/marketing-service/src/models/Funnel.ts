@@ -233,7 +233,8 @@ export interface IFunnel extends Document {
     accessDurationDays?: number;   // How long user has access (null = forever)
     emailSequenceId?: string;      // Linked email sequence
     defaultEmailProviderId?: string; // Email provider for this funnel
-    trackingPixelId?: string;      // Facebook/Google pixel ID
+    trackingPixelId?: string;      // Facebook Pixel ID
+    googleAnalyticsId?: string;    // Google Analytics 4 Measurement ID
     customDomain?: string;         // Custom domain for funnel pages
   };
 
@@ -417,7 +418,8 @@ const FunnelSchema = new Schema<IFunnel>({
     accessDurationDays: { type: Number, min: 1 },
     emailSequenceId: { type: String },
     defaultEmailProviderId: { type: String },
-    trackingPixelId: { type: String },
+    trackingPixelId: { type: String },       // Facebook Pixel ID
+    googleAnalyticsId: { type: String },     // Google Analytics 4 Measurement ID
     customDomain: { type: String },
   },
   design: {
