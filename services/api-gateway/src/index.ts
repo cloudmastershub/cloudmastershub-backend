@@ -101,9 +101,13 @@ app.use(rateLimiter);
 // Extract user information from JWT tokens for backend services
 app.use('/api', extractUserFromJWT);
 
-// Apply body parsing only to non-proxy routes
+// Apply body parsing only to non-proxy routes (except tracking endpoints which need parsed body)
 app.use((req, res, next) => {
-  // Skip body parsing for proxy routes
+  // Parse body for tracking endpoints (they need JSON body forwarded)
+  if (req.path.startsWith('/api/marketing/track')) {
+    return express.json()(req, res, next);
+  }
+  // Skip body parsing for other proxy routes
   if (req.path.startsWith('/api/')) {
     next();
   } else {
