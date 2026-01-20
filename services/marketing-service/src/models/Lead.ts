@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document, Model } from 'mongoose';
 
 /**
  * Lead Source Types
@@ -153,6 +153,39 @@ export interface ILead extends Document {
   capturedAt: Date;
   createdAt: Date;
   updatedAt: Date;
+
+  // Instance methods
+  addScore(points: number, reason: string): void;
+  updateScoreLevel(): void;
+  updateStatus(newStatus: LeadStatus, reason?: string): void;
+  addTag(tag: string): void;
+  removeTag(tag: string): void;
+  recordActivity(type: ILeadActivity['type'], metadata?: Record<string, any>): void;
+  recordEmailOpen(): void;
+  recordEmailClick(metadata?: Record<string, any>): void;
+  markConverted(userId: string, purchaseId?: string, amount?: number): void;
+  unsubscribe(reason?: string): void;
+}
+
+/**
+ * Lead Model Interface (static methods)
+ */
+export interface ILeadModel extends Model<ILead> {
+  findByEmail(email: string): Promise<ILead | null>;
+  findByTag(tag: string): Promise<ILead[]>;
+  findByScoreLevel(level: LeadScoreLevel): Promise<ILead[]>;
+  findByFunnel(funnelId: string): Promise<ILead[]>;
+  findSubscribed(): Promise<ILead[]>;
+  getStats(): Promise<{
+    total: number;
+    newLeads: number;
+    engaged: number;
+    qualified: number;
+    converted: number;
+    unsubscribed: number;
+    avgScore: number;
+    totalRevenue: number;
+  }>;
 }
 
 /**
@@ -506,7 +539,7 @@ LeadSchema.statics.getStats = async function() {
   };
 };
 
-const LeadModel = mongoose.model<ILead>('Lead', LeadSchema);
+const LeadModel = mongoose.model<ILead, ILeadModel>('Lead', LeadSchema);
 
 export { LeadModel as Lead };
 export default LeadModel;

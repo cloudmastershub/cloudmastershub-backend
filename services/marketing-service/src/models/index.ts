@@ -18,13 +18,13 @@ export { EmailTemplate, EmailTemplateCategory, EmailTemplateStatus } from './Ema
 export type { IEmailTemplate, ITemplateVariable } from './EmailTemplate';
 
 export { Lead, LeadSource, LeadStatus, LeadScoreLevel } from './Lead';
-export type { ILead, ILeadActivity } from './Lead';
+export type { ILead, ILeadActivity, ILeadModel } from './Lead';
 
 export { ConversionEvent, ConversionEventType } from './ConversionEvent';
 export type { IConversionEvent } from './ConversionEvent';
 
 export { EmailQueueJob, EmailJobStatus, EmailJobType } from './EmailQueueJob';
-export type { IEmailQueueJob } from './EmailQueueJob';
+export type { IEmailQueueJob, IEmailQueueJobModel } from './EmailQueueJob';
 
 export { EmailCampaign, CampaignStatus, CampaignType } from './EmailCampaign';
 export type { IEmailCampaign, ISegmentCondition, ICampaignVariant } from './EmailCampaign';

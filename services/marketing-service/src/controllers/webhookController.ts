@@ -1,11 +1,14 @@
 import { Request, Response } from 'express';
 import crypto from 'crypto';
-import { EmailQueueJob, EmailJobStatus } from '../models/EmailQueueJob';
-import { Lead, LeadStatus } from '../models/Lead';
+import { EmailQueueJob, EmailJobStatus, IEmailQueueJob } from '../models/EmailQueueJob';
+import { Lead, LeadStatus, ILead } from '../models/Lead';
 import { EmailSequence } from '../models/EmailSequence';
 import { EmailTemplate } from '../models/EmailTemplate';
 import { ConversionEvent, ConversionEventType } from '../models/ConversionEvent';
 import logger from '../utils/logger';
+
+// Helper type for email job documents
+type EmailJobDoc = (IEmailQueueJob & { save(): Promise<any> }) | null;
 
 // Mailgun webhook signing key
 const MAILGUN_WEBHOOK_KEY = process.env.MAILGUN_WEBHOOK_SIGNING_KEY || '';
@@ -146,11 +149,11 @@ export const handleMailgunWebhook = async (req: Request, res: Response) => {
 
       case 'failed':
       case 'permanent_fail':
-        await handleBounce(eventData, jobId, messageId, recipient, 'hard');
+        await handleBounce(eventData, 'hard', jobId, messageId, recipient);
         break;
 
       case 'temporary_fail':
-        await handleBounce(eventData, jobId, messageId, recipient, 'soft');
+        await handleBounce(eventData, 'soft', jobId, messageId, recipient);
         break;
 
       default:
@@ -172,10 +175,10 @@ async function handleDelivered(
   jobId?: string,
   messageId?: string
 ): Promise<void> {
-  // Update email job
-  let emailJob = jobId ? await EmailQueueJob.findById(jobId) : null;
+  // Update email job - find by jobId first, then by messageId
+  let emailJob: EmailJobDoc = jobId ? await EmailQueueJob.findById(jobId) : null;
   if (!emailJob && messageId) {
-    emailJob = await EmailQueueJob.findByMessageId(messageId);
+    emailJob = await EmailQueueJob.findByMessageId(messageId) as EmailJobDoc;
   }
 
   if (emailJob) {
@@ -197,10 +200,10 @@ async function handleOpened(
   messageId?: string,
   recipient?: string
 ): Promise<void> {
-  // Update email job
-  let emailJob = jobId ? await EmailQueueJob.findById(jobId) : null;
+  // Update email job - find by jobId first, then by messageId
+  let emailJob: EmailJobDoc = jobId ? await EmailQueueJob.findById(jobId) : null;
   if (!emailJob && messageId) {
-    emailJob = await EmailQueueJob.findByMessageId(messageId);
+    emailJob = await EmailQueueJob.findByMessageId(messageId) as EmailJobDoc;
   }
 
   if (emailJob) {
@@ -245,10 +248,10 @@ async function handleClicked(
 ): Promise<void> {
   const clickedUrl = eventData.url;
 
-  // Update email job
-  let emailJob = jobId ? await EmailQueueJob.findById(jobId) : null;
+  // Update email job - find by jobId first, then by messageId
+  let emailJob: EmailJobDoc = jobId ? await EmailQueueJob.findById(jobId) : null;
   if (!emailJob && messageId) {
-    emailJob = await EmailQueueJob.findByMessageId(messageId);
+    emailJob = await EmailQueueJob.findByMessageId(messageId) as EmailJobDoc;
   }
 
   if (emailJob) {
@@ -336,19 +339,19 @@ async function handleComplained(
  */
 async function handleBounce(
   eventData: MailgunWebhookPayload['event-data'],
+  bounceType: 'soft' | 'hard',
   jobId?: string,
   messageId?: string,
-  recipient?: string,
-  bounceType: 'soft' | 'hard'
+  recipient?: string
 ): Promise<void> {
   const deliveryStatus = eventData['delivery-status'];
   const bounceReason = deliveryStatus?.message || deliveryStatus?.description || 'Unknown';
   const bounceCode = deliveryStatus?.code?.toString() || deliveryStatus?.['bounce-code'];
 
-  // Update email job
-  let emailJob = jobId ? await EmailQueueJob.findById(jobId) : null;
+  // Update email job - find by jobId first, then by messageId
+  let emailJob: EmailJobDoc = jobId ? await EmailQueueJob.findById(jobId) : null;
   if (!emailJob && messageId) {
-    emailJob = await EmailQueueJob.findByMessageId(messageId);
+    emailJob = await EmailQueueJob.findByMessageId(messageId) as EmailJobDoc;
   }
 
   if (emailJob) {

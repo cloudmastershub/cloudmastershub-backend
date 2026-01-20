@@ -7,10 +7,21 @@ import logger from '../utils/logger';
 import mongoose from 'mongoose';
 
 /**
+ * Device info interface
+ */
+interface DeviceInfo {
+  type: 'desktop' | 'tablet' | 'mobile';
+  os: string;
+  browser: string;
+  screenWidth?: number;
+  screenHeight?: number;
+}
+
+/**
  * Parse user agent to determine device type
  */
-const parseUserAgent = (userAgent: string | undefined) => {
-  if (!userAgent) return { type: 'desktop' as const, os: 'Unknown', browser: 'Unknown' };
+const parseUserAgent = (userAgent: string | undefined): DeviceInfo => {
+  if (!userAgent) return { type: 'desktop', os: 'Unknown', browser: 'Unknown' };
 
   const ua = userAgent.toLowerCase();
 

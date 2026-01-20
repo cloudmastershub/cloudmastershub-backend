@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document, Model } from 'mongoose';
 
 /**
  * Email Job Status
@@ -93,6 +93,37 @@ export interface IEmailQueueJob extends Document {
 
   createdAt: Date;
   updatedAt: Date;
+
+  // Instance methods
+  markSent(messageId: string): Promise<IEmailQueueJob>;
+  markDelivered(): Promise<IEmailQueueJob>;
+  markOpened(): Promise<IEmailQueueJob>;
+  markClicked(): Promise<IEmailQueueJob>;
+  markBounced(type: 'soft' | 'hard', reason: string): Promise<IEmailQueueJob>;
+  markFailed(errorMessage: string, errorCode?: string): Promise<IEmailQueueJob>;
+  markSkipped(reason: string): Promise<IEmailQueueJob>;
+}
+
+/**
+ * Email Queue Job Document Type (for better compatibility with findById etc)
+ */
+export type EmailQueueJobDocument = mongoose.Document<unknown, {}, IEmailQueueJob> & IEmailQueueJob & Required<{ _id: mongoose.Types.ObjectId }>;
+
+/**
+ * Email Queue Job Model Interface (static methods)
+ */
+export interface IEmailQueueJobModel extends Model<IEmailQueueJob> {
+  findPendingJobs(limit?: number): Promise<EmailQueueJobDocument[]>;
+  findByMessageId(messageId: string): Promise<EmailQueueJobDocument | null>;
+  getSequenceJobsForLead(
+    sequenceId: mongoose.Types.ObjectId,
+    leadId: mongoose.Types.ObjectId
+  ): Promise<EmailQueueJobDocument[]>;
+  cancelPendingForLead(
+    leadId: mongoose.Types.ObjectId,
+    sequenceId?: mongoose.Types.ObjectId
+  ): Promise<{ modifiedCount: number }>;
+  getStats(startDate?: Date, endDate?: Date): Promise<Record<string, number>>;
 }
 
 /**
@@ -367,7 +398,7 @@ EmailQueueJobSchema.statics.getStats = async function(startDate?: Date, endDate?
   return result;
 };
 
-const EmailQueueJobModel = mongoose.model<IEmailQueueJob>('EmailQueueJob', EmailQueueJobSchema);
+const EmailQueueJobModel = mongoose.model<IEmailQueueJob, IEmailQueueJobModel>('EmailQueueJob', EmailQueueJobSchema);
 
 export { EmailQueueJobModel as EmailQueueJob };
 export default EmailQueueJobModel;
