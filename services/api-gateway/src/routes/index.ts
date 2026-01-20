@@ -261,6 +261,24 @@ const serviceRoutes = {
       '^/api/marketing/health': '/health'
     }
   },
+  '/marketing/webhooks': {
+    target: process.env.MARKETING_SERVICE_URL || 'http://marketing-service:3006',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/marketing/webhooks': '/webhooks'
+    }
+  },
+  '/marketing/track': {
+    target: process.env.MARKETING_SERVICE_URL || 'http://marketing-service:3006',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/marketing/track': '/track'
+    }
+  },
 };
 
 // Handle specific routes first with exact path matching
