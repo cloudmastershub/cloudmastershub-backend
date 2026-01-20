@@ -13,11 +13,11 @@ import challengeRoutes, { publicChallengeRouter } from './routes/challengeRoutes
 import emailRoutes from './routes/emailRoutes';
 import campaignRoutes from './routes/campaignRoutes';
 import segmentRoutes from './routes/segmentRoutes';
+import mailingListRoutes from './routes/mailingListRoutes';
+import leadRoutes from './routes/leadRoutes';
 import trackingRoutes from './routes/trackingRoutes';
 import webhookRoutes from './routes/webhookRoutes';
 import { sequenceScheduler } from './services/sequenceScheduler';
-// Future route imports will be added here:
-// import leadRoutes from './routes/leadRoutes';
 
 // Import middleware
 import { authenticate, requireAdmin } from './middleware/auth';
@@ -88,8 +88,9 @@ app.use('/admin/challenges', challengeRoutes);
 app.use('/admin/email', emailRoutes);
 app.use('/admin/campaigns', campaignRoutes);
 app.use('/admin/segments', segmentRoutes);
+app.use('/admin/mailing-lists', mailingListRoutes);
+app.use('/admin/leads', leadRoutes);
 // These will be implemented in subsequent phases:
-// app.use('/admin/leads', leadRoutes);
 // app.use('/admin/analytics', analyticsRoutes);
 
 // ============================================
@@ -187,7 +188,38 @@ app.get('/', (req, res) => {
           leads: 'GET /admin/segments/:id/leads',
           fields: 'GET /admin/segments/fields',
         },
-        leads: '/admin/leads (coming soon)',
+        mailingLists: {
+          list: 'GET /admin/mailing-lists',
+          create: 'POST /admin/mailing-lists',
+          get: 'GET /admin/mailing-lists/:id',
+          update: 'PUT /admin/mailing-lists/:id',
+          delete: 'DELETE /admin/mailing-lists/:id',
+          archive: 'POST /admin/mailing-lists/:id/archive',
+          restore: 'POST /admin/mailing-lists/:id/restore',
+          duplicate: 'POST /admin/mailing-lists/:id/duplicate',
+          members: 'GET /admin/mailing-lists/:id/members',
+          addMembers: 'POST /admin/mailing-lists/:id/members',
+          removeMembers: 'DELETE /admin/mailing-lists/:id/members',
+          import: 'POST /admin/mailing-lists/:id/import',
+          export: 'GET /admin/mailing-lists/:id/export',
+        },
+        leads: {
+          list: 'GET /admin/leads',
+          create: 'POST /admin/leads',
+          get: 'GET /admin/leads/:id',
+          update: 'PUT /admin/leads/:id',
+          delete: 'DELETE /admin/leads/:id',
+          search: 'POST /admin/leads/search',
+          stats: 'GET /admin/leads/stats',
+          tags: 'GET /admin/leads/tags',
+          addTag: 'POST /admin/leads/:id/tags',
+          removeTag: 'DELETE /admin/leads/:id/tags/:tag',
+          bulkUpdate: 'POST /admin/leads/bulk/update',
+          bulkDelete: 'POST /admin/leads/bulk/delete',
+          import: 'POST /admin/leads/import',
+          export: 'GET /admin/leads/export',
+          merge: 'POST /admin/leads/merge',
+        },
         analytics: '/admin/analytics (coming soon)',
       },
       public: {

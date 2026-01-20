@@ -140,6 +140,9 @@ export interface IEmailCampaign extends Document {
   updatedBy: string;
   createdAt: Date;
   updatedAt: Date;
+
+  // Instance methods
+  updateRates(): void;
 }
 
 /**

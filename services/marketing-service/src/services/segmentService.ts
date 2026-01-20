@@ -413,7 +413,7 @@ class SegmentService {
 
       case 'is_not_empty':
         return {
-          [field]: { $exists: true, $ne: null, $ne: '' },
+          [field]: { $exists: true, $nin: [null, ''] },
           ...(field.includes('.') ? {} : { [`${field}.0`]: { $exists: true } }),
         };
 
