@@ -12,6 +12,8 @@ import funnelRoutes, { publicFunnelRouter } from './routes/funnelRoutes';
 import challengeRoutes, { publicChallengeRouter } from './routes/challengeRoutes';
 import emailRoutes from './routes/emailRoutes';
 import trackingRoutes from './routes/trackingRoutes';
+import webhookRoutes from './routes/webhookRoutes';
+import { sequenceScheduler } from './services/sequenceScheduler';
 // Future route imports will be added here:
 // import leadRoutes from './routes/leadRoutes';
 
@@ -92,6 +94,7 @@ app.use('/admin/email', emailRoutes);
 app.use('/f', publicFunnelRouter);             // /f/:funnelSlug
 app.use('/challenge', publicChallengeRouter);  // /challenge/:slug
 app.use('/track', trackingRoutes);             // Conversion tracking
+app.use('/webhooks', webhookRoutes);           // Mailgun webhooks
 // These will be implemented for public funnel pages:
 // app.use('/leads', publicLeadRoutes);         // Lead capture endpoints
 
@@ -176,6 +179,10 @@ app.get('/', (req, res) => {
           funnelAnalytics: 'GET /track/analytics/funnel/:funnelId (auth required)',
           sessionJourney: 'GET /track/session/:sessionId (auth required)',
         },
+        webhooks: {
+          mailgun: 'POST /webhooks/mailgun (Mailgun events: delivered, opened, clicked, bounced, unsubscribed)',
+          status: 'GET /webhooks/status (auth required)',
+        },
       },
     },
   });
@@ -203,11 +210,20 @@ const startServer = async () => {
     await mongoConnection.connect();
     logger.info('MongoDB connected for Marketing Service');
 
+    // Initialize sequence scheduler (email automation)
+    try {
+      await sequenceScheduler.initialize();
+      logger.info('Sequence scheduler initialized');
+    } catch (error) {
+      logger.warn('Failed to initialize sequence scheduler (Redis may not be available):', error);
+      // Continue without scheduler - emails can still be sent manually
+    }
+
     // Start server
     app.listen(PORT, () => {
       logger.info(`Marketing Service running on port ${PORT}`);
       logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
-      logger.info('Available models: Funnel, Challenge, ChallengeParticipant, EmailSequence, EmailTemplate, Lead, ConversionEvent');
+      logger.info('Available models: Funnel, Challenge, ChallengeParticipant, EmailSequence, EmailTemplate, Lead, ConversionEvent, EmailQueueJob');
     });
   } catch (error) {
     logger.error('Failed to start Marketing Service:', error);
@@ -222,6 +238,11 @@ const gracefulShutdown = async (signal: string) => {
   logger.info(`${signal} received, shutting down marketing service gracefully`);
 
   try {
+    // Shutdown sequence scheduler (close Bull queues)
+    await sequenceScheduler.shutdown();
+    logger.info('Sequence scheduler shutdown complete');
+
+    // Close MongoDB connection
     const mongoConnection = MongoConnection.getInstance();
     await mongoConnection.disconnect();
     logger.info('MongoDB connection closed');
