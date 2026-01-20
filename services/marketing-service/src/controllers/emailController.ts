@@ -432,6 +432,273 @@ export const listSequences = async (
 };
 
 // ==========================================
+// Email Dashboard Stats
+// ==========================================
+
+/**
+ * Get email dashboard statistics
+ * GET /admin/email/stats
+ */
+export const getEmailDashboardStats = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    // Import models dynamically to avoid circular dependencies
+    const EmailCampaign = (await import('../models/EmailCampaign')).default;
+    const EmailTemplate = (await import('../models/EmailTemplate')).default;
+    const EmailSequence = (await import('../models/EmailSequence')).default;
+    const Lead = (await import('../models/Lead')).default;
+    const Segment = (await import('../models/Segment')).default;
+
+    // Run all aggregations in parallel for performance
+    const [
+      campaignStats,
+      templateStats,
+      sequenceStats,
+      leadStats,
+      segmentStats,
+      recentCampaigns,
+    ] = await Promise.all([
+      // Campaign statistics
+      EmailCampaign.aggregate([
+        {
+          $facet: {
+            total: [{ $count: 'count' }],
+            byStatus: [
+              { $group: { _id: '$status', count: { $sum: 1 } } },
+            ],
+            metrics: [
+              {
+                $group: {
+                  _id: null,
+                  totalSent: { $sum: '$metrics.sent' },
+                  totalDelivered: { $sum: '$metrics.delivered' },
+                  totalOpened: { $sum: '$metrics.opened' },
+                  totalClicked: { $sum: '$metrics.clicked' },
+                  totalBounced: { $sum: '$metrics.bounced' },
+                  totalUnsubscribed: { $sum: '$metrics.unsubscribed' },
+                },
+              },
+            ],
+          },
+        },
+      ]),
+
+      // Template statistics
+      EmailTemplate.aggregate([
+        {
+          $facet: {
+            total: [{ $count: 'count' }],
+            byStatus: [
+              { $group: { _id: '$status', count: { $sum: 1 } } },
+            ],
+            byCategory: [
+              { $group: { _id: '$category', count: { $sum: 1 } } },
+            ],
+          },
+        },
+      ]),
+
+      // Sequence statistics
+      EmailSequence.aggregate([
+        {
+          $facet: {
+            total: [{ $count: 'count' }],
+            byStatus: [
+              { $group: { _id: '$status', count: { $sum: 1 } } },
+            ],
+            totalEnrolled: [
+              {
+                $group: {
+                  _id: null,
+                  enrolled: { $sum: '$metrics.totalEnrolled' },
+                  completed: { $sum: '$metrics.totalCompleted' },
+                },
+              },
+            ],
+          },
+        },
+      ]),
+
+      // Lead/subscriber statistics
+      Lead.aggregate([
+        {
+          $facet: {
+            total: [{ $count: 'count' }],
+            byStatus: [
+              { $group: { _id: '$status', count: { $sum: 1 } } },
+            ],
+            subscribed: [
+              { $match: { emailConsent: true } },
+              { $count: 'count' },
+            ],
+            unsubscribed: [
+              { $match: { emailConsent: false } },
+              { $count: 'count' },
+            ],
+            recentLeads: [
+              { $match: { capturedAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } } },
+              { $count: 'count' },
+            ],
+          },
+        },
+      ]),
+
+      // Segment statistics
+      Segment.aggregate([
+        {
+          $facet: {
+            total: [{ $count: 'count' }],
+            byType: [
+              { $group: { _id: '$type', count: { $sum: 1 } } },
+            ],
+          },
+        },
+      ]),
+
+      // Recent campaigns (last 10)
+      EmailCampaign.find()
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .select('name subject status type metrics.sent metrics.opened metrics.clicked scheduledFor sentAt createdAt')
+        .lean(),
+    ]);
+
+    // Process campaign stats
+    const campaignData = campaignStats[0];
+    const totalCampaigns = campaignData.total[0]?.count || 0;
+    const campaignsByStatus = campaignData.byStatus.reduce((acc: Record<string, number>, item: any) => {
+      acc[item._id] = item.count;
+      return acc;
+    }, {});
+    const campaignMetrics = campaignData.metrics[0] || {
+      totalSent: 0,
+      totalDelivered: 0,
+      totalOpened: 0,
+      totalClicked: 0,
+      totalBounced: 0,
+      totalUnsubscribed: 0,
+    };
+
+    // Process template stats
+    const templateData = templateStats[0];
+    const totalTemplates = templateData.total[0]?.count || 0;
+    const templatesByStatus = templateData.byStatus.reduce((acc: Record<string, number>, item: any) => {
+      acc[item._id] = item.count;
+      return acc;
+    }, {});
+    const templatesByCategory = templateData.byCategory.reduce((acc: Record<string, number>, item: any) => {
+      acc[item._id] = item.count;
+      return acc;
+    }, {});
+
+    // Process sequence stats
+    const sequenceData = sequenceStats[0];
+    const totalSequences = sequenceData.total[0]?.count || 0;
+    const sequencesByStatus = sequenceData.byStatus.reduce((acc: Record<string, number>, item: any) => {
+      acc[item._id] = item.count;
+      return acc;
+    }, {});
+    const sequenceEnrollment = sequenceData.totalEnrolled[0] || { enrolled: 0, completed: 0 };
+
+    // Process lead stats
+    const leadData = leadStats[0];
+    const totalLeads = leadData.total[0]?.count || 0;
+    const leadsByStatus = leadData.byStatus.reduce((acc: Record<string, number>, item: any) => {
+      acc[item._id] = item.count;
+      return acc;
+    }, {});
+    const subscribedCount = leadData.subscribed[0]?.count || 0;
+    const unsubscribedCount = leadData.unsubscribed[0]?.count || 0;
+    const recentLeadsCount = leadData.recentLeads[0]?.count || 0;
+
+    // Process segment stats
+    const segmentData = segmentStats[0];
+    const totalSegments = segmentData.total[0]?.count || 0;
+    const segmentsByType = segmentData.byType.reduce((acc: Record<string, number>, item: any) => {
+      acc[item._id] = item.count;
+      return acc;
+    }, {});
+
+    // Calculate derived metrics
+    const openRate = campaignMetrics.totalSent > 0
+      ? (campaignMetrics.totalOpened / campaignMetrics.totalSent * 100).toFixed(2)
+      : '0.00';
+    const clickRate = campaignMetrics.totalOpened > 0
+      ? (campaignMetrics.totalClicked / campaignMetrics.totalOpened * 100).toFixed(2)
+      : '0.00';
+    const bounceRate = campaignMetrics.totalSent > 0
+      ? (campaignMetrics.totalBounced / campaignMetrics.totalSent * 100).toFixed(2)
+      : '0.00';
+
+    res.json({
+      success: true,
+      data: {
+        overview: {
+          totalSent: campaignMetrics.totalSent,
+          totalDelivered: campaignMetrics.totalDelivered,
+          totalOpened: campaignMetrics.totalOpened,
+          totalClicked: campaignMetrics.totalClicked,
+          openRate: parseFloat(openRate),
+          clickRate: parseFloat(clickRate),
+          bounceRate: parseFloat(bounceRate),
+          unsubscribeRate: campaignMetrics.totalSent > 0
+            ? parseFloat((campaignMetrics.totalUnsubscribed / campaignMetrics.totalSent * 100).toFixed(2))
+            : 0,
+        },
+        campaigns: {
+          total: totalCampaigns,
+          byStatus: campaignsByStatus,
+        },
+        templates: {
+          total: totalTemplates,
+          byStatus: templatesByStatus,
+          byCategory: templatesByCategory,
+        },
+        sequences: {
+          total: totalSequences,
+          byStatus: sequencesByStatus,
+          totalEnrolled: sequenceEnrollment.enrolled,
+          totalCompleted: sequenceEnrollment.completed,
+        },
+        segments: {
+          total: totalSegments,
+          byType: segmentsByType,
+        },
+        leads: {
+          total: totalLeads,
+          byStatus: leadsByStatus,
+          subscribed: subscribedCount,
+          unsubscribed: unsubscribedCount,
+          newThisWeek: recentLeadsCount,
+        },
+        recentCampaigns: recentCampaigns.map((campaign: any) => ({
+          id: campaign._id,
+          name: campaign.name,
+          subject: campaign.subject,
+          status: campaign.status,
+          type: campaign.type,
+          sent: campaign.metrics?.sent || 0,
+          opened: campaign.metrics?.opened || 0,
+          clicked: campaign.metrics?.clicked || 0,
+          openRate: campaign.metrics?.sent > 0
+            ? parseFloat(((campaign.metrics.opened || 0) / campaign.metrics.sent * 100).toFixed(2))
+            : 0,
+          scheduledFor: campaign.scheduledFor,
+          sentAt: campaign.sentAt,
+          createdAt: campaign.createdAt,
+        })),
+      },
+    });
+  } catch (error) {
+    logger.error('Error fetching email dashboard stats:', error);
+    next(error);
+  }
+};
+
+// ==========================================
 // Direct Email Sending
 // ==========================================
 
@@ -553,4 +820,6 @@ export default {
   // Direct sending
   sendEmail,
   sendBulkEmail,
+  // Dashboard
+  getEmailDashboardStats,
 };

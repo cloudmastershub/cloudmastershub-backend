@@ -11,6 +11,8 @@ import healthRoutes from './routes/healthRoutes';
 import funnelRoutes, { publicFunnelRouter } from './routes/funnelRoutes';
 import challengeRoutes, { publicChallengeRouter } from './routes/challengeRoutes';
 import emailRoutes from './routes/emailRoutes';
+import campaignRoutes from './routes/campaignRoutes';
+import segmentRoutes from './routes/segmentRoutes';
 import trackingRoutes from './routes/trackingRoutes';
 import webhookRoutes from './routes/webhookRoutes';
 import { sequenceScheduler } from './services/sequenceScheduler';
@@ -84,6 +86,8 @@ app.use('/health', healthRoutes);
 app.use('/admin/funnels', funnelRoutes);
 app.use('/admin/challenges', challengeRoutes);
 app.use('/admin/email', emailRoutes);
+app.use('/admin/campaigns', campaignRoutes);
+app.use('/admin/segments', segmentRoutes);
 // These will be implemented in subsequent phases:
 // app.use('/admin/leads', leadRoutes);
 // app.use('/admin/analytics', analyticsRoutes);
@@ -157,6 +161,31 @@ app.get('/', (req, res) => {
           },
           send: 'POST /admin/email/send',
           bulk: 'POST /admin/email/bulk',
+        },
+        campaigns: {
+          list: 'GET /admin/campaigns',
+          create: 'POST /admin/campaigns',
+          get: 'GET /admin/campaigns/:id',
+          update: 'PUT /admin/campaigns/:id',
+          delete: 'DELETE /admin/campaigns/:id',
+          schedule: 'POST /admin/campaigns/:id/schedule',
+          send: 'POST /admin/campaigns/:id/send',
+          pause: 'POST /admin/campaigns/:id/pause',
+          cancel: 'POST /admin/campaigns/:id/cancel',
+          stats: 'GET /admin/campaigns/:id/stats',
+          preview: 'POST /admin/campaigns/:id/preview',
+          duplicate: 'POST /admin/campaigns/:id/duplicate',
+        },
+        segments: {
+          list: 'GET /admin/segments',
+          create: 'POST /admin/segments',
+          get: 'GET /admin/segments/:id',
+          update: 'PUT /admin/segments/:id',
+          delete: 'DELETE /admin/segments/:id',
+          preview: 'POST /admin/segments/preview',
+          calculate: 'POST /admin/segments/:id/calculate',
+          leads: 'GET /admin/segments/:id/leads',
+          fields: 'GET /admin/segments/fields',
         },
         leads: '/admin/leads (coming soon)',
         analytics: '/admin/analytics (coming soon)',

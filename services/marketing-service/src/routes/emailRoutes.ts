@@ -144,6 +144,18 @@ const listQueryValidation = [
 ];
 
 // ==========================================
+// Dashboard Stats Route
+// ==========================================
+
+// Get email dashboard statistics
+router.get(
+  '/stats',
+  authenticate,
+  requireAdmin,
+  emailController.getEmailDashboardStats
+);
+
+// ==========================================
 // Email Template Routes
 // ==========================================
 
