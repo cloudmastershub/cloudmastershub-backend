@@ -266,7 +266,7 @@ class LeadService {
     const sortDirection = sortOrder === 'asc' ? 1 : -1;
     const sortOptions: Record<string, 1 | -1> = { [sortBy]: sortDirection };
 
-    const [data, total] = await Promise.all([
+    const [rawData, total] = await Promise.all([
       Lead.find(query)
         .sort(sortOptions)
         .skip((page - 1) * limit)
@@ -274,6 +274,12 @@ class LeadService {
         .lean(),
       Lead.countDocuments(query),
     ]);
+
+    // Transform _id to id for lean results (since toJSON transform is bypassed by .lean())
+    const data = rawData.map((lead: any) => ({
+      ...lead,
+      id: lead._id.toString(),
+    }));
 
     return { data: data as ILead[], total };
   }
@@ -299,7 +305,7 @@ class LeadService {
       ],
     };
 
-    const [data, total] = await Promise.all([
+    const [rawData, total] = await Promise.all([
       Lead.find(query)
         .sort({ capturedAt: -1 })
         .skip((page - 1) * limit)
@@ -307,6 +313,12 @@ class LeadService {
         .lean(),
       Lead.countDocuments(query),
     ]);
+
+    // Transform _id to id for lean results (since toJSON transform is bypassed by .lean())
+    const data = rawData.map((lead: any) => ({
+      ...lead,
+      id: lead._id.toString(),
+    }));
 
     return { data: data as ILead[], total };
   }

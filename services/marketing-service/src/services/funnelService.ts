@@ -249,7 +249,7 @@ class FunnelService {
     const sortDirection = sortOrder === 'asc' ? 1 : -1;
 
     // Execute query
-    const [funnels, total] = await Promise.all([
+    const [rawFunnels, total] = await Promise.all([
       Funnel.find(query)
         .sort({ [sortBy]: sortDirection })
         .skip(skip)
@@ -257,6 +257,12 @@ class FunnelService {
         .lean(),
       Funnel.countDocuments(query),
     ]);
+
+    // Transform _id to id for lean results (since toJSON transform is bypassed by .lean())
+    const funnels = rawFunnels.map((funnel: any) => ({
+      ...funnel,
+      id: funnel._id.toString(),
+    }));
 
     return {
       data: funnels as IFunnel[],

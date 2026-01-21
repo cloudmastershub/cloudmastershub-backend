@@ -274,7 +274,7 @@ class ChallengeService {
     const skip = (page - 1) * limit;
     const sortDirection = sortOrder === 'asc' ? 1 : -1;
 
-    const [challenges, total] = await Promise.all([
+    const [rawChallenges, total] = await Promise.all([
       Challenge.find(query)
         .sort({ [sortBy]: sortDirection })
         .skip(skip)
@@ -282,6 +282,12 @@ class ChallengeService {
         .lean(),
       Challenge.countDocuments(query),
     ]);
+
+    // Transform _id to id for lean results (since toJSON transform is bypassed by .lean())
+    const challenges = rawChallenges.map((challenge: any) => ({
+      ...challenge,
+      id: challenge._id.toString(),
+    }));
 
     return {
       data: challenges as IChallenge[],

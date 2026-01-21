@@ -184,7 +184,7 @@ class SegmentService {
     const sortDirection = sortOrder === 'asc' ? 1 : -1;
     const sortOptions: any = { [sortBy]: sortDirection };
 
-    const [data, total] = await Promise.all([
+    const [rawData, total] = await Promise.all([
       Segment.find(query)
         .sort(sortOptions)
         .skip((page - 1) * limit)
@@ -192,6 +192,12 @@ class SegmentService {
         .lean(),
       Segment.countDocuments(query),
     ]);
+
+    // Transform _id to id for lean results (since toJSON transform is bypassed by .lean())
+    const data = rawData.map((segment: any) => ({
+      ...segment,
+      id: segment._id.toString(),
+    }));
 
     return { data: data as ISegment[], total };
   }
@@ -249,13 +255,19 @@ class SegmentService {
         return { data: [], total: 0 };
       }
 
-      const [data, total] = await Promise.all([
+      const [rawData, total] = await Promise.all([
         Lead.find({ _id: { $in: segment.leadIds } })
           .skip((page - 1) * limit)
           .limit(limit)
           .lean(),
         segment.leadIds.length,
       ]);
+
+      // Transform _id to id for lean results
+      const data = rawData.map((lead: any) => ({
+        ...lead,
+        id: lead._id.toString(),
+      }));
 
       return { data: data as ILead[], total };
     }
@@ -265,13 +277,19 @@ class SegmentService {
     }
 
     const query = this.buildMongoQuery(segment.rootGroup);
-    const [data, total] = await Promise.all([
+    const [rawData, total] = await Promise.all([
       Lead.find(query)
         .skip((page - 1) * limit)
         .limit(limit)
         .lean(),
       Lead.countDocuments(query),
     ]);
+
+    // Transform _id to id for lean results
+    const data = rawData.map((lead: any) => ({
+      ...lead,
+      id: lead._id.toString(),
+    }));
 
     return { data: data as ILead[], total };
   }
@@ -284,13 +302,19 @@ class SegmentService {
   ): Promise<{ count: number; sampleLeads: Partial<ILead>[] }> {
     const query = this.buildMongoQuery(rootGroup);
 
-    const [count, sampleLeads] = await Promise.all([
+    const [count, rawSampleLeads] = await Promise.all([
       Lead.countDocuments(query),
       Lead.find(query)
         .select('email firstName lastName status score scoreLevel tags capturedAt')
         .limit(10)
         .lean(),
     ]);
+
+    // Transform _id to id for lean results
+    const sampleLeads = rawSampleLeads.map((lead: any) => ({
+      ...lead,
+      id: lead._id.toString(),
+    }));
 
     return { count, sampleLeads: sampleLeads as Partial<ILead>[] };
   }
