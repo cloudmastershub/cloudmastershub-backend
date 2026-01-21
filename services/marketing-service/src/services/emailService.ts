@@ -392,7 +392,7 @@ class EmailService {
       ];
     }
 
-    const [data, total] = await Promise.all([
+    const [rawData, total] = await Promise.all([
       EmailTemplate.find(query)
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
@@ -400,6 +400,13 @@ class EmailService {
         .lean(),
       EmailTemplate.countDocuments(query),
     ]);
+
+    // Transform _id to id since .lean() bypasses toJSON transform
+    const data = rawData.map((doc: any) => ({
+      ...doc,
+      id: doc._id.toString(),
+      _id: undefined,
+    }));
 
     return { data: data as IEmailTemplate[], total };
   }
@@ -485,7 +492,7 @@ class EmailService {
     if (status) query.status = status;
     if (triggerType) query.triggerType = triggerType;
 
-    const [data, total] = await Promise.all([
+    const [rawData, total] = await Promise.all([
       EmailSequence.find(query)
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
@@ -493,6 +500,13 @@ class EmailService {
         .lean(),
       EmailSequence.countDocuments(query),
     ]);
+
+    // Transform _id to id since .lean() bypasses toJSON transform
+    const data = rawData.map((doc: any) => ({
+      ...doc,
+      id: doc._id.toString(),
+      _id: undefined,
+    }));
 
     return { data: data as IEmailSequence[], total };
   }
