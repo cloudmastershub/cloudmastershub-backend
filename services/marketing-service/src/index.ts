@@ -15,6 +15,7 @@ import campaignRoutes from './routes/campaignRoutes';
 import segmentRoutes from './routes/segmentRoutes';
 import mailingListRoutes from './routes/mailingListRoutes';
 import leadRoutes from './routes/leadRoutes';
+import workflowRoutes from './routes/workflowRoutes';
 import trackingRoutes from './routes/trackingRoutes';
 import webhookRoutes from './routes/webhookRoutes';
 import { sequenceScheduler } from './services/sequenceScheduler';
@@ -90,6 +91,7 @@ app.use('/admin/campaigns', campaignRoutes);
 app.use('/admin/segments', segmentRoutes);
 app.use('/admin/mailing-lists', mailingListRoutes);
 app.use('/admin/leads', leadRoutes);
+app.use('/admin/workflows', workflowRoutes);
 // These will be implemented in subsequent phases:
 // app.use('/admin/analytics', analyticsRoutes);
 

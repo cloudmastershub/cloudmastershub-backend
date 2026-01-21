@@ -28,3 +28,9 @@ export type { IEmailQueueJob, IEmailQueueJobModel } from './EmailQueueJob';
 
 export { EmailCampaign, CampaignStatus, CampaignType } from './EmailCampaign';
 export type { IEmailCampaign, ISegmentCondition, ICampaignVariant } from './EmailCampaign';
+
+export { Workflow, WorkflowStatus, WorkflowTriggerType, WorkflowNodeType, ConditionOperator } from './Workflow';
+export type { IWorkflow, IWorkflowTrigger, IWorkflowNode, IWorkflowEdge, IWorkflowNodeConfig, IWorkflowSettings, IWorkflowMetrics } from './Workflow';
+
+export { WorkflowParticipant, WorkflowParticipantStatus } from './WorkflowParticipant';
+export type { IWorkflowParticipant, IWorkflowLogEntry } from './WorkflowParticipant';
