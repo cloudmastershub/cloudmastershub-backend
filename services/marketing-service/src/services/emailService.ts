@@ -308,6 +308,7 @@ class EmailService {
       ...input,
       variables: transformedVariables,
       status: 'draft',
+      updatedBy: input.createdBy, // Required field - set to createdBy on creation
     });
 
     await template.save();
