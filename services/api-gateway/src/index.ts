@@ -60,18 +60,24 @@ const corsMiddleware = cors({
 // Apply CORS only to non-proxied routes
 app.use((req, res, next) => {
   // Skip CORS for proxied routes - let backend services handle CORS
-  // EXCEPTION: /api/marketing/track endpoints need CORS handled at gateway level
-  // because they're browser-facing public APIs and OPTIONS preflight must be handled
-  const proxiedPaths = ['/api/instructor', '/api/courses', '/api/users', '/api/referrals', '/api/auth', '/api/admin', '/api/pages', '/api/marketing'];
+  // EXCEPTION: /api/marketing endpoints need CORS handled at gateway level
+  // because OPTIONS preflight requests must be handled before proxying
+  const proxiedPaths = ['/api/instructor', '/api/courses', '/api/users', '/api/referrals', '/api/auth', '/api/admin', '/api/pages'];
   const isProxiedRoute = proxiedPaths.some(path => req.path.startsWith(path));
-  const isTrackingEndpoint = req.path.startsWith('/api/marketing/track');
+  const isMarketingEndpoint = req.path.startsWith('/api/marketing');
 
-  if (isProxiedRoute && !isTrackingEndpoint) {
+  // Always handle CORS for marketing endpoints at gateway level
+  if (isMarketingEndpoint) {
+    console.log(`🌐 CORS: Handling CORS at gateway for marketing route: ${req.path}`);
+    return corsMiddleware(req, res, next);
+  }
+
+  if (isProxiedRoute) {
     console.log(`🌐 CORS: Skipping gateway CORS for proxied route: ${req.path}`);
     return next();
   }
 
-  // Apply CORS for non-proxied routes AND tracking endpoints
+  // Apply CORS for non-proxied routes
   corsMiddleware(req, res, next);
 });
 
