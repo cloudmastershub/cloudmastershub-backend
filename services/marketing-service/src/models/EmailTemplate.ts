@@ -15,6 +15,7 @@ export enum EmailTemplateCategory {
   RE_ENGAGEMENT = 're_engagement',
   CONFIRMATION = 'confirmation',
   NOTIFICATION = 'notification',
+  OTHER = 'other',
 }
 
 /**
