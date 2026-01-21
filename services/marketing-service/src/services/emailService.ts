@@ -295,8 +295,18 @@ class EmailService {
     tags?: string[];
     createdBy: string;
   }): Promise<IEmailTemplate> {
+    // Transform string[] variables to ITemplateVariable[] objects
+    // The model expects objects with name, description, required, type fields
+    const transformedVariables = input.variables?.map(varName => ({
+      name: varName,
+      description: `Variable: ${varName}`,
+      required: false,
+      type: 'string' as const,
+    })) || [];
+
     const template = new EmailTemplate({
       ...input,
+      variables: transformedVariables,
       status: 'draft',
     });
 
@@ -326,7 +336,18 @@ class EmailService {
       throw ApiError.badRequest('Invalid template ID');
     }
 
-    const template = await EmailTemplate.findByIdAndUpdate(id, input, { new: true });
+    // Transform string[] variables to ITemplateVariable[] objects if provided
+    const updateData: Record<string, unknown> = { ...input };
+    if (input.variables) {
+      updateData.variables = input.variables.map(varName => ({
+        name: varName,
+        description: `Variable: ${varName}`,
+        required: false,
+        type: 'string' as const,
+      }));
+    }
+
+    const template = await EmailTemplate.findByIdAndUpdate(id, updateData, { new: true });
     if (template) {
       // Clear template cache
       this.compiledTemplates.delete(template.htmlContent);
