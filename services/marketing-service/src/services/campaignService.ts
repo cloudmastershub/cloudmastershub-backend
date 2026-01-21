@@ -346,7 +346,7 @@ class CampaignService {
     const sortDirection = sortOrder === 'asc' ? 1 : -1;
     const sortOptions: any = { [sortBy]: sortDirection };
 
-    const [data, total] = await Promise.all([
+    const [rawData, total] = await Promise.all([
       EmailCampaign.find(query)
         .sort(sortOptions)
         .skip((page - 1) * limit)
@@ -354,6 +354,12 @@ class CampaignService {
         .lean(),
       EmailCampaign.countDocuments(query),
     ]);
+
+    // Transform _id to id for lean results (since toJSON transform is bypassed by .lean())
+    const data = rawData.map((campaign: any) => ({
+      ...campaign,
+      id: campaign._id.toString(),
+    }));
 
     return { data: data as IEmailCampaign[], total };
   }
