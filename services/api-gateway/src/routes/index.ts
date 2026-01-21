@@ -261,6 +261,33 @@ const serviceRoutes = {
       '^/api/marketing/admin/leads': '/admin/leads'
     }
   },
+  '/marketing/admin/workflows': {
+    target: process.env.MARKETING_SERVICE_URL || 'http://marketing-service:3006',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/marketing/admin/workflows': '/admin/workflows'
+    }
+  },
+  '/marketing/admin/segments': {
+    target: process.env.MARKETING_SERVICE_URL || 'http://marketing-service:3006',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/marketing/admin/segments': '/admin/segments'
+    }
+  },
+  '/marketing/admin/mailing-lists': {
+    target: process.env.MARKETING_SERVICE_URL || 'http://marketing-service:3006',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/marketing/admin/mailing-lists': '/admin/mailing-lists'
+    }
+  },
   '/marketing/f': {
     target: process.env.MARKETING_SERVICE_URL || 'http://marketing-service:3006',
     changeOrigin: true,
