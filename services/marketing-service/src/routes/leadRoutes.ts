@@ -173,11 +173,14 @@ const searchValidation = [
 ];
 
 const addTagValidation = [
-  body('tag')
-    .notEmpty()
-    .withMessage('Tag is required')
+  body('tags')
+    .isArray({ min: 1 })
+    .withMessage('Tags must be a non-empty array'),
+  body('tags.*')
+    .isString()
+    .withMessage('Each tag must be a string')
     .isLength({ max: 50 })
-    .withMessage('Tag must be less than 50 characters'),
+    .withMessage('Each tag must be less than 50 characters'),
 ];
 
 const bulkUpdateValidation = [
@@ -396,7 +399,18 @@ router.post(
   leadController.addTag
 );
 
-// Remove tag from lead
+// Remove tags from lead (accepts array of tags in body)
+router.delete(
+  '/:id/tags',
+  authenticate,
+  requireAdmin,
+  logAdminAction('REMOVE_LEAD_TAGS'),
+  idParamValidation,
+  addTagValidation, // Reuse same validation - expects { tags: string[] }
+  leadController.removeTags
+);
+
+// Remove single tag from lead (legacy - tag in URL)
 router.delete(
   '/:id/tags/:tag',
   authenticate,

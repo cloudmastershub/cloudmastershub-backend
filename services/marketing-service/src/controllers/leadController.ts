@@ -330,9 +330,10 @@ export const addTag = async (
     }
 
     const { id } = req.params;
-    const { tag } = req.body;
+    const { tags } = req.body;
 
-    const lead = await leadService.addTag(id, tag);
+    // Get the lead first
+    let lead = await leadService.getLead(id);
     if (!lead) {
       res.status(404).json({
         success: false,
@@ -341,10 +342,15 @@ export const addTag = async (
       return;
     }
 
+    // Add each tag
+    for (const tag of tags) {
+      lead = await leadService.addTag(id, tag);
+    }
+
     res.json({
       success: true,
       data: lead,
-      message: 'Tag added successfully',
+      message: `${tags.length} tag(s) added successfully`,
     });
   } catch (error) {
     next(error);
@@ -352,7 +358,54 @@ export const addTag = async (
 };
 
 /**
- * Remove tag from lead
+ * Remove multiple tags from lead
+ * DELETE /admin/leads/:id/tags
+ */
+export const removeTags = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Validation failed', details: errors.array() },
+      });
+      return;
+    }
+
+    const { id } = req.params;
+    const { tags } = req.body;
+
+    // Get the lead first
+    let lead = await leadService.getLead(id);
+    if (!lead) {
+      res.status(404).json({
+        success: false,
+        error: { message: 'Lead not found' },
+      });
+      return;
+    }
+
+    // Remove each tag
+    for (const tag of tags) {
+      lead = await leadService.removeTag(id, tag);
+    }
+
+    res.json({
+      success: true,
+      data: lead,
+      message: `${tags.length} tag(s) removed successfully`,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Remove single tag from lead (legacy)
  * DELETE /admin/leads/:id/tags/:tag
  */
 export const removeTag = async (
