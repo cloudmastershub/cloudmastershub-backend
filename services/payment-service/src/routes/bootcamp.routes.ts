@@ -9,6 +9,7 @@ import {
   getUserEnrollments,
   // Admin
   getAllBootcamps,
+  getBootcampById,
   createBootcamp,
   updateBootcamp,
   deleteBootcamp,
@@ -48,7 +49,8 @@ router.get('/enrollments/user/:userId', getUserEnrollments);
 router.use(authorize('admin'));
 
 // Bootcamp CRUD
-router.get('/admin/all', getAllBootcamps);
+router.get('/admin', getAllBootcamps);
+router.get('/admin/:id', getBootcampById);
 router.post('/admin', createBootcamp);
 router.put('/admin/:id', updateBootcamp);
 router.delete('/admin/:id', deleteBootcamp);

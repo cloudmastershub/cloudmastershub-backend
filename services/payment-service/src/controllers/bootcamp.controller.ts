@@ -373,6 +373,37 @@ export const getAllBootcamps = async (req: AuthRequest, res: Response) => {
   }
 };
 
+export const getBootcampById = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const rows = await executeQuery(
+      'SELECT * FROM bootcamps WHERE id = $1',
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Bootcamp not found'
+      });
+    }
+
+    const bootcamp = rowToBootcamp(rows[0]);
+
+    res.json({
+      success: true,
+      data: bootcamp
+    });
+  } catch (error) {
+    logger.error('Error fetching bootcamp by ID:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch bootcamp'
+    });
+  }
+};
+
 export const createBootcamp = async (req: AuthRequest, res: Response) => {
   try {
     const data = req.body as CreateBootcampRequest;

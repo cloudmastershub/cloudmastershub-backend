@@ -104,6 +104,15 @@ const serviceRoutes = {
       '^/api/webhooks': '/webhooks'
     }
   },
+  '/bootcamps': {
+    target: process.env.PAYMENT_SERVICE_URL || 'http://payment-service:3004',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/bootcamps': '/bootcamps'
+    }
+  },
   '/instructor': {
     target: process.env.COURSE_SERVICE_URL || 'http://course-service:3002',
     changeOrigin: true,
