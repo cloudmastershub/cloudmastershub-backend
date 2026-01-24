@@ -187,6 +187,15 @@ const serviceRoutes = {
       '^/api/admin/landing-pages': '/admin/landing-pages'
     }
   },
+  '/admin/content': {
+    target: process.env.ADMIN_SERVICE_URL || 'http://admin-service:3005',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/admin/content': '/admin/content'
+    }
+  },
   '/admin': {
     target: process.env.ADMIN_SERVICE_URL || 'http://admin-service:3005',
     changeOrigin: true,

@@ -70,7 +70,14 @@ export const requireAdmin = (req: AdminRequest, res: Response, next: NextFunctio
     req.adminId = decoded.userId;
     req.adminEmail = decoded.email;
     req.adminRoles = decoded.roles;
-    req.adminPermissions = decoded.permissions || [];
+    // Grant all permissions to admin users by default if not explicitly set
+    req.adminPermissions = decoded.permissions || [
+      AdminPermission.MANAGE_USERS,
+      AdminPermission.MODERATE_CONTENT,
+      AdminPermission.VIEW_ANALYTICS,
+      AdminPermission.MANAGE_SETTINGS,
+      AdminPermission.SYSTEM_ADMIN,
+    ];
 
     logger.info('Admin authenticated', {
       adminId: decoded.userId,
