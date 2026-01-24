@@ -283,7 +283,7 @@ export const getUserEnrollments = async (req: AuthRequest, res: Response) => {
     const requestingUserId = req.user?.id;
 
     // Users can only view their own enrollments unless admin
-    if (requestingUserId !== userId && !req.user?.isAdmin) {
+    if (requestingUserId !== userId && !req.user?.roles?.includes('admin')) {
       return res.status(403).json({
         success: false,
         message: 'Access denied'
