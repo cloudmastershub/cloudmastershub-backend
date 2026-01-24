@@ -3,15 +3,27 @@ export interface SubscriptionPlan {
   name: string;
   description?: string;
   price: number;
+  yearly_price?: number;
   currency: string;
-  interval: 'month' | 'year';
+  interval: 'month' | 'year' | 'lifetime';
   stripe_price_id: string;
+  stripe_price_id_yearly?: string;
   stripe_product_id?: string;
   features?: string[];
+  features_json?: {
+    features: string[];
+    limits?: {
+      lab_hours_per_month: number | null;
+      concurrent_labs: number;
+      course_downloads: boolean;
+      certificate_downloads: boolean;
+    };
+  };
   max_courses: number | null;
   max_labs: number | null;
+  max_storage_gb?: number | null;
   active: boolean;
-  tier: string;
+  tier: 'free' | 'basic' | 'premium' | 'enterprise';
   created_at: Date;
   updated_at: Date;
 }
@@ -113,6 +125,7 @@ export interface CreateCheckoutSessionRequest {
   user_id: string;
   type: 'subscription' | 'purchase';
   plan_id?: string;
+  billing_cycle?: 'monthly' | 'yearly';
   purchasable_type?: 'course' | 'learning_path';
   purchasable_id?: string;
   success_url: string;

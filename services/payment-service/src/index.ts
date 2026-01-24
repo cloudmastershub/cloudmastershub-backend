@@ -13,6 +13,7 @@ import paymentRoutes from './routes/payment.routes';
 import purchaseRoutes from './routes/purchase.routes';
 import webhookRoutes from './routes/webhook.routes';
 import healthRoutes from './routes/health.routes';
+import bootcampRoutes from './routes/bootcamp.routes';
 
 // Load environment variables
 dotenv.config();
@@ -84,6 +85,7 @@ app.use('/webhooks', webhookRoutes); // Webhooks need to be before auth middlewa
 app.use('/subscriptions', subscriptionRoutes);
 app.use('/payments', paymentRoutes);
 app.use('/purchases', purchaseRoutes);
+app.use('/bootcamps', bootcampRoutes);
 
 // Error handling middleware
 app.use(errorHandler);

@@ -26,7 +26,21 @@ export const getSubscriptionPlans = async (req: Request, res: Response) => {
 
     if (!plans) {
       plans = await executeQuery<SubscriptionPlan>(
-        'SELECT * FROM subscription_plans WHERE active = true ORDER BY price ASC'
+        `SELECT
+          id, name, description, price, yearly_price, interval, tier,
+          features_json, max_courses, max_labs, max_storage_gb,
+          stripe_price_id, stripe_price_id_yearly,
+          active, created_at, updated_at
+        FROM subscription_plans
+        WHERE active = true
+        ORDER BY
+          CASE
+            WHEN tier = 'free' THEN 1
+            WHEN tier = 'basic' THEN 2
+            WHEN tier = 'premium' THEN 3
+            WHEN tier = 'enterprise' THEN 4
+            ELSE 5
+          END`
       );
       await setCache(cacheKey, plans, 3600); // Cache for 1 hour
     }
@@ -152,13 +166,21 @@ export const createCheckoutSession = async (req: AuthRequest, res: Response) => 
       });
     }
 
-    const { type, plan_id, purchasable_type, purchasable_id, success_url, cancel_url } = body;
+    const { type, plan_id, billing_cycle, purchasable_type, purchasable_id, success_url, cancel_url } = body;
 
     // Validate request
     if (type === 'subscription' && !plan_id) {
       return res.status(400).json({
         success: false,
         message: 'plan_id is required for subscription checkout'
+      });
+    }
+
+    // Validate billing_cycle if provided
+    if (billing_cycle && !['monthly', 'yearly'].includes(billing_cycle)) {
+      return res.status(400).json({
+        success: false,
+        message: 'billing_cycle must be "monthly" or "yearly"'
       });
     }
 
@@ -189,7 +211,23 @@ export const createCheckoutSession = async (req: AuthRequest, res: Response) => 
         });
       }
 
-      stripe_price_id = plans[0].stripe_price_id;
+      const plan = plans[0];
+
+      // Use yearly price if billing_cycle is yearly
+      if (billing_cycle === 'yearly') {
+        if (!plan.stripe_price_id_yearly) {
+          return res.status(400).json({
+            success: false,
+            message: 'This plan does not have a yearly billing option'
+          });
+        }
+        stripe_price_id = plan.stripe_price_id_yearly;
+        metadata.billing_cycle = 'yearly';
+      } else {
+        stripe_price_id = plan.stripe_price_id;
+        metadata.billing_cycle = 'monthly';
+      }
+
       metadata.plan_id = plan_id!;
     } else if (type === 'purchase') {
       // Handle individual purchase

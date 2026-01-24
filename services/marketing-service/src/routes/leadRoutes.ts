@@ -263,7 +263,37 @@ const mergeLeadsValidation = [
 ];
 
 // ==========================================
-// Lead Routes
+// PUBLIC Lead Routes (no authentication)
+// ==========================================
+
+// Capture bootcamp interest - PUBLIC endpoint for curriculum downloads
+const bootcampInterestValidation = [
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Valid email is required'),
+  body('bootcamp_slug')
+    .notEmpty()
+    .isLength({ max: 100 })
+    .withMessage('Bootcamp slug is required'),
+  body('firstName')
+    .optional()
+    .isLength({ max: 100 })
+    .withMessage('First name must be less than 100 characters'),
+  body('lastName')
+    .optional()
+    .isLength({ max: 100 })
+    .withMessage('Last name must be less than 100 characters'),
+];
+
+router.post(
+  '/bootcamp-interest',
+  bootcampInterestValidation,
+  leadController.captureBootcampInterest
+);
+
+// ==========================================
+// Protected Lead Routes
 // ==========================================
 
 // Get lead statistics (must be before /:id route)

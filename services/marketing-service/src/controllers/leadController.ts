@@ -617,6 +617,135 @@ export const mergeLeads = async (
   }
 };
 
+/**
+ * Capture bootcamp interest lead (PUBLIC - no auth required)
+ * POST /leads/bootcamp-interest
+ *
+ * This endpoint is for the public bootcamps page to capture leads
+ * who want to download curriculum information.
+ */
+export const captureBootcampInterest = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { email, firstName, lastName, bootcamp_slug } = req.body;
+
+    // Validate required fields
+    if (!email || !bootcamp_slug) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Email and bootcamp_slug are required' },
+      });
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Invalid email format' },
+      });
+      return;
+    }
+
+    // Try to find existing lead
+    const Lead = (await import('../models/Lead')).default;
+    let lead = await Lead.findOne({ email: email.toLowerCase().trim() });
+
+    if (lead) {
+      // Update existing lead with bootcamp interest
+      if (!lead.tags.includes('bootcamp_interest')) {
+        lead.tags.push('bootcamp_interest');
+      }
+      if (!lead.tags.includes(`bootcamp_${bootcamp_slug}`)) {
+        lead.tags.push(`bootcamp_${bootcamp_slug}`);
+      }
+      if (!lead.tags.includes('curriculum_download')) {
+        lead.tags.push('curriculum_download');
+      }
+
+      // Update name if provided and not already set
+      if (firstName && !lead.firstName) {
+        lead.firstName = firstName;
+      }
+      if (lastName && !lead.lastName) {
+        lead.lastName = lastName;
+      }
+
+      // Record curriculum download activity
+      lead.recordActivity('download', {
+        type: 'curriculum',
+        bootcamp: bootcamp_slug,
+        timestamp: new Date().toISOString()
+      });
+
+      await lead.save();
+
+      logger.info('Updated existing lead with bootcamp interest', {
+        email,
+        bootcamp_slug,
+        leadId: lead._id.toString()
+      });
+    } else {
+      // Create new lead
+      lead = await leadService.createLead({
+        email: email.toLowerCase().trim(),
+        firstName,
+        lastName,
+        source: {
+          type: LeadSource.LANDING_PAGE,
+          landingPageId: `/bootcamps/${bootcamp_slug}`,
+        },
+        tags: ['bootcamp_interest', `bootcamp_${bootcamp_slug}`, 'curriculum_download'],
+        emailConsent: true,
+      });
+
+      // Record curriculum download activity
+      lead.recordActivity('download', {
+        type: 'curriculum',
+        bootcamp: bootcamp_slug,
+        timestamp: new Date().toISOString()
+      });
+      await lead.save();
+
+      logger.info('Created new lead from bootcamp interest', {
+        email,
+        bootcamp_slug,
+        leadId: lead._id.toString()
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Thank you for your interest! Check your email for the curriculum.',
+      data: {
+        lead_id: lead._id.toString(),
+        bootcamp: bootcamp_slug
+      }
+    });
+  } catch (error: any) {
+    logger.error('Error capturing bootcamp interest:', {
+      error: error.message,
+      stack: error.stack
+    });
+
+    // Handle duplicate email error gracefully
+    if (error.message?.includes('already exists')) {
+      res.status(200).json({
+        success: true,
+        message: 'Thank you for your interest! Check your email for the curriculum.',
+        data: { bootcamp: req.body.bootcamp_slug }
+      });
+      return;
+    }
+
+    next(error);
+  }
+};
+
 export default {
   createLead,
   getLead,
@@ -633,4 +762,5 @@ export default {
   importLeads,
   exportLeads,
   mergeLeads,
+  captureBootcampInterest,
 };

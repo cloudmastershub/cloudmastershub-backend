@@ -156,6 +156,10 @@ const handleCheckoutSessionCompleted = async (event: Stripe.Event) => {
           timestamp: new Date().toISOString()
         });
 
+      } else if (type === 'bootcamp') {
+        // Handle bootcamp enrollment
+        await handleBootcampCheckout(client, session, metadata);
+
       } else if (type === 'purchase') {
         // Handle individual purchase
         const purchasableType = metadata?.purchasable_type;
@@ -232,8 +236,16 @@ const handleCheckoutSessionCompleted = async (event: Stripe.Event) => {
 const handleInvoicePaymentSucceeded = async (event: Stripe.Event) => {
   try {
     const invoice = event.data.object as Stripe.Invoice;
-    
+
     await executeTransaction(async (client: PoolClient) => {
+      // Check if this is a bootcamp installment payment
+      if (invoice.subscription) {
+        const isBootcampPayment = await handleBootcampInstallmentPayment(client, invoice);
+        if (isBootcampPayment) {
+          return; // Bootcamp payment handled, skip regular subscription processing
+        }
+      }
+
       // Update or create invoice record
       await client.query(`
         INSERT INTO invoices (
@@ -601,6 +613,323 @@ const handlePaymentIntentFailed = async (event: Stripe.Event) => {
     throw error;
   }
 };
+
+// ============================================================================
+// BOOTCAMP HANDLERS
+// ============================================================================
+
+async function handleBootcampCheckout(
+  client: PoolClient,
+  session: Stripe.Checkout.Session,
+  metadata: Stripe.Metadata
+) {
+  const userId = metadata.user_id;
+  const bootcampId = metadata.bootcamp_id;
+  const paymentType = metadata.payment_type as 'full' | 'installment';
+  const scheduleId = metadata.schedule_id;
+
+  if (!userId || !bootcampId) {
+    throw new Error('Missing bootcamp metadata: user_id or bootcamp_id');
+  }
+
+  // Get bootcamp details
+  const bootcampResult = await client.query(`
+    SELECT * FROM bootcamps WHERE id = $1
+  `, [bootcampId]);
+
+  if (bootcampResult.rows.length === 0) {
+    throw new Error(`Bootcamp not found: ${bootcampId}`);
+  }
+
+  const bootcamp = bootcampResult.rows[0];
+
+  if (paymentType === 'full') {
+    // Full payment - create enrollment with active status
+    const amountTotal = parseFloat(bootcamp.price_full_discounted);
+
+    const enrollmentResult = await client.query(`
+      INSERT INTO bootcamp_enrollments (
+        user_id, bootcamp_id, payment_type, payment_method,
+        amount_paid, amount_total, installments_paid,
+        stripe_payment_intent_id, benefits_unlocked,
+        status, enrolled_at
+      ) VALUES ($1, $2, 'full', 'stripe', $3, $4, 1, $5, $6, 'active', NOW())
+      ON CONFLICT (user_id, bootcamp_id) WHERE status IN ('pending', 'active')
+      DO UPDATE SET
+        amount_paid = EXCLUDED.amount_paid,
+        status = 'active',
+        enrolled_at = NOW(),
+        stripe_payment_intent_id = EXCLUDED.stripe_payment_intent_id,
+        updated_at = NOW()
+      RETURNING id
+    `, [
+      userId,
+      bootcampId,
+      amountTotal,
+      amountTotal,
+      session.payment_intent,
+      JSON.stringify([...bootcamp.core_benefits || [], ...bootcamp.pay_in_full_benefits || []])
+    ]);
+
+    const enrollmentId = enrollmentResult.rows[0].id;
+
+    // Create payment record
+    await client.query(`
+      INSERT INTO payments (
+        user_id, amount, currency, status,
+        payment_method, stripe_payment_intent_id, processed_at,
+        metadata_json
+      ) VALUES ($1, $2, $3, 'succeeded', $4, $5, NOW(), $6)
+    `, [
+      userId,
+      session.amount_total! / 100,
+      session.currency,
+      session.payment_method_types?.[0],
+      session.payment_intent,
+      JSON.stringify({
+        type: 'bootcamp_enrollment',
+        bootcamp_id: bootcampId,
+        enrollment_id: enrollmentId,
+        payment_type: 'full'
+      })
+    ]);
+
+    // Grant bootcamp access
+    await grantBootcampAccess(client, userId, bootcampId, enrollmentId, bootcamp.includes_premium_access);
+
+    // Publish event
+    await publishEvent('bootcamp.enrolled', {
+      user_id: userId,
+      bootcamp_id: bootcampId,
+      enrollment_id: enrollmentId,
+      payment_type: 'full',
+      timestamp: new Date().toISOString()
+    });
+
+    logger.info('Bootcamp full payment enrollment completed', {
+      userId,
+      bootcampId,
+      enrollmentId
+    });
+
+  } else if (paymentType === 'installment') {
+    // Installment payment - create enrollment with first installment
+    const installmentAmount = parseFloat(bootcamp.installment_amount);
+    const installmentTotal = parseFloat(bootcamp.price_installment_total);
+
+    // Get first installment benefits
+    const unlockSchedule = bootcamp.installment_unlock_schedule || {};
+    const firstInstallmentBenefits = unlockSchedule['1'] || [];
+
+    const enrollmentResult = await client.query(`
+      INSERT INTO bootcamp_enrollments (
+        user_id, bootcamp_id, payment_type, payment_method,
+        amount_paid, amount_total, installments_paid,
+        stripe_subscription_id, stripe_schedule_id,
+        benefits_unlocked, status, enrolled_at,
+        next_installment_due
+      ) VALUES ($1, $2, 'installment', 'stripe', $3, $4, 1, $5, $6, $7, 'active', NOW(), $8)
+      ON CONFLICT (user_id, bootcamp_id) WHERE status IN ('pending', 'active')
+      DO UPDATE SET
+        amount_paid = EXCLUDED.amount_paid,
+        installments_paid = 1,
+        status = 'active',
+        enrolled_at = NOW(),
+        stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+        stripe_schedule_id = EXCLUDED.stripe_schedule_id,
+        next_installment_due = EXCLUDED.next_installment_due,
+        updated_at = NOW()
+      RETURNING id
+    `, [
+      userId,
+      bootcampId,
+      installmentAmount,
+      installmentTotal,
+      session.subscription,
+      scheduleId,
+      JSON.stringify(firstInstallmentBenefits),
+      new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days from now
+    ]);
+
+    const enrollmentId = enrollmentResult.rows[0].id;
+
+    // Create payment record
+    await client.query(`
+      INSERT INTO payments (
+        user_id, amount, currency, status,
+        payment_method, stripe_payment_intent_id, processed_at,
+        metadata_json
+      ) VALUES ($1, $2, $3, 'succeeded', $4, $5, NOW(), $6)
+    `, [
+      userId,
+      session.amount_total! / 100,
+      session.currency,
+      session.payment_method_types?.[0],
+      session.payment_intent,
+      JSON.stringify({
+        type: 'bootcamp_installment',
+        bootcamp_id: bootcampId,
+        enrollment_id: enrollmentId,
+        installment_number: 1,
+        total_installments: bootcamp.installment_count
+      })
+    ]);
+
+    // Grant partial bootcamp access
+    await grantBootcampAccess(client, userId, bootcampId, enrollmentId, bootcamp.includes_premium_access);
+
+    // Publish event
+    await publishEvent('bootcamp.enrolled', {
+      user_id: userId,
+      bootcamp_id: bootcampId,
+      enrollment_id: enrollmentId,
+      payment_type: 'installment',
+      installment_number: 1,
+      timestamp: new Date().toISOString()
+    });
+
+    logger.info('Bootcamp installment enrollment started', {
+      userId,
+      bootcampId,
+      enrollmentId,
+      installmentPaid: 1
+    });
+  }
+}
+
+// Handle bootcamp installment payment
+async function handleBootcampInstallmentPayment(
+  client: PoolClient,
+  invoice: Stripe.Invoice
+) {
+  const subscriptionId = invoice.subscription as string;
+
+  // Find enrollment by subscription ID
+  const enrollmentResult = await client.query(`
+    SELECT be.*, b.installment_unlock_schedule, b.installment_count
+    FROM bootcamp_enrollments be
+    JOIN bootcamps b ON be.bootcamp_id = b.id
+    WHERE be.stripe_subscription_id = $1
+  `, [subscriptionId]);
+
+  if (enrollmentResult.rows.length === 0) {
+    // Not a bootcamp subscription
+    return false;
+  }
+
+  const enrollment = enrollmentResult.rows[0];
+  const newInstallmentCount = enrollment.installments_paid + 1;
+  const installmentTotal = enrollment.installment_count;
+
+  // Get newly unlocked benefits
+  const unlockSchedule = enrollment.installment_unlock_schedule || {};
+  const newBenefits = unlockSchedule[newInstallmentCount.toString()] || [];
+  const existingBenefits = enrollment.benefits_unlocked || [];
+  const allBenefits = [...existingBenefits, ...newBenefits];
+
+  // Check if this completes the enrollment
+  const isComplete = newInstallmentCount >= installmentTotal;
+
+  await client.query(`
+    UPDATE bootcamp_enrollments
+    SET
+      amount_paid = amount_paid + $1,
+      installments_paid = $2,
+      benefits_unlocked = $3,
+      status = $4,
+      completed_at = $5,
+      next_installment_due = $6,
+      updated_at = NOW()
+    WHERE id = $7
+  `, [
+    invoice.amount_paid / 100,
+    newInstallmentCount,
+    JSON.stringify(allBenefits),
+    isComplete ? 'completed' : 'active',
+    isComplete ? new Date() : null,
+    isComplete ? null : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    enrollment.id
+  ]);
+
+  // Create payment record
+  await client.query(`
+    INSERT INTO payments (
+      user_id, amount, currency, status,
+      stripe_invoice_id, processed_at,
+      metadata_json
+    ) VALUES ($1, $2, $3, 'succeeded', $4, NOW(), $5)
+  `, [
+    enrollment.user_id,
+    invoice.amount_paid / 100,
+    invoice.currency,
+    invoice.id,
+    JSON.stringify({
+      type: 'bootcamp_installment',
+      bootcamp_id: enrollment.bootcamp_id,
+      enrollment_id: enrollment.id,
+      installment_number: newInstallmentCount,
+      total_installments: installmentTotal
+    })
+  ]);
+
+  // Publish event
+  await publishEvent('bootcamp.installment_paid', {
+    user_id: enrollment.user_id,
+    bootcamp_id: enrollment.bootcamp_id,
+    enrollment_id: enrollment.id,
+    installment_number: newInstallmentCount,
+    is_complete: isComplete,
+    timestamp: new Date().toISOString()
+  });
+
+  logger.info('Bootcamp installment payment processed', {
+    enrollmentId: enrollment.id,
+    installmentNumber: newInstallmentCount,
+    isComplete
+  });
+
+  return true;
+}
+
+// Grant bootcamp access to user
+async function grantBootcampAccess(
+  client: PoolClient,
+  userId: string,
+  bootcampId: string,
+  enrollmentId: string,
+  includesPremiumAccess: boolean
+) {
+  // Grant bootcamp-specific access
+  await client.query(`
+    INSERT INTO user_access (
+      user_id, access_type, access_id, resource_type,
+      resource_id, source, granted_at
+    ) VALUES ($1, 'bootcamp', $2, 'bootcamp', $3, 'bootcamp_enrollment', NOW())
+    ON CONFLICT DO NOTHING
+  `, [userId, enrollmentId, bootcampId]);
+
+  // Grant premium access if bootcamp includes it
+  if (includesPremiumAccess) {
+    await client.query(`
+      INSERT INTO user_access (
+        user_id, access_type, access_id, resource_type,
+        source, granted_at
+      ) VALUES ($1, 'bootcamp', $2, 'platform', 'bootcamp_premium', NOW())
+      ON CONFLICT DO NOTHING
+    `, [userId, enrollmentId]);
+  }
+
+  logger.info('Bootcamp access granted', {
+    userId,
+    bootcampId,
+    enrollmentId,
+    includesPremiumAccess
+  });
+}
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
 
 // Helper functions for access control
 async function grantUserAccess(
