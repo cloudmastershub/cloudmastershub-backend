@@ -690,8 +690,8 @@ export const captureBootcampInterest = async (
         leadId: lead._id.toString()
       });
     } else {
-      // Create new lead
-      lead = await leadService.createLead({
+      // Create new lead using Lead model directly to maintain type consistency
+      lead = new Lead({
         email: email.toLowerCase().trim(),
         firstName,
         lastName,
@@ -701,6 +701,11 @@ export const captureBootcampInterest = async (
         },
         tags: ['bootcamp_interest', `bootcamp_${bootcamp_slug}`, 'curriculum_download'],
         emailConsent: true,
+        emailConsentAt: new Date(),
+        status: 'new',
+        score: 0,
+        scoreLevel: 'cold',
+        capturedAt: new Date(),
       });
 
       // Record curriculum download activity
@@ -718,11 +723,14 @@ export const captureBootcampInterest = async (
       });
     }
 
+    // At this point lead is guaranteed to be non-null
+    const leadId = lead._id.toString();
+
     res.status(200).json({
       success: true,
       message: 'Thank you for your interest! Check your email for the curriculum.',
       data: {
-        lead_id: lead._id.toString(),
+        lead_id: leadId,
         bootcamp: bootcamp_slug
       }
     });
