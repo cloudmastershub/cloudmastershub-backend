@@ -138,18 +138,58 @@ export const getProgress = async (
       return;
     }
 
-    // For now, return empty progress until this is implemented with database
-    // This will need to query the CourseProgress collection
-    logger.warn(`Progress tracking not yet implemented for user ${userId}`);
-    
-    res.status(501).json({
-      success: false,
-      message: 'Progress tracking not yet implemented',
-      error: {
-        code: 'NOT_IMPLEMENTED',
-        details: 'User progress tracking will be available in a future update'
-      }
-    });
+    logger.info(`Fetching progress for user ${userId}`);
+
+    // Call the course service to get user's progress
+    try {
+      const courseServiceUrl = process.env.COURSE_SERVICE_URL || 'http://course-service:3002';
+      const response = await axios.get(`${courseServiceUrl}/progress/user/${userId}`, {
+        headers: {
+          'x-user-id': userId,
+          'x-internal-service': 'true'
+        },
+        timeout: 10000
+      });
+
+      res.json({
+        success: true,
+        data: response.data.data || {
+          userId,
+          enrolledCourses: [],
+          totalWatchTime: 0,
+          overallProgress: 0,
+          coursesCompleted: 0,
+          coursesEnrolled: 0,
+          streak: 0,
+          certificationsEarned: 0,
+          labsCompleted: 0,
+          pointsEarned: 0
+        }
+      });
+    } catch (courseServiceError: any) {
+      logger.error('Error fetching progress from course service:', {
+        message: courseServiceError.message,
+        status: courseServiceError.response?.status,
+        data: courseServiceError.response?.data
+      });
+
+      // Return default progress if course service is unavailable
+      res.json({
+        success: true,
+        data: {
+          userId,
+          enrolledCourses: [],
+          totalWatchTime: 0,
+          overallProgress: 0,
+          coursesCompleted: 0,
+          coursesEnrolled: 0,
+          streak: 0,
+          certificationsEarned: 0,
+          labsCompleted: 0,
+          pointsEarned: 0
+        }
+      });
+    }
   } catch (error) {
     logger.error('Error in getProgress:', error);
     next(error);

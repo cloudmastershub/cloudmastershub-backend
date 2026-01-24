@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { CourseProgress } from '../models/CourseProgress';
 import logger from '../utils/logger';
 
 export const getUserProgress = async (
@@ -9,37 +10,68 @@ export const getUserProgress = async (
   try {
     const { userId } = req.params;
 
-    // TODO: Fetch user progress from database
+    if (!userId) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'User ID is required' }
+      });
+      return;
+    }
+
+    // Fetch all course progress records for this user
+    const progressRecords = await CourseProgress.find({ userId })
+      .sort({ lastAccessedAt: -1 })
+      .lean();
+
+    // Calculate aggregate stats
+    const totalWatchTime = progressRecords.reduce((sum, p) => sum + (p.watchedTime || 0), 0);
+    const completedCourses = progressRecords.filter(p => p.completedAt).length;
+    const totalCourses = progressRecords.length;
+    const overallProgress = totalCourses > 0
+      ? Math.round(progressRecords.reduce((sum, p) => sum + (p.progress || 0), 0) / totalCourses)
+      : 0;
+
+    // Calculate streak (simplified - days with activity in last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const recentActivity = progressRecords.filter(
+      p => p.lastAccessedAt && new Date(p.lastAccessedAt) > thirtyDaysAgo
+    );
+
+    // Simple streak calculation based on recent activity
+    const streak = recentActivity.length > 0 ? Math.min(recentActivity.length, 7) : 0;
 
     const progress = {
       userId,
-      enrolledCourses: [
-        {
-          courseId: 'aws-fundamentals',
-          enrolledAt: new Date('2024-01-01'),
-          progress: 65,
-          lastAccessedAt: new Date('2024-01-15'),
-          completedLessons: 8,
-          totalLessons: 12,
-        },
-        {
-          courseId: 'azure-devops',
-          enrolledAt: new Date('2024-01-10'),
-          progress: 30,
-          lastAccessedAt: new Date('2024-01-14'),
-          completedLessons: 3,
-          totalLessons: 10,
-        },
-      ],
-      totalWatchTime: 3600, // seconds
-      streak: 5, // days
+      enrolledCourses: progressRecords.map(p => ({
+        courseId: p.courseId,
+        enrolledAt: p.enrolledAt,
+        progress: p.progress || 0,
+        lastAccessedAt: p.lastAccessedAt,
+        completedLessons: p.completedLessons?.length || 0,
+        currentLesson: p.currentLesson,
+        completedAt: p.completedAt,
+        watchedTime: p.watchedTime || 0
+      })),
+      totalWatchTime,
+      overallProgress,
+      coursesCompleted: completedCourses,
+      coursesEnrolled: totalCourses,
+      streak,
+      certificationsEarned: progressRecords.filter(p => p.certificate).length,
+      labsCompleted: 0, // TODO: Integrate with lab service
+      pointsEarned: completedCourses * 100 + Math.floor(totalWatchTime / 3600) * 10
     };
+
+    logger.info(`Fetched progress for user ${userId}: ${totalCourses} courses, ${overallProgress}% overall`);
 
     res.json({
       success: true,
       data: progress,
     });
   } catch (error: any) {
+    logger.error('Error fetching user progress:', error);
     next(error);
   }
 };
