@@ -21,6 +21,9 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3004;
 
+// Trust proxy for Kubernetes/nginx ingress (required for rate limiting behind proxy)
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet());
 
