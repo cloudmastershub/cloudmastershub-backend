@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { logger } from '@cloudmastershub/utils';
 import { AuthRequest } from '@cloudmastershub/types';
 import { executeQuery, executeTransaction } from '../services/database.service';
+import { convertToUuid } from '../utils/userIdConverter';
 import { setCache, getCache, deleteCache } from '../services/redis.service';
 import { 
   createCheckoutSession as createStripeCheckoutSession, 
@@ -106,13 +107,13 @@ export const getSubscriptionStatus = async (req: Request, res: Response) => {
          JOIN subscription_plans sp ON s.plan_id = sp.id 
          WHERE s.user_id = $1 AND s.status IN ('active', 'trialing')
          ORDER BY s.created_at DESC LIMIT 1`,
-        [userId]
+        [convertToUuid(userId)]
       );
 
       // Get purchases
       const purchases = await executeQuery(
         'SELECT * FROM purchases WHERE user_id = $1 AND status = $2 ORDER BY created_at DESC',
-        [userId, 'completed']
+        [convertToUuid(userId), 'completed']
       );
 
       // Get access records
@@ -121,7 +122,7 @@ export const getSubscriptionStatus = async (req: Request, res: Response) => {
          WHERE user_id = $1 
          AND revoked_at IS NULL
          AND (expires_at IS NULL OR expires_at > NOW())`,
-        [userId]
+        [convertToUuid(userId)]
       );
 
       status = {
@@ -249,7 +250,7 @@ export const createCheckoutSession = async (req: AuthRequest, res: Response) => 
     // First check our mapping table
     const mappingResults = await executeQuery<{stripe_customer_id: string}>(
       'SELECT stripe_customer_id FROM user_stripe_mapping WHERE user_id = $1',
-      [userId]
+      [convertToUuid(userId)]
     );
 
     let stripeCustomerId: string;
@@ -271,7 +272,7 @@ export const createCheckoutSession = async (req: AuthRequest, res: Response) => 
       // Store in our mapping table
       await executeQuery(
         'INSERT INTO user_stripe_mapping (user_id, stripe_customer_id) VALUES ($1, $2)',
-        [userId, stripeCustomerId]
+        [convertToUuid(userId), stripeCustomerId]
       );
     }
 
@@ -333,7 +334,7 @@ export const createSubscription = async (req: AuthRequest, res: Response) => {
     // Check if user already has active subscription
     const existingSubscriptions = await executeQuery(
       'SELECT * FROM subscriptions WHERE user_id = $1 AND status IN ($2, $3)',
-      [userId, 'active', 'trialing']
+      [convertToUuid(userId), 'active', 'trialing']
     );
 
     if (existingSubscriptions.length > 0) {
@@ -346,7 +347,7 @@ export const createSubscription = async (req: AuthRequest, res: Response) => {
     // Get or create Stripe customer
     const mappingResults = await executeQuery<{stripe_customer_id: string}>(
       'SELECT stripe_customer_id FROM user_stripe_mapping WHERE user_id = $1',
-      [userId]
+      [convertToUuid(userId)]
     );
 
     let stripeCustomerId: string;
@@ -366,7 +367,7 @@ export const createSubscription = async (req: AuthRequest, res: Response) => {
       
       await executeQuery(
         'INSERT INTO user_stripe_mapping (user_id, stripe_customer_id) VALUES ($1, $2)',
-        [userId, stripeCustomerId]
+        [convertToUuid(userId), stripeCustomerId]
       );
     }
 
@@ -461,7 +462,7 @@ export const cancelSubscription = async (req: AuthRequest, res: Response) => {
         AND access_type = 'subscription' 
         AND access_id = $2
         AND revoked_at IS NULL
-      `, [userId, subscriptionId]);
+      `, [convertToUuid(userId), subscriptionId]);
 
       // Clear cache
       await deleteCache(`subscription_status:${userId}`);

@@ -3,6 +3,7 @@ import { logger } from '@cloudmastershub/utils';
 import { constructWebhookEvent, getStripe } from '../services/stripe.service';
 import { publishEvent } from '../services/redis.service';
 import { executeTransaction, executeQuery } from '../services/database.service';
+import { convertToUuid } from '../utils/userIdConverter';
 import { PoolClient } from 'pg';
 import Stripe from 'stripe';
 
@@ -906,7 +907,7 @@ async function grantBootcampAccess(
       resource_id, source, granted_at
     ) VALUES ($1, 'bootcamp', $2, 'bootcamp', $3, 'bootcamp_enrollment', NOW())
     ON CONFLICT DO NOTHING
-  `, [userId, enrollmentId, bootcampId]);
+  `, [convertToUuid(userId), enrollmentId, bootcampId]);
 
   // Grant premium access if bootcamp includes it
   if (includesPremiumAccess) {
@@ -916,7 +917,7 @@ async function grantBootcampAccess(
         source, granted_at
       ) VALUES ($1, 'bootcamp', $2, 'platform', 'bootcamp_premium', NOW())
       ON CONFLICT DO NOTHING
-    `, [userId, enrollmentId]);
+    `, [convertToUuid(userId), enrollmentId]);
   }
 
   logger.info('Bootcamp access granted', {
@@ -946,11 +947,11 @@ async function grantUserAccess(
       resource_id, source, granted_at
     ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
     ON CONFLICT (user_id, access_type, access_id, resource_type, COALESCE(resource_id, '00000000-0000-0000-0000-000000000000'))
-    DO UPDATE SET 
+    DO UPDATE SET
       revoked_at = NULL,
       updated_at = NOW()
   `, [
-    userId,
+    convertToUuid(userId),
     accessType,
     accessId,
     resourceType,
@@ -981,7 +982,7 @@ async function revokeUserAccess(
     AND access_type = $2 
     AND access_id = $3
     AND revoked_at IS NULL
-  `, [userId, accessType, accessId]);
+  `, [convertToUuid(userId), accessType, accessId]);
 
   logger.info('User access revoked', {
     userId,

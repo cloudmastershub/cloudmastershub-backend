@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { logger } from '@cloudmastershub/utils';
 import { AuthRequest, CreatePurchaseRequest } from '@cloudmastershub/types';
 import { executeQuery, executeTransaction } from '../services/database.service';
+import { convertToUuid } from '../utils/userIdConverter';
 import { getStripe, createCheckoutSession } from '../services/stripe.service';
 import { PoolClient } from 'pg';
 
@@ -43,7 +44,7 @@ export const createPurchase = async (req: AuthRequest, res: Response) => {
         AND purchasable_type = $2 
         AND purchasable_id = $3 
         AND status = 'completed'
-      `, [userId, purchasable_type, purchasable_id]);
+      `, [convertToUuid(userId), purchasable_type, purchasable_id]);
 
       if (existingPurchases.rows.length > 0) {
         return res.status(400).json({
@@ -60,7 +61,7 @@ export const createPurchase = async (req: AuthRequest, res: Response) => {
         WHERE s.user_id = $1 
         AND s.status IN ('active', 'trialing')
         AND (s.expires_at IS NULL OR s.expires_at > NOW())
-      `, [userId]);
+      `, [convertToUuid(userId)]);
 
       if (activeSubscriptions.rows.length > 0) {
         return res.status(400).json({
@@ -72,7 +73,7 @@ export const createPurchase = async (req: AuthRequest, res: Response) => {
       // Get or create Stripe customer
       const mappingResults = await client.query(
         'SELECT stripe_customer_id FROM user_stripe_mapping WHERE user_id = $1',
-        [userId]
+        [convertToUuid(userId)]
       );
 
       let stripeCustomerId: string;
@@ -189,7 +190,7 @@ export const getPurchaseHistory = async (req: AuthRequest, res: Response) => {
       )
       WHERE p.user_id = $1
       ORDER BY p.created_at DESC
-    `, [userId]);
+    `, [convertToUuid(userId)]);
 
     res.json({
       success: true,
@@ -373,7 +374,7 @@ export const refundPurchase = async (req: AuthRequest, res: Response) => {
         AND access_type = 'purchase' 
         AND access_id = $2
         AND revoked_at IS NULL
-      `, [userId, purchaseId]);
+      `, [convertToUuid(userId), purchaseId]);
 
       res.json({
         success: true,

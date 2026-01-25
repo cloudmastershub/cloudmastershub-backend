@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { logger } from '@cloudmastershub/utils';
 import { AuthRequest } from '@cloudmastershub/types';
 import { executeQuery, executeTransaction } from '../services/database.service';
+import { convertToUuid } from '../utils/userIdConverter';
 import { setCache, getCache, deleteCache } from '../services/redis.service';
 import { getStripe, createCustomer, createCheckoutSession as createStripeCheckoutSession } from '../services/stripe.service';
 import {
@@ -137,7 +138,7 @@ export const createBootcampCheckout = async (req: AuthRequest, res: Response) =>
     const existingEnrollments = await executeQuery(
       `SELECT * FROM bootcamp_enrollments
        WHERE user_id = $1 AND bootcamp_id = $2 AND status IN ('pending', 'active')`,
-      [userId, bootcamp_id]
+      [convertToUuid(userId), bootcamp_id]
     );
 
     if (existingEnrollments.length > 0) {
@@ -150,7 +151,7 @@ export const createBootcampCheckout = async (req: AuthRequest, res: Response) =>
     // Get or create Stripe customer
     const mappingResults = await executeQuery<{ stripe_customer_id: string }>(
       'SELECT stripe_customer_id FROM user_stripe_mapping WHERE user_id = $1',
-      [userId]
+      [convertToUuid(userId)]
     );
 
     let stripeCustomerId: string;
@@ -166,7 +167,7 @@ export const createBootcampCheckout = async (req: AuthRequest, res: Response) =>
       stripeCustomerId = customer.id;
       await executeQuery(
         'INSERT INTO user_stripe_mapping (user_id, stripe_customer_id) VALUES ($1, $2)',
-        [userId, stripeCustomerId]
+        [convertToUuid(userId), stripeCustomerId]
       );
     }
 
@@ -307,7 +308,7 @@ export const getUserEnrollments = async (req: AuthRequest, res: Response) => {
          JOIN bootcamps b ON be.bootcamp_id = b.id
          WHERE be.user_id = $1
          ORDER BY be.created_at DESC`,
-        [userId]
+        [convertToUuid(userId)]
       );
 
       enrollments = rows.map(row => ({
@@ -887,7 +888,7 @@ async function grantBootcampAccess(userId: string, bootcampId: string, enrollmen
     ON CONFLICT (user_id, access_type, access_id, resource_type, resource_id)
     WHERE revoked_at IS NULL
     DO NOTHING`,
-    [userId, enrollmentId, bootcampId]
+    [convertToUuid(userId), enrollmentId, bootcampId]
   );
 
   // Also grant premium access if bootcamp includes it
@@ -904,12 +905,12 @@ async function grantBootcampAccess(userId: string, bootcampId: string, enrollmen
       ON CONFLICT (user_id, access_type, access_id, resource_type, resource_id)
       WHERE revoked_at IS NULL
       DO NOTHING`,
-      [userId, enrollmentId]
+      [convertToUuid(userId), enrollmentId]
     );
   }
 
   // Clear subscription status cache to reflect new access
-  await deleteCache(`subscription_status:${userId}`);
+  await deleteCache(`subscription_status:${convertToUuid(userId)}`);
 }
 
 async function revokeBootcampAccess(userId: string, enrollmentId: string) {
@@ -918,11 +919,11 @@ async function revokeBootcampAccess(userId: string, enrollmentId: string) {
      SET revoked_at = NOW(), updated_at = NOW()
      WHERE user_id = $1 AND access_id = $2 AND access_type = 'bootcamp'
      AND revoked_at IS NULL`,
-    [userId, enrollmentId]
+    [convertToUuid(userId), enrollmentId]
   );
 
   // Clear subscription status cache
-  await deleteCache(`subscription_status:${userId}`);
+  await deleteCache(`subscription_status:${convertToUuid(userId)}`);
 }
 
 // Export for webhook handler

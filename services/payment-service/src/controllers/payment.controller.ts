@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { logger } from '@cloudmastershub/utils';
 import { AuthRequest } from '@cloudmastershub/types';
 import { executeQuery, executeTransaction } from '../services/database.service';
+import { convertToUuid } from '../utils/userIdConverter';
 import { getStripe } from '../services/stripe.service';
 import { PoolClient } from 'pg';
 import Stripe from 'stripe';
@@ -34,7 +35,7 @@ export const getPaymentHistory = async (req: AuthRequest, res: Response) => {
       WHERE p.user_id = $1
       ORDER BY p.created_at DESC
       LIMIT 50
-    `, [userId]);
+    `, [convertToUuid(userId)]);
 
     res.json({
       success: true,
@@ -76,7 +77,7 @@ export const getPaymentMethods = async (req: AuthRequest, res: Response) => {
       FROM payment_methods 
       WHERE user_id = $1 AND active = true
       ORDER BY is_default DESC, created_at DESC
-    `, [userId]);
+    `, [convertToUuid(userId)]);
 
     res.json({
       success: true,
@@ -114,7 +115,7 @@ export const addPaymentMethod = async (req: AuthRequest, res: Response) => {
       // Get or create Stripe customer
       const mappingResults = await client.query(
         'SELECT stripe_customer_id FROM user_stripe_mapping WHERE user_id = $1',
-        [userId]
+        [convertToUuid(userId)]
       );
 
       let stripeCustomerId: string;
@@ -242,7 +243,7 @@ export const removePaymentMethod = async (req: AuthRequest, res: Response) => {
       if (paymentMethod.is_default) {
         await client.query(
           'UPDATE payment_methods SET is_default = false WHERE user_id = $1',
-          [userId]
+          [convertToUuid(userId)]
         );
       }
 
@@ -296,7 +297,7 @@ export const setDefaultPaymentMethod = async (req: AuthRequest, res: Response) =
       // Get Stripe customer ID
       const mappingResults = await client.query(
         'SELECT stripe_customer_id FROM user_stripe_mapping WHERE user_id = $1',
-        [userId]
+        [convertToUuid(userId)]
       );
 
       if (mappingResults.rows.length === 0) {
@@ -316,7 +317,7 @@ export const setDefaultPaymentMethod = async (req: AuthRequest, res: Response) =
       // Unset all other default payment methods for this user
       await client.query(
         'UPDATE payment_methods SET is_default = false WHERE user_id = $1',
-        [userId]
+        [convertToUuid(userId)]
       );
 
       // Set this payment method as default
@@ -368,7 +369,7 @@ export const createSetupIntent = async (req: AuthRequest, res: Response) => {
     // Get or create Stripe customer
     const mappingResults = await executeQuery(
       'SELECT stripe_customer_id FROM user_stripe_mapping WHERE user_id = $1',
-      [userId]
+      [convertToUuid(userId)]
     );
 
     let stripeCustomerId: string;
