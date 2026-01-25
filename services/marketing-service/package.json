@@ -10,7 +10,8 @@
     "test": "jest --passWithNoTests",
     "lint": "eslint src/**/*.ts",
     "typecheck": "tsc --noEmit",
-    "seed": "ts-node src/scripts/seed.ts"
+    "seed": "ts-node src/scripts/seed.ts",
+    "seed:devops-kickstarter": "ts-node src/scripts/seed7DayDevOpsKickstarter.ts"
   },
   "dependencies": {
     "express": "^4.18.2",
