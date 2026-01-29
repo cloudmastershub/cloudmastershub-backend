@@ -17,12 +17,12 @@ echo "Port: ${PORT:-3000}"
 
 # Validate service name
 case "$SERVICE_NAME" in
-  "api-gateway"|"user-service"|"course-service"|"lab-service"|"admin-service"|"payment-service"|"marketing-service")
+  "api-gateway"|"user-service"|"course-service"|"lab-service"|"admin-service"|"payment-service"|"marketing-service"|"community-service")
     echo "Valid service name: $SERVICE_NAME"
     ;;
   *)
     echo "Error: Invalid service name '$SERVICE_NAME'"
-    echo "Valid options: api-gateway, user-service, course-service, lab-service, admin-service, payment-service, marketing-service"
+    echo "Valid options: api-gateway, user-service, course-service, lab-service, admin-service, payment-service, marketing-service, community-service"
     exit 1
     ;;
 esac
@@ -61,6 +61,9 @@ case "$SERVICE_NAME" in
     ;;
   "marketing-service")
     export PORT=${PORT:-3006}
+    ;;
+  "community-service")
+    export PORT=${PORT:-3007}
     ;;
 esac
 
