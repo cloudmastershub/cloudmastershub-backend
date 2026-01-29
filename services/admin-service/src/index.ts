@@ -14,6 +14,7 @@ import analyticsRoutes from './routes/analyticsRoutes';
 import settingsRoutes from './routes/settingsRoutes';
 import securityRoutes from './routes/securityRoutes';
 import landingPageRoutes, { publicLandingPageRouter } from './routes/landingPageRoutes';
+import videoPopupRoutes, { publicVideoPopupRouter } from './routes/videoPopupRoutes';
 // Removed pathRoutes - learning paths are managed by course service
 
 dotenv.config();
@@ -74,10 +75,14 @@ app.use('/admin/analytics', analyticsRoutes);
 app.use('/admin/settings', settingsRoutes);
 app.use('/admin/security', securityRoutes);
 app.use('/admin/landing-pages', landingPageRoutes);
+app.use('/admin/video-popups', videoPopupRoutes);
 // Removed /admin/paths - learning paths are managed by course service with admin role restrictions
 
 // Public landing page routes (no authentication required)
 app.use('/pages', publicLandingPageRouter);
+
+// Public video popup routes (no authentication required)
+app.use('/video-popups', publicVideoPopupRouter);
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -117,6 +122,7 @@ const startServer = async () => {
       logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
       logger.info(`CORS Origin: ${process.env.CORS_ORIGIN || 'http://localhost:3000'}`);
       logger.info('Landing Page Manager endpoints available at /admin/landing-pages');
+      logger.info('Video Popup Manager endpoints available at /admin/video-popups');
     });
   } catch (error) {
     logger.error('Failed to start Admin Service:', error);
