@@ -1,14 +1,9 @@
 import Bull from 'bull';
 import logger from '../utils/logger';
 
-const redisConfig = {
-  host: process.env.REDIS_HOST || 'localhost',
-  port: Number(process.env.REDIS_PORT) || 6379,
-};
+const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 
-export const labQueue = new Bull('lab-queue', {
-  redis: redisConfig,
-});
+export const labQueue = new Bull('lab-queue', REDIS_URL);
 
 export const initializeQueue = () => {
   // Handle queue connection errors
