@@ -26,6 +26,9 @@ export const getContentForModeration = async (
       sort: { sortBy, sortOrder },
     });
 
+    // Forward auth token to course-service
+    contentService.setAuthToken(req.headers.authorization || null);
+
     const result = await contentService.getContentForModeration({
       page: Number(page),
       limit: Number(limit),
@@ -80,6 +83,9 @@ export const getContentDetails = async (
       contentType,
     });
 
+    // Forward auth token to course-service
+    contentService.setAuthToken(req.headers.authorization || null);
+
     const result = await contentService.getContentById(contentId, contentType);
 
     if (!result.success) {
@@ -118,6 +124,9 @@ export const moderateContent = async (
       action,
       reason: reason ? 'provided' : 'none',
     });
+
+    // Forward auth token to course-service
+    contentService.setAuthToken(req.headers.authorization || null);
 
     const result = await contentService.moderateContent(
       contentId,
@@ -173,6 +182,9 @@ export const getFlaggedContent = async (
       pagination: { page, limit },
     });
 
+    // Forward auth token to course-service
+    contentService.setAuthToken(req.headers.authorization || null);
+
     const result = await contentService.getFlaggedContent({
       page: Number(page),
       limit: Number(limit),
@@ -212,6 +224,9 @@ export const getContentStats = async (
       timeframe,
     });
 
+    // Forward auth token to course-service
+    contentService.setAuthToken(req.headers.authorization || null);
+
     const result = await contentService.getContentAnalytics(timeframe);
 
     if (!result.success) {
@@ -248,6 +263,9 @@ export const getPopularContent = async (
       timeframe,
       limit,
     });
+
+    // Forward auth token to course-service
+    contentService.setAuthToken(req.headers.authorization || null);
 
     const result = await contentService.getPopularContent({
       type,
@@ -320,6 +338,9 @@ export const bulkModerateContent = async (
       reason,
     });
 
+    // Forward auth token to course-service
+    contentService.setAuthToken(req.headers.authorization || null);
+
     const result = await contentService.bulkModerateContent(contentItems, action, reason);
 
     if (!result.success) {
@@ -362,6 +383,9 @@ export const getContentModerationQueue = async (
     logger.info('Admin fetching content moderation queue summary', {
       adminId: req.adminId,
     });
+
+    // Forward auth token to course-service
+    contentService.setAuthToken(req.headers.authorization || null);
 
     // Fetch pending content counts
     const [coursesResult, pathsResult] = await Promise.all([

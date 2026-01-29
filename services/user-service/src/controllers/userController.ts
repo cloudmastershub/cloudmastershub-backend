@@ -1,13 +1,14 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/authenticate';
-import { 
-  getUserById, 
-  updateUser, 
-  getUserSubscriptionInfo, 
-  updateUserSubscriptionStatus 
+import {
+  getUserById,
+  updateUser,
+  getUserSubscriptionInfo,
+  updateUserSubscriptionStatus
 } from '../services/userService';
 import logger from '../utils/logger';
 import axios from 'axios';
+import User from '../models/User';
 
 export const getProfile = async (
   req: AuthRequest,
@@ -16,6 +17,7 @@ export const getProfile = async (
 ): Promise<void> => {
   try {
     const userId = req.userId;
+    const userEmail = req.userEmail;
 
     if (!userId) {
       res.status(400).json({
@@ -25,7 +27,47 @@ export const getProfile = async (
       return;
     }
 
-    const user = await getUserById(userId);
+    // First try MongoDB (for Google OAuth users) using email
+    let user = null;
+    let subscriptionInfo = null;
+
+    if (userEmail) {
+      const mongoUser = await User.findOne({ email: userEmail.toLowerCase() });
+      if (mongoUser) {
+        // Found in MongoDB (Google OAuth user)
+        user = {
+          id: mongoUser._id.toString(),
+          email: mongoUser.email,
+          firstName: mongoUser.firstName,
+          lastName: mongoUser.lastName,
+          bio: mongoUser.bio,
+          roles: mongoUser.roles,
+          subscriptionStatus: 'active',
+          subscriptionPlan: mongoUser.subscription || 'free',
+          subscriptionStartDate: mongoUser.createdAt,
+          subscriptionEndDate: null,
+          lastPaymentDate: null,
+          paymentStatus: null,
+          createdAt: mongoUser.createdAt,
+          updatedAt: mongoUser.updatedAt
+        };
+        subscriptionInfo = { isActive: true };
+        logger.debug('User found in MongoDB', { userId: user.id, email: user.email });
+      }
+    }
+
+    // Fall back to PostgreSQL if not found in MongoDB
+    if (!user) {
+      // Only try PostgreSQL if userId looks like a valid UUID
+      const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+      if (isValidUUID) {
+        user = await getUserById(userId);
+        if (user) {
+          subscriptionInfo = await getUserSubscriptionInfo(userId);
+        }
+      }
+    }
+
     if (!user) {
       res.status(404).json({
         success: false,
@@ -33,9 +75,6 @@ export const getProfile = async (
       });
       return;
     }
-
-    // Get subscription info
-    const subscriptionInfo = await getUserSubscriptionInfo(userId);
 
     const userProfile = {
       id: user.id,

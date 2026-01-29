@@ -8,9 +8,24 @@ interface ServiceResponse<T = any> {
 
 class ContentServiceClient {
   private baseUrl: string;
+  private authToken: string | null = null;
 
   constructor() {
     this.baseUrl = process.env.COURSE_SERVICE_URL || 'http://course-service:3002';
+  }
+
+  setAuthToken(token: string | null) {
+    this.authToken = token;
+  }
+
+  private getHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (this.authToken) {
+      headers['Authorization'] = this.authToken;
+    }
+    return headers;
   }
 
   async getContentForModeration(params: {
@@ -31,9 +46,7 @@ class ContentServiceClient {
 
       const response = await fetch(`${this.baseUrl}/admin/moderation?${queryParams}`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: this.getHeaders(),
       });
 
       const data = await response.json();
@@ -55,9 +68,7 @@ class ContentServiceClient {
       const endpoint = contentType === 'course' ? 'courses' : 'paths';
       const response = await fetch(`${this.baseUrl}/${endpoint}/${contentId}`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: this.getHeaders(),
       });
 
       const data = await response.json();
@@ -82,9 +93,7 @@ class ContentServiceClient {
       const endpoint = contentType === 'course' ? 'courses' : 'paths';
       const response = await fetch(`${this.baseUrl}/admin/${endpoint}/${contentId}/moderate`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: this.getHeaders(),
         body: JSON.stringify({ action, reason, notes }),
       });
 
@@ -114,9 +123,7 @@ class ContentServiceClient {
 
       const response = await fetch(`${this.baseUrl}/admin/flagged?${queryParams}`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: this.getHeaders(),
       });
 
       const data = await response.json();
@@ -136,9 +143,7 @@ class ContentServiceClient {
         `${this.baseUrl}/admin/analytics/content?timeframe=${timeframe}`,
         {
           method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: this.getHeaders(),
         }
       );
 
@@ -168,9 +173,7 @@ class ContentServiceClient {
 
       const response = await fetch(`${this.baseUrl}/admin/popular?${queryParams}`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: this.getHeaders(),
       });
 
       const data = await response.json();
@@ -195,9 +198,7 @@ class ContentServiceClient {
     try {
       const response = await fetch(`${this.baseUrl}/admin/bulk-moderate`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: this.getHeaders(),
         body: JSON.stringify({ contentItems, action, reason }),
       });
 
