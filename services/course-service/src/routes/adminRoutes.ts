@@ -15,6 +15,7 @@ import {
   removePathwayStep
 } from '../controllers/learningPathController';
 import { authenticate, authorize, AuthRequest } from '@cloudmastershub/middleware';
+import { CourseStatus } from '@cloudmastershub/types';
 import { Course } from '../models';
 import logger from '../utils/logger';
 
@@ -509,22 +510,22 @@ router.put('/courses/:id/moderate', async (req: AuthRequest, res: Response, next
     }
 
     // Update course status based on action
-    let newStatus: string;
+    let newStatus: CourseStatus;
     switch (action) {
       case 'approve':
-        newStatus = 'published';
+        newStatus = CourseStatus.PUBLISHED;
         break;
       case 'reject':
-        newStatus = 'archived';
+        newStatus = CourseStatus.ARCHIVED;
         break;
       case 'flag':
-        newStatus = 'flagged';
+        newStatus = CourseStatus.UNDER_REVIEW;
         break;
       case 'unflag':
-        newStatus = 'draft';
+        newStatus = CourseStatus.DRAFT;
         break;
       default:
-        newStatus = course.status;
+        newStatus = course.status as CourseStatus;
     }
 
     course.status = newStatus;
@@ -570,13 +571,13 @@ router.get('/flagged', async (req: AuthRequest, res: Response, next: NextFunctio
     const skip = (Number(page) - 1) * Number(limit);
 
     const [courses, total] = await Promise.all([
-      Course.find({ status: 'flagged' })
+      Course.find({ status: 'under_review' })
         .sort({ updatedAt: -1 })
         .skip(skip)
         .limit(Number(limit))
         .select('_id title slug description thumbnail status instructor createdAt updatedAt')
         .lean(),
-      Course.countDocuments({ status: 'flagged' })
+      Course.countDocuments({ status: 'under_review' })
     ]);
 
     const content = courses.map((course: any) => ({
@@ -584,7 +585,7 @@ router.get('/flagged', async (req: AuthRequest, res: Response, next: NextFunctio
       contentType: 'course',
       title: course.title,
       slug: course.slug,
-      status: 'flagged',
+      status: 'under_review',
       instructor: course.instructor,
       flaggedAt: course.updatedAt
     }));
@@ -669,7 +670,7 @@ router.get('/analytics/content', async (req: AuthRequest, res: Response, next: N
           totalCourses: { $sum: 1 },
           publishedCourses: { $sum: { $cond: [{ $eq: ['$status', 'published'] }, 1, 0] } },
           draftCourses: { $sum: { $cond: [{ $eq: ['$status', 'draft'] }, 1, 0] } },
-          flaggedCourses: { $sum: { $cond: [{ $eq: ['$status', 'flagged'] }, 1, 0] } },
+          underReviewCourses: { $sum: { $cond: [{ $eq: ['$status', 'under_review'] }, 1, 0] } },
           totalEnrollments: { $sum: '$enrollmentCount' },
           averageRating: { $avg: '$rating' }
         }
@@ -680,7 +681,7 @@ router.get('/analytics/content', async (req: AuthRequest, res: Response, next: N
       totalCourses: 0,
       publishedCourses: 0,
       draftCourses: 0,
-      flaggedCourses: 0,
+      underReviewCourses: 0,
       totalEnrollments: 0,
       averageRating: 0
     };
