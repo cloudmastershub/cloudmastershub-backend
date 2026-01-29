@@ -1,9 +1,14 @@
 import { Request, Response } from 'express';
+import axios from 'axios';
 import logger from '../utils/logger';
 import User, { UserRole } from '../models/User';
 import { ReferralLink } from '../models/Referral';
 import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
+
+// Service URLs for inter-service communication
+const COURSE_SERVICE_URL = process.env.COURSE_SERVICE_URL || 'http://course-service:3002';
+const PAYMENT_SERVICE_URL = process.env.PAYMENT_SERVICE_URL || 'http://payment-service:3004';
 
 // Extend Request interface to include userId (from authentication middleware)
 interface AuthenticatedRequest extends Request {
@@ -194,23 +199,16 @@ export const getAdminStats = async (req: AuthenticatedRequest, res: Response): P
       pendingEarnings: 0
     };
 
-    // TODO: Fetch from other services
-    // For now, we'll use placeholders and implement service calls later
-    const courseStats = {
-      courseCount: 0,      // TODO: Fetch from course-service
-      pendingCourses: 0    // TODO: Fetch from course-service
-    };
+    // Fetch stats from other services in parallel (non-blocking)
+    const [courseStats, externalPaymentStats, supportStats] = await Promise.all([
+      fetchCourseStats(),
+      fetchPaymentStats(),
+      fetchSupportStats()
+    ]);
 
     const paymentStats = {
-      revenue: 0,              // TODO: Fetch from payment-service
-      monthlyRevenue: 0,       // TODO: Fetch from payment-service  
-      monthlyGrowth: 0,        // TODO: Calculate from payment-service
-      payoutPending: referralStatsResult.pendingEarnings,
-      activeSubscriptions: 0   // TODO: Fetch from payment-service
-    };
-
-    const supportStats = {
-      openSupportTickets: 0    // TODO: Fetch from support-service when available
+      ...externalPaymentStats,
+      payoutPending: referralStatsResult.pendingEarnings
     };
 
     // Build comprehensive response
@@ -275,18 +273,33 @@ export const getAdminStats = async (req: AuthenticatedRequest, res: Response): P
   }
 };
 
-// TODO: Future implementations for service integration
 /**
  * Fetch course statistics from course-service
  * @private
  */
 async function fetchCourseStats(): Promise<{ courseCount: number; pendingCourses: number }> {
-  // Implementation will make HTTP calls to course-service
-  // For now, return placeholders
-  return {
-    courseCount: 0,
-    pendingCourses: 0
-  };
+  try {
+    const response = await axios.get(`${COURSE_SERVICE_URL}/admin/stats`, {
+      timeout: 5000,
+      headers: { 'X-Internal-Service': 'user-service' }
+    });
+
+    if (response.data.success) {
+      return {
+        courseCount: response.data.data.totalCourses || 0,
+        pendingCourses: response.data.data.pendingCourses || 0
+      };
+    }
+
+    logger.warn('Course service returned unsuccessful response', { response: response.data });
+    return { courseCount: 0, pendingCourses: 0 };
+  } catch (error) {
+    logger.warn('Failed to fetch course stats from course-service', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      url: `${COURSE_SERVICE_URL}/admin/stats`
+    });
+    return { courseCount: 0, pendingCourses: 0 };
+  }
 }
 
 /**
@@ -299,14 +312,30 @@ async function fetchPaymentStats(): Promise<{
   monthlyGrowth: number;
   activeSubscriptions: number;
 }> {
-  // Implementation will make HTTP calls to payment-service
-  // For now, return placeholders
-  return {
-    revenue: 0,
-    monthlyRevenue: 0,
-    monthlyGrowth: 0,
-    activeSubscriptions: 0
-  };
+  try {
+    const response = await axios.get(`${PAYMENT_SERVICE_URL}/admin/stats`, {
+      timeout: 5000,
+      headers: { 'X-Internal-Service': 'user-service' }
+    });
+
+    if (response.data.success) {
+      return {
+        revenue: response.data.data.totalRevenue || 0,
+        monthlyRevenue: response.data.data.monthlyRevenue || 0,
+        monthlyGrowth: response.data.data.monthlyGrowth || 0,
+        activeSubscriptions: response.data.data.activeSubscriptions || 0
+      };
+    }
+
+    logger.warn('Payment service returned unsuccessful response', { response: response.data });
+    return { revenue: 0, monthlyRevenue: 0, monthlyGrowth: 0, activeSubscriptions: 0 };
+  } catch (error) {
+    logger.warn('Failed to fetch payment stats from payment-service', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      url: `${PAYMENT_SERVICE_URL}/admin/stats`
+    });
+    return { revenue: 0, monthlyRevenue: 0, monthlyGrowth: 0, activeSubscriptions: 0 };
+  }
 }
 
 /**
@@ -314,11 +343,8 @@ async function fetchPaymentStats(): Promise<{
  * @private
  */
 async function fetchSupportStats(): Promise<{ openSupportTickets: number }> {
-  // Implementation will make HTTP calls to support-service when available
-  // For now, return placeholder
-  return {
-    openSupportTickets: 0
-  };
+  // Support service not yet implemented
+  return { openSupportTickets: 0 };
 }
 
 // ============================================================================

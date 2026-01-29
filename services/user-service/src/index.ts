@@ -97,8 +97,9 @@ app.listen(PORT, async () => {
     await mongoose.connect(mongoUrl);
     logger.info('MongoDB connected successfully for referral system');
     
-    // TEMPORARY: Skip PostgreSQL database initialization until connectivity is fixed
-    logger.warn('PostgreSQL database initialization skipped - using mock data with hardcoded admin user');
+    // Initialize PostgreSQL database connection
+    await initializeDatabase();
+    logger.info('PostgreSQL database initialized successfully');
     
     // Initialize payment event subscriber
     initializePaymentEventSubscriber();

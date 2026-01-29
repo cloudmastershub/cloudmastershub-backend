@@ -1,6 +1,57 @@
 import { Request, Response } from 'express';
+import axios from 'axios';
 import User, { UserRole } from '../models/User';
 import logger from '../utils/logger';
+
+// Service URLs for inter-service communication
+const COURSE_SERVICE_URL = process.env.COURSE_SERVICE_URL || 'http://course-service:3002';
+const PAYMENT_SERVICE_URL = process.env.PAYMENT_SERVICE_URL || 'http://payment-service:3004';
+
+/**
+ * Fetch instructor course count from course-service
+ */
+async function fetchInstructorCourseCount(instructorId: string): Promise<number> {
+  try {
+    const response = await axios.get(`${COURSE_SERVICE_URL}/instructor/${instructorId}/stats`, {
+      timeout: 5000,
+      headers: { 'X-Internal-Service': 'user-service' }
+    });
+
+    if (response.data.success) {
+      return response.data.data.courseCount || 0;
+    }
+    return 0;
+  } catch (error) {
+    logger.warn('Failed to fetch instructor course count', {
+      instructorId,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+    return 0;
+  }
+}
+
+/**
+ * Fetch instructor earnings from payment-service
+ */
+async function fetchInstructorEarnings(instructorId: string): Promise<number> {
+  try {
+    const response = await axios.get(`${PAYMENT_SERVICE_URL}/instructor/${instructorId}/earnings`, {
+      timeout: 5000,
+      headers: { 'X-Internal-Service': 'user-service' }
+    });
+
+    if (response.data.success) {
+      return response.data.data.totalEarnings || 0;
+    }
+    return 0;
+  } catch (error) {
+    logger.warn('Failed to fetch instructor earnings', {
+      instructorId,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+    return 0;
+  }
+}
 
 // Extend Request to include authenticated user
 interface AuthRequest extends Request {
@@ -53,14 +104,17 @@ export const getInstructorStats = async (req: AuthRequest, res: Response) => {
       }
     ]);
 
-    // For now, we'll return placeholder values for courseCount and totalEarnings
-    // These should be fetched from course-service and payment-service respectively
-    // In a production environment, you'd make internal service calls here
+    // Fetch course count and earnings from respective services in parallel
+    const [courseCount, totalEarnings] = await Promise.all([
+      fetchInstructorCourseCount(instructorId),
+      fetchInstructorEarnings(instructorId)
+    ]);
+
     const instructorStats = {
       studentCount: stats?.studentCount || 0,
       instructorCount: stats?.instructorCount || 0,
-      courseCount: 0, // TODO: Fetch from course-service
-      totalEarnings: 0 // TODO: Fetch from payment-service
+      courseCount,
+      totalEarnings
     };
 
     logger.info(`Instructor stats fetched for user ${instructorId}`, { stats: instructorStats });
