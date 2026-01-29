@@ -363,6 +363,409 @@ router.get('/stats', async (req: AuthRequest, res: Response, next: NextFunction)
 });
 
 /**
+ * Get content for moderation (courses pending review)
+ * @route GET /admin/moderation
+ * @query page, limit, status (pending, approved, rejected), type (course, learning_path), sortBy, sortOrder
+ */
+router.get('/moderation', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const {
+      page = 1,
+      limit = 20,
+      status = 'pending',
+      type = 'course',
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+
+    logger.info('Admin fetching content for moderation', {
+      adminId: req.userId,
+      filters: { status, type },
+      pagination: { page, limit },
+      sort: { sortBy, sortOrder }
+    });
+
+    const skip = (Number(page) - 1) * Number(limit);
+    const sortDirection = sortOrder === 'asc' ? 1 : -1;
+
+    // Build query based on status
+    let statusFilter: any = {};
+    if (status === 'pending') {
+      statusFilter = { status: 'draft' }; // Draft courses are considered pending review
+    } else if (status === 'approved') {
+      statusFilter = { status: 'published' };
+    } else if (status === 'rejected') {
+      statusFilter = { status: 'archived' };
+    } else if (status === 'all') {
+      statusFilter = {}; // No status filter
+    } else {
+      statusFilter = { status: status };
+    }
+
+    // Get courses with pagination
+    const [courses, total] = await Promise.all([
+      Course.find(statusFilter)
+        .sort({ [String(sortBy)]: sortDirection })
+        .skip(skip)
+        .limit(Number(limit))
+        .select('_id title slug description thumbnail status instructor createdAt updatedAt rating enrollmentCount')
+        .lean(),
+      Course.countDocuments(statusFilter)
+    ]);
+
+    // Transform to moderation format
+    const content = courses.map((course: any) => ({
+      id: course._id.toString(),
+      contentId: course._id.toString(),
+      contentType: 'course',
+      title: course.title,
+      slug: course.slug,
+      description: course.description,
+      thumbnail: course.thumbnail,
+      status: course.status === 'draft' ? 'pending' : course.status === 'published' ? 'approved' : 'rejected',
+      originalStatus: course.status,
+      instructor: course.instructor,
+      submittedAt: course.createdAt,
+      lastUpdated: course.updatedAt,
+      rating: course.rating,
+      enrollmentCount: course.enrollmentCount
+    }));
+
+    logger.info(`Admin: Retrieved ${content.length} items for moderation`, {
+      total,
+      page: Number(page),
+      limit: Number(limit)
+    });
+
+    res.json({
+      success: true,
+      data: {
+        content,
+        items: content, // Alias for compatibility
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          total,
+          totalPages: Math.ceil(total / Number(limit))
+        },
+        total
+      }
+    });
+  } catch (error: any) {
+    logger.error('Admin: Failed to fetch content for moderation', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to fetch content for moderation',
+        details: error.message
+      }
+    });
+  }
+});
+
+/**
+ * Moderate content (approve/reject a course)
+ * @route PUT /admin/courses/:id/moderate
+ * @body { action: 'approve' | 'reject' | 'flag', reason?: string, notes?: string }
+ */
+router.put('/courses/:id/moderate', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { action, reason, notes } = req.body;
+
+    if (!['approve', 'reject', 'flag', 'unflag'].includes(action)) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Action must be approve, reject, flag, or unflag' }
+      });
+      return;
+    }
+
+    logger.info('Admin moderating course', {
+      adminId: req.userId,
+      courseId: id,
+      action,
+      reason: reason ? 'provided' : 'none'
+    });
+
+    // Find course by ID or slug
+    let course = null;
+    const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+
+    if (isValidObjectId) {
+      course = await Course.findById(id);
+    }
+
+    if (!course) {
+      course = await Course.findOne({ slug: id });
+    }
+
+    if (!course) {
+      res.status(404).json({
+        success: false,
+        error: { message: 'Course not found' }
+      });
+      return;
+    }
+
+    // Update course status based on action
+    let newStatus: string;
+    switch (action) {
+      case 'approve':
+        newStatus = 'published';
+        break;
+      case 'reject':
+        newStatus = 'archived';
+        break;
+      case 'flag':
+        newStatus = 'flagged';
+        break;
+      case 'unflag':
+        newStatus = 'draft';
+        break;
+      default:
+        newStatus = course.status;
+    }
+
+    course.status = newStatus;
+    await course.save();
+
+    logger.info('Course moderation completed', {
+      courseId: id,
+      action,
+      newStatus,
+      adminId: req.userId
+    });
+
+    res.json({
+      success: true,
+      message: `Course ${action}d successfully`,
+      data: {
+        id: course._id,
+        title: course.title,
+        status: course.status,
+        moderatedAt: new Date().toISOString()
+      }
+    });
+  } catch (error: any) {
+    logger.error('Admin: Failed to moderate course', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to moderate course',
+        details: error.message
+      }
+    });
+  }
+});
+
+/**
+ * Get flagged content
+ * @route GET /admin/flagged
+ */
+router.get('/flagged', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { page = 1, limit = 20, type } = req.query;
+
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const [courses, total] = await Promise.all([
+      Course.find({ status: 'flagged' })
+        .sort({ updatedAt: -1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .select('_id title slug description thumbnail status instructor createdAt updatedAt')
+        .lean(),
+      Course.countDocuments({ status: 'flagged' })
+    ]);
+
+    const content = courses.map((course: any) => ({
+      id: course._id.toString(),
+      contentType: 'course',
+      title: course.title,
+      slug: course.slug,
+      status: 'flagged',
+      instructor: course.instructor,
+      flaggedAt: course.updatedAt
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        content,
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          total,
+          totalPages: Math.ceil(total / Number(limit))
+        }
+      }
+    });
+  } catch (error: any) {
+    logger.error('Admin: Failed to fetch flagged content', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to fetch flagged content',
+        details: error.message
+      }
+    });
+  }
+});
+
+/**
+ * Get popular content
+ * @route GET /admin/popular
+ */
+router.get('/popular', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { type, timeframe = '30d', limit = 10 } = req.query;
+
+    const courses = await Course.find({ status: 'published' })
+      .sort({ enrollmentCount: -1, rating: -1 })
+      .limit(Number(limit))
+      .select('_id title slug thumbnail enrollmentCount rating instructor')
+      .lean();
+
+    const content = courses.map((course: any) => ({
+      id: course._id.toString(),
+      contentType: 'course',
+      title: course.title,
+      slug: course.slug,
+      thumbnail: course.thumbnail,
+      enrollmentCount: course.enrollmentCount,
+      rating: course.rating,
+      instructor: course.instructor
+    }));
+
+    res.json({
+      success: true,
+      data: { content }
+    });
+  } catch (error: any) {
+    logger.error('Admin: Failed to fetch popular content', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to fetch popular content',
+        details: error.message
+      }
+    });
+  }
+});
+
+/**
+ * Get content analytics
+ * @route GET /admin/analytics/content
+ */
+router.get('/analytics/content', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { timeframe = '30d' } = req.query;
+
+    const stats = await Course.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalCourses: { $sum: 1 },
+          publishedCourses: { $sum: { $cond: [{ $eq: ['$status', 'published'] }, 1, 0] } },
+          draftCourses: { $sum: { $cond: [{ $eq: ['$status', 'draft'] }, 1, 0] } },
+          flaggedCourses: { $sum: { $cond: [{ $eq: ['$status', 'flagged'] }, 1, 0] } },
+          totalEnrollments: { $sum: '$enrollmentCount' },
+          averageRating: { $avg: '$rating' }
+        }
+      }
+    ]);
+
+    const result = stats[0] || {
+      totalCourses: 0,
+      publishedCourses: 0,
+      draftCourses: 0,
+      flaggedCourses: 0,
+      totalEnrollments: 0,
+      averageRating: 0
+    };
+
+    res.json({
+      success: true,
+      data: {
+        ...result,
+        timeframe
+      }
+    });
+  } catch (error: any) {
+    logger.error('Admin: Failed to fetch content analytics', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to fetch content analytics',
+        details: error.message
+      }
+    });
+  }
+});
+
+/**
+ * Bulk moderate content
+ * @route POST /admin/bulk-moderate
+ */
+router.post('/bulk-moderate', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { contentItems, action, reason } = req.body;
+
+    if (!Array.isArray(contentItems) || contentItems.length === 0) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Content items array is required' }
+      });
+      return;
+    }
+
+    if (!['approve', 'reject'].includes(action)) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Action must be approve or reject' }
+      });
+      return;
+    }
+
+    const newStatus = action === 'approve' ? 'published' : 'archived';
+    const courseIds = contentItems
+      .filter((item: any) => item.contentType === 'course')
+      .map((item: any) => item.contentId);
+
+    const result = await Course.updateMany(
+      { _id: { $in: courseIds } },
+      { $set: { status: newStatus } }
+    );
+
+    logger.info('Bulk moderation completed', {
+      action,
+      itemCount: contentItems.length,
+      modifiedCount: result.modifiedCount,
+      adminId: req.userId
+    });
+
+    res.json({
+      success: true,
+      data: {
+        processed: contentItems.length,
+        modified: result.modifiedCount,
+        action
+      }
+    });
+  } catch (error: any) {
+    logger.error('Admin: Failed to bulk moderate content', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to bulk moderate content',
+        details: error.message
+      }
+    });
+  }
+});
+
+/**
  * Learning Path Management Routes
  * Admins can manage all learning paths
  */
