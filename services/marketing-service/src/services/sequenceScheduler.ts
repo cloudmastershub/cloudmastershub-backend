@@ -38,7 +38,7 @@ const emailQueue = new Queue<{
  * Sequence Processor Queue - For enrolling leads and scheduling emails
  */
 const sequenceProcessorQueue = new Queue<{
-  type: 'enroll' | 'process_next' | 'check_conditions';
+  type: 'enroll' | 'process_next' | 'check_conditions' | 'cleanup';
   leadId: string;
   sequenceId: string;
   currentEmailOrder?: number;
@@ -295,7 +295,7 @@ class SequenceSchedulerService {
 
     // Clean up old jobs daily
     await sequenceProcessorQueue.add(
-      { type: 'cleanup' as any, leadId: '', sequenceId: '' },
+      { type: 'cleanup', leadId: '', sequenceId: '' },
       {
         repeat: { cron: '0 3 * * *' }, // 3 AM daily
         jobId: 'cleanup-old-jobs',
