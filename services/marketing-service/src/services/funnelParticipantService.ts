@@ -9,6 +9,8 @@ import { Lead, LeadSource, LeadStatus } from '../models';
 import logger from '../utils/logger';
 import { ApiError } from '../middleware/errorHandler';
 import { v4 as uuidv4 } from 'uuid';
+import { sequenceScheduler } from './sequenceScheduler';
+import { SequenceTrigger } from '../models/EmailSequence';
 
 /**
  * Registration input for funnel
@@ -526,6 +528,35 @@ class FunnelParticipantService {
         await lead.save();
         participant.leadId = lead._id;
         await participant.save();
+      }
+
+      // Trigger email sequences for funnel opt-in
+      if (lead && lead.emailConsent) {
+        try {
+          const triggerResult = await sequenceScheduler.triggerSequence(
+            SequenceTrigger.FUNNEL_OPTIN,
+            lead._id,
+            {
+              funnelId: funnel._id.toString(),
+              funnelName: funnel.name,
+              funnelSlug: funnel.slug,
+              firstName: lead.firstName,
+              lastName: lead.lastName,
+              email: lead.email,
+            }
+          );
+
+          if (triggerResult.enrolled.length > 0) {
+            logger.info(`Triggered ${triggerResult.enrolled.length} email sequences for funnel opt-in`, {
+              leadId: lead._id.toString(),
+              funnelId: funnel._id.toString(),
+              sequences: triggerResult.enrolled,
+            });
+          }
+        } catch (seqError) {
+          // Don't fail registration if sequence trigger fails
+          logger.error('Failed to trigger email sequences:', seqError);
+        }
       }
     } catch (error) {
       // Don't fail registration if lead creation fails
