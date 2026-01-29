@@ -4,6 +4,7 @@ import {
   // Public
   getBootcamps,
   getBootcampBySlug,
+  getBootcampSessions,
   // Protected
   createBootcampCheckout,
   getUserEnrollments,
@@ -15,7 +16,13 @@ import {
   deleteBootcamp,
   createManualEnrollment,
   updateEnrollment,
-  getEnrollmentsByBootcamp
+  getEnrollmentsByBootcamp,
+  // Admin - Sessions
+  getAllSessions,
+  getSessionById,
+  createSession,
+  updateSession,
+  deleteSession
 } from '../controllers/bootcamp.controller';
 
 const router = Router();
@@ -29,6 +36,9 @@ router.get('/', getBootcamps);
 
 // Get bootcamp by slug
 router.get('/slug/:slug', getBootcampBySlug);
+
+// Get visible sessions for a bootcamp (previous, current, next)
+router.get('/:bootcampId/sessions', getBootcampSessions);
 
 // ============================================================================
 // PROTECTED ROUTES (require authentication)
@@ -59,5 +69,12 @@ router.delete('/admin/:id', deleteBootcamp);
 router.get('/admin/enrollments/bootcamp/:bootcampId', getEnrollmentsByBootcamp);
 router.post('/admin/enrollments', createManualEnrollment);
 router.put('/admin/enrollments/:id', updateEnrollment);
+
+// Session management
+router.get('/admin/:bootcampId/sessions', getAllSessions);
+router.get('/admin/sessions/:id', getSessionById);
+router.post('/admin/:bootcampId/sessions', createSession);
+router.put('/admin/sessions/:id', updateSession);
+router.delete('/admin/sessions/:id', deleteSession);
 
 export default router;

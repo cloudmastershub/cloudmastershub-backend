@@ -1,5 +1,84 @@
 // Bootcamp and Enrollment types for CloudMastersHub
 
+// ============================================================================
+// SESSION TYPES
+// ============================================================================
+
+export type BootcampSessionStatus = 'upcoming' | 'ongoing' | 'ended';
+
+export interface BootcampSession {
+  id: string;
+  bootcamp_id: string;
+  name: string;
+  slug: string;
+  start_date: Date;
+  end_date: Date;
+  status: BootcampSessionStatus;
+  enrollment_open: boolean;
+  max_capacity?: number;
+  description?: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface BootcampSessionWithStats extends BootcampSession {
+  enrollment_count?: number;
+  bootcamp_name?: string;
+}
+
+export interface CreateSessionRequest {
+  name: string;
+  slug: string;
+  start_date: string; // ISO date string
+  end_date: string;   // ISO date string
+  status?: BootcampSessionStatus;
+  enrollment_open?: boolean;
+  max_capacity?: number;
+  description?: string;
+}
+
+export interface UpdateSessionRequest {
+  name?: string;
+  slug?: string;
+  start_date?: string;
+  end_date?: string;
+  status?: BootcampSessionStatus;
+  enrollment_open?: boolean;
+  max_capacity?: number;
+  description?: string;
+}
+
+// Helper to convert DB row to BootcampSession
+export function rowToSession(row: any): BootcampSession {
+  return {
+    id: row.id,
+    bootcamp_id: row.bootcamp_id,
+    name: row.name,
+    slug: row.slug,
+    start_date: new Date(row.start_date),
+    end_date: new Date(row.end_date),
+    status: row.status,
+    enrollment_open: row.enrollment_open,
+    max_capacity: row.max_capacity || undefined,
+    description: row.description || undefined,
+    created_at: new Date(row.created_at),
+    updated_at: new Date(row.updated_at),
+  };
+}
+
+// Helper to convert DB row to BootcampSessionWithStats
+export function rowToSessionWithStats(row: any): BootcampSessionWithStats {
+  return {
+    ...rowToSession(row),
+    enrollment_count: row.enrollment_count ? parseInt(row.enrollment_count) : undefined,
+    bootcamp_name: row.bootcamp_name || undefined,
+  };
+}
+
+// ============================================================================
+// CURRICULUM TYPES
+// ============================================================================
+
 export interface CurriculumModule {
   title: string;
   weeks: number;
@@ -57,6 +136,7 @@ export interface BootcampEnrollment {
   id: string;
   user_id: string;
   bootcamp_id: string;
+  session_id?: string; // Optional reference to specific bootcamp session
   payment_type: BootcampPaymentType;
   payment_method?: BootcampPaymentMethod;
 
@@ -123,6 +203,7 @@ export interface UpdateBootcampRequest extends Partial<CreateBootcampRequest> {
 export interface BootcampCheckoutRequest {
   user_id: string;
   bootcamp_id: string;
+  session_id?: string; // Optional session for cohort-based enrollment
   payment_type: 'full' | 'installment';
   success_url: string;
   cancel_url: string;
@@ -131,6 +212,7 @@ export interface BootcampCheckoutRequest {
 export interface ManualEnrollmentRequest {
   user_id: string;
   bootcamp_id: string;
+  session_id?: string; // Optional session for cohort-based enrollment
   payment_method: 'cash' | 'zelle' | 'cashapp';
   amount_paid?: number;
   admin_notes?: string;
@@ -227,6 +309,7 @@ export function rowToEnrollment(row: any): BootcampEnrollment {
     id: row.id,
     user_id: row.user_id,
     bootcamp_id: row.bootcamp_id,
+    session_id: row.session_id || undefined,
     payment_type: row.payment_type,
     payment_method: row.payment_method,
     amount_paid: parseFloat(row.amount_paid || '0'),

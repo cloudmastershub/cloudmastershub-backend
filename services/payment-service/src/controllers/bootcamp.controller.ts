@@ -14,8 +14,14 @@ import {
   UpdateBootcampRequest,
   ManualEnrollmentRequest,
   UpdateEnrollmentRequest,
+  BootcampSession,
+  BootcampSessionWithStats,
+  CreateSessionRequest,
+  UpdateSessionRequest,
   rowToBootcamp,
-  rowToEnrollment
+  rowToEnrollment,
+  rowToSession,
+  rowToSessionWithStats
 } from '../models/bootcamp.model';
 import { PoolClient } from 'pg';
 
@@ -103,7 +109,7 @@ export const createBootcampCheckout = async (req: AuthRequest, res: Response) =>
       });
     }
 
-    const { bootcamp_id, payment_type, success_url, cancel_url } = req.body as BootcampCheckoutRequest;
+    const { bootcamp_id, session_id, payment_type, success_url, cancel_url } = req.body as BootcampCheckoutRequest;
 
     if (!bootcamp_id || !payment_type || !success_url || !cancel_url) {
       return res.status(400).json({
@@ -117,6 +123,45 @@ export const createBootcampCheckout = async (req: AuthRequest, res: Response) =>
         success: false,
         message: 'payment_type must be "full" or "installment"'
       });
+    }
+
+    // Validate session if provided
+    if (session_id) {
+      const sessionRows = await executeQuery(
+        'SELECT * FROM bootcamp_sessions WHERE id = $1 AND bootcamp_id = $2',
+        [session_id, bootcamp_id]
+      );
+
+      if (sessionRows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Session not found for this bootcamp'
+        });
+      }
+
+      const session = sessionRows[0];
+
+      if (!session.enrollment_open) {
+        return res.status(400).json({
+          success: false,
+          message: 'Enrollment is not open for this session'
+        });
+      }
+
+      // Check capacity if set
+      if (session.max_capacity) {
+        const enrollmentCount = await executeQuery(
+          'SELECT COUNT(*) as count FROM bootcamp_enrollments WHERE session_id = $1 AND status IN ($2, $3)',
+          [session_id, 'pending', 'active']
+        );
+
+        if (parseInt(enrollmentCount[0].count) >= session.max_capacity) {
+          return res.status(400).json({
+            success: false,
+            message: 'This session has reached maximum capacity'
+          });
+        }
+      }
     }
 
     // Get bootcamp
@@ -171,13 +216,18 @@ export const createBootcampCheckout = async (req: AuthRequest, res: Response) =>
       );
     }
 
-    const metadata = {
+    const metadata: Record<string, string> = {
       user_id: userId,
       bootcamp_id: bootcamp.id,
       bootcamp_name: bootcamp.name,
       payment_type,
       type: 'bootcamp'
     };
+
+    // Add session_id to metadata if provided
+    if (session_id) {
+      metadata.session_id = session_id;
+    }
 
     if (payment_type === 'full') {
       // One-time payment for pay-in-full
@@ -676,6 +726,21 @@ export const createManualEnrollment = async (req: AuthRequest, res: Response) =>
 
     const bootcamp = rowToBootcamp(bootcamps[0]);
 
+    // Validate session if provided
+    if (data.session_id) {
+      const sessionRows = await executeQuery(
+        'SELECT * FROM bootcamp_sessions WHERE id = $1 AND bootcamp_id = $2',
+        [data.session_id, data.bootcamp_id]
+      );
+
+      if (sessionRows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Session not found for this bootcamp'
+        });
+      }
+    }
+
     // Check for existing active enrollment
     const existingEnrollments = await executeQuery(
       `SELECT * FROM bootcamp_enrollments
@@ -696,13 +761,14 @@ export const createManualEnrollment = async (req: AuthRequest, res: Response) =>
 
     const result = await executeQuery(
       `INSERT INTO bootcamp_enrollments (
-        user_id, bootcamp_id, payment_type, payment_method,
+        user_id, bootcamp_id, session_id, payment_type, payment_method,
         amount_paid, amount_total, status, enrolled_at, admin_notes
-      ) VALUES ($1, $2, 'manual', $3, $4, $5, $6, $7, $8)
+      ) VALUES ($1, $2, $3, 'manual', $4, $5, $6, $7, $8, $9)
       RETURNING *`,
       [
         data.user_id,
         data.bootcamp_id,
+        data.session_id || null,
         data.payment_method,
         amountPaid,
         amountTotal,
@@ -872,6 +938,372 @@ export const getEnrollmentsByBootcamp = async (req: AuthRequest, res: Response) 
     res.status(500).json({
       success: false,
       message: 'Failed to fetch enrollments'
+    });
+  }
+};
+
+// ============================================================================
+// SESSION MANAGEMENT - PUBLIC
+// ============================================================================
+
+export const getBootcampSessions = async (req: Request, res: Response) => {
+  try {
+    const { bootcampId } = req.params;
+
+    // Get sessions for this bootcamp
+    // Returns: previous (most recent ended), current (ongoing), next (upcoming with enrollment open)
+    const rows = await executeQuery(
+      `SELECT bs.*,
+              (SELECT COUNT(*) FROM bootcamp_enrollments be WHERE be.session_id = bs.id) as enrollment_count
+       FROM bootcamp_sessions bs
+       WHERE bs.bootcamp_id = $1
+       AND (
+         -- Most recent ended session
+         (bs.status = 'ended' AND bs.id = (
+           SELECT id FROM bootcamp_sessions
+           WHERE bootcamp_id = $1 AND status = 'ended'
+           ORDER BY end_date DESC LIMIT 1
+         ))
+         OR
+         -- Current ongoing session
+         bs.status = 'ongoing'
+         OR
+         -- Next upcoming session with enrollment open
+         (bs.status = 'upcoming' AND bs.enrollment_open = true AND bs.id = (
+           SELECT id FROM bootcamp_sessions
+           WHERE bootcamp_id = $1 AND status = 'upcoming' AND enrollment_open = true
+           ORDER BY start_date ASC LIMIT 1
+         ))
+       )
+       ORDER BY
+         CASE bs.status
+           WHEN 'upcoming' THEN 1
+           WHEN 'ongoing' THEN 2
+           WHEN 'ended' THEN 3
+         END,
+         bs.start_date ASC`,
+      [bootcampId]
+    );
+
+    const sessions = rows.map(rowToSessionWithStats);
+
+    res.json({
+      success: true,
+      data: sessions
+    });
+  } catch (error) {
+    logger.error('Error fetching bootcamp sessions:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch bootcamp sessions'
+    });
+  }
+};
+
+// ============================================================================
+// SESSION MANAGEMENT - ADMIN
+// ============================================================================
+
+export const getAllSessions = async (req: AuthRequest, res: Response) => {
+  try {
+    const { bootcampId } = req.params;
+
+    const rows = await executeQuery(
+      `SELECT bs.*,
+              b.name as bootcamp_name,
+              (SELECT COUNT(*) FROM bootcamp_enrollments be WHERE be.session_id = bs.id) as enrollment_count
+       FROM bootcamp_sessions bs
+       JOIN bootcamps b ON bs.bootcamp_id = b.id
+       WHERE bs.bootcamp_id = $1
+       ORDER BY bs.start_date DESC`,
+      [bootcampId]
+    );
+
+    const sessions = rows.map(rowToSessionWithStats);
+
+    res.json({
+      success: true,
+      data: sessions
+    });
+  } catch (error) {
+    logger.error('Error fetching all sessions:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch sessions'
+    });
+  }
+};
+
+export const getSessionById = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const rows = await executeQuery(
+      `SELECT bs.*,
+              b.name as bootcamp_name,
+              (SELECT COUNT(*) FROM bootcamp_enrollments be WHERE be.session_id = bs.id) as enrollment_count
+       FROM bootcamp_sessions bs
+       JOIN bootcamps b ON bs.bootcamp_id = b.id
+       WHERE bs.id = $1`,
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Session not found'
+      });
+    }
+
+    const session = rowToSessionWithStats(rows[0]);
+
+    res.json({
+      success: true,
+      data: session
+    });
+  } catch (error) {
+    logger.error('Error fetching session by ID:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch session'
+    });
+  }
+};
+
+export const createSession = async (req: AuthRequest, res: Response) => {
+  try {
+    const { bootcampId } = req.params;
+    const data = req.body as CreateSessionRequest;
+
+    // Validate required fields
+    if (!data.name || !data.slug || !data.start_date || !data.end_date) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: name, slug, start_date, end_date'
+      });
+    }
+
+    // Verify bootcamp exists
+    const bootcampCheck = await executeQuery(
+      'SELECT id FROM bootcamps WHERE id = $1',
+      [bootcampId]
+    );
+
+    if (bootcampCheck.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Bootcamp not found'
+      });
+    }
+
+    // Check slug uniqueness within bootcamp
+    const slugCheck = await executeQuery(
+      'SELECT id FROM bootcamp_sessions WHERE bootcamp_id = $1 AND slug = $2',
+      [bootcampId, data.slug]
+    );
+
+    if (slugCheck.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'A session with this slug already exists for this bootcamp'
+      });
+    }
+
+    // Validate dates
+    const startDate = new Date(data.start_date);
+    const endDate = new Date(data.end_date);
+
+    if (endDate <= startDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'End date must be after start date'
+      });
+    }
+
+    const result = await executeQuery(
+      `INSERT INTO bootcamp_sessions (
+        bootcamp_id, name, slug, start_date, end_date,
+        status, enrollment_open, max_capacity, description
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      RETURNING *`,
+      [
+        bootcampId,
+        data.name,
+        data.slug,
+        data.start_date,
+        data.end_date,
+        data.status || 'upcoming',
+        data.enrollment_open ?? false,
+        data.max_capacity || null,
+        data.description || null
+      ]
+    );
+
+    const session = rowToSession(result[0]);
+
+    // Clear relevant caches
+    await deleteCache(`bootcamp_sessions:${bootcampId}`);
+
+    res.status(201).json({
+      success: true,
+      data: session,
+      message: 'Session created successfully'
+    });
+  } catch (error) {
+    logger.error('Error creating session:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create session'
+    });
+  }
+};
+
+export const updateSession = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const data = req.body as UpdateSessionRequest;
+
+    // Get existing session
+    const existing = await executeQuery(
+      'SELECT * FROM bootcamp_sessions WHERE id = $1',
+      [id]
+    );
+
+    if (existing.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Session not found'
+      });
+    }
+
+    const session = existing[0];
+
+    // Check slug uniqueness if changing
+    if (data.slug && data.slug !== session.slug) {
+      const slugCheck = await executeQuery(
+        'SELECT id FROM bootcamp_sessions WHERE bootcamp_id = $1 AND slug = $2 AND id != $3',
+        [session.bootcamp_id, data.slug, id]
+      );
+      if (slugCheck.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'A session with this slug already exists for this bootcamp'
+        });
+      }
+    }
+
+    // Validate dates if provided
+    if (data.start_date || data.end_date) {
+      const startDate = new Date(data.start_date || session.start_date);
+      const endDate = new Date(data.end_date || session.end_date);
+
+      if (endDate <= startDate) {
+        return res.status(400).json({
+          success: false,
+          message: 'End date must be after start date'
+        });
+      }
+    }
+
+    // Build dynamic update query
+    const updates: string[] = [];
+    const values: any[] = [];
+    let paramIndex = 1;
+
+    const fields = ['name', 'slug', 'start_date', 'end_date', 'status', 'enrollment_open', 'max_capacity', 'description'];
+
+    for (const field of fields) {
+      if (data[field as keyof UpdateSessionRequest] !== undefined) {
+        updates.push(`${field} = $${paramIndex}`);
+        values.push(data[field as keyof UpdateSessionRequest]);
+        paramIndex++;
+      }
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No fields to update'
+      });
+    }
+
+    updates.push(`updated_at = NOW()`);
+    values.push(id);
+
+    const result = await executeQuery(
+      `UPDATE bootcamp_sessions SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+      values
+    );
+
+    const updatedSession = rowToSession(result[0]);
+
+    // Clear relevant caches
+    await deleteCache(`bootcamp_sessions:${session.bootcamp_id}`);
+
+    res.json({
+      success: true,
+      data: updatedSession,
+      message: 'Session updated successfully'
+    });
+  } catch (error) {
+    logger.error('Error updating session:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update session'
+    });
+  }
+};
+
+export const deleteSession = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Check for existing enrollments
+    const enrollmentCheck = await executeQuery(
+      'SELECT COUNT(*) as count FROM bootcamp_enrollments WHERE session_id = $1',
+      [id]
+    );
+
+    if (parseInt(enrollmentCheck[0].count) > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot delete session with existing enrollments. Set status to "ended" instead.'
+      });
+    }
+
+    // Get session for cache clearing
+    const sessionResult = await executeQuery(
+      'SELECT bootcamp_id FROM bootcamp_sessions WHERE id = $1',
+      [id]
+    );
+
+    if (sessionResult.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Session not found'
+      });
+    }
+
+    const bootcampId = sessionResult[0].bootcamp_id;
+
+    // Delete the session
+    await executeQuery(
+      'DELETE FROM bootcamp_sessions WHERE id = $1',
+      [id]
+    );
+
+    // Clear relevant caches
+    await deleteCache(`bootcamp_sessions:${bootcampId}`);
+
+    res.json({
+      success: true,
+      message: 'Session deleted successfully'
+    });
+  } catch (error) {
+    logger.error('Error deleting session:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete session'
     });
   }
 };

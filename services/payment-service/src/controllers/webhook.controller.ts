@@ -626,6 +626,7 @@ async function handleBootcampCheckout(
 ) {
   const userId = metadata.user_id;
   const bootcampId = metadata.bootcamp_id;
+  const sessionId = metadata.session_id || null; // Optional session for cohort enrollment
   const paymentType = metadata.payment_type as 'full' | 'installment';
   const scheduleId = metadata.schedule_id;
 
@@ -650,14 +651,15 @@ async function handleBootcampCheckout(
 
     const enrollmentResult = await client.query(`
       INSERT INTO bootcamp_enrollments (
-        user_id, bootcamp_id, payment_type, payment_method,
+        user_id, bootcamp_id, session_id, payment_type, payment_method,
         amount_paid, amount_total, installments_paid,
         stripe_payment_intent_id, benefits_unlocked,
         status, enrolled_at
-      ) VALUES ($1, $2, 'full', 'stripe', $3, $4, 1, $5, $6, 'active', NOW())
+      ) VALUES ($1, $2, $3, 'full', 'stripe', $4, $5, 1, $6, $7, 'active', NOW())
       ON CONFLICT (user_id, bootcamp_id) WHERE status IN ('pending', 'active')
       DO UPDATE SET
         amount_paid = EXCLUDED.amount_paid,
+        session_id = EXCLUDED.session_id,
         status = 'active',
         enrolled_at = NOW(),
         stripe_payment_intent_id = EXCLUDED.stripe_payment_intent_id,
@@ -666,6 +668,7 @@ async function handleBootcampCheckout(
     `, [
       userId,
       bootcampId,
+      sessionId,
       amountTotal,
       amountTotal,
       session.payment_intent,
@@ -702,6 +705,7 @@ async function handleBootcampCheckout(
     await publishEvent('bootcamp.enrolled', {
       user_id: userId,
       bootcamp_id: bootcampId,
+      session_id: sessionId,
       enrollment_id: enrollmentId,
       payment_type: 'full',
       timestamp: new Date().toISOString()
@@ -710,6 +714,7 @@ async function handleBootcampCheckout(
     logger.info('Bootcamp full payment enrollment completed', {
       userId,
       bootcampId,
+      sessionId,
       enrollmentId
     });
 
@@ -724,15 +729,16 @@ async function handleBootcampCheckout(
 
     const enrollmentResult = await client.query(`
       INSERT INTO bootcamp_enrollments (
-        user_id, bootcamp_id, payment_type, payment_method,
+        user_id, bootcamp_id, session_id, payment_type, payment_method,
         amount_paid, amount_total, installments_paid,
         stripe_subscription_id, stripe_schedule_id,
         benefits_unlocked, status, enrolled_at,
         next_installment_due
-      ) VALUES ($1, $2, 'installment', 'stripe', $3, $4, 1, $5, $6, $7, 'active', NOW(), $8)
+      ) VALUES ($1, $2, $3, 'installment', 'stripe', $4, $5, 1, $6, $7, $8, 'active', NOW(), $9)
       ON CONFLICT (user_id, bootcamp_id) WHERE status IN ('pending', 'active')
       DO UPDATE SET
         amount_paid = EXCLUDED.amount_paid,
+        session_id = EXCLUDED.session_id,
         installments_paid = 1,
         status = 'active',
         enrolled_at = NOW(),
@@ -744,6 +750,7 @@ async function handleBootcampCheckout(
     `, [
       userId,
       bootcampId,
+      sessionId,
       installmentAmount,
       installmentTotal,
       session.subscription,
@@ -783,6 +790,7 @@ async function handleBootcampCheckout(
     await publishEvent('bootcamp.enrolled', {
       user_id: userId,
       bootcamp_id: bootcampId,
+      session_id: sessionId,
       enrollment_id: enrollmentId,
       payment_type: 'installment',
       installment_number: 1,
@@ -792,6 +800,7 @@ async function handleBootcampCheckout(
     logger.info('Bootcamp installment enrollment started', {
       userId,
       bootcampId,
+      sessionId,
       enrollmentId,
       installmentPaid: 1
     });
