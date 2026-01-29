@@ -9,6 +9,8 @@ import lessonRoutes from './routes/lessonRoutes';
 import progressRoutes from './routes/progressRoutes';
 import learningPathRoutes from './routes/learningPathRoutes';
 import curriculumRoutes from './routes/curriculumRoutes';
+import bookmarkRoutes from './routes/bookmarkRoutes';
+import certificateRoutes from './routes/certificateRoutes';
 import { errorHandler } from './middleware/errorHandler';
 import { initializeCoursePaymentEventSubscriber } from './events/paymentEventSubscriber';
 import DatabaseConnection from './database/connection';
@@ -77,6 +79,10 @@ app.use('/progress', progressRoutes);
 // Learning paths with admin role restrictions for CRUD operations
 app.use('/paths', learningPathRoutes);
 app.use('/curriculum', curriculumRoutes);
+// Bookmarks for saving video positions
+app.use('/bookmarks', bookmarkRoutes);
+// Certificates - includes public verification endpoint
+app.use('/certificates', certificateRoutes);
 
 app.use(errorHandler);
 

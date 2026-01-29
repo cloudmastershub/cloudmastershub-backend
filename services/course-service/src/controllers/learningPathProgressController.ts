@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import logger from '../utils/logger';
 import { LearningPathProgress, LearningPathEnrollment } from '@cloudmastershub/types';
+import { Certificate } from '../models/Certificate';
+import { LearningPath, LearningPathProgress as LearningPathProgressModel } from '../models/LearningPath';
 
 export const enrollInLearningPath = async (
   req: Request,
@@ -297,34 +299,119 @@ export const getLearningPathCertificate = async (
   try {
     const { id } = req.params;
     const userId = (req as any).user?.userId;
+    const { userName, userEmail } = req.body;
 
-    logger.info('Generating learning path certificate', { pathId: id, userId });
+    logger.info('Fetching/generating learning path certificate', { pathId: id, userId });
 
-    // TODO: Verify path completion
-    // TODO: Check if certificate already exists
-    // TODO: Generate certificate PDF
-    // TODO: Store certificate record
-
-    // Mock certificate data
-    const certificate = {
-      id: `cert-${Date.now()}`,
-      pathId: id,
+    // Check if certificate already exists
+    const existingCert = await Certificate.findOne({
       userId,
-      pathTitle: 'AWS Solutions Architect Journey',
-      userName: 'John Doe',
-      completedAt: new Date(),
-      issuedAt: new Date(),
-      certificateUrl: 'https://certificates.cloudmastershub.com/aws-architect-john-doe.pdf',
-      verificationCode: 'CMH-AWS-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
-      skills: ['AWS Architecture', 'Cloud Security', 'Cost Optimization'],
-      finalScore: 94.5,
-      creditsEarned: 24,
-    };
+      pathId: id,
+      type: 'learning_path',
+      status: 'issued'
+    });
 
-    res.status(200).json({
+    if (existingCert) {
+      res.status(200).json({
+        success: true,
+        message: 'Certificate already exists',
+        data: {
+          id: existingCert.certificateId,
+          pathId: id,
+          userId,
+          pathTitle: existingCert.pathTitle,
+          userName: existingCert.userName,
+          completedAt: existingCert.completedAt,
+          issuedAt: existingCert.issuedAt,
+          certificateUrl: `https://cloudmastershub.com/certificates/${existingCert.certificateId}`,
+          verificationCode: existingCert.verificationCode,
+          skills: existingCert.skills,
+          finalScore: existingCert.finalScore,
+          creditsEarned: existingCert.creditsEarned,
+          linkedInShareUrl: existingCert.linkedInShareUrl
+        },
+      });
+      return;
+    }
+
+    // Verify path completion
+    const progress = await LearningPathProgressModel.findOne({ userId, pathId: id });
+
+    if (!progress || !progress.isCompleted) {
+      res.status(400).json({
+        success: false,
+        error: {
+          message: 'Learning path not completed. Complete all steps to earn a certificate.',
+          code: 'PATH_NOT_COMPLETED',
+          currentProgress: progress?.progress || 0
+        }
+      });
+      return;
+    }
+
+    // Fetch learning path details
+    const learningPath = await LearningPath.findById(id);
+
+    if (!learningPath) {
+      res.status(404).json({
+        success: false,
+        error: { message: 'Learning path not found', code: 'PATH_NOT_FOUND' }
+      });
+      return;
+    }
+
+    // Require userName for certificate generation
+    if (!userName) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'userName is required in request body for certificate generation', code: 'VALIDATION_ERROR' }
+      });
+      return;
+    }
+
+    // Create certificate
+    const certificate = new Certificate({
+      userId,
+      userName,
+      userEmail,
+      type: 'learning_path',
+      pathId: id,
+      pathTitle: learningPath.title,
+      completedAt: progress.completedAt || new Date(),
+      skills: learningPath.skills || [],
+      finalScore: progress.progress || 100,
+      creditsEarned: learningPath.estimatedHours || Math.round((learningPath.steps?.length || 0) * 2),
+      metadata: {
+        totalLessons: learningPath.steps?.length || 0,
+        totalWatchTime: (progress.totalTimeSpentMinutes || 0) * 60
+      }
+    });
+
+    // Generate LinkedIn share URL
+    certificate.generateLinkedInShareUrl();
+
+    await certificate.save();
+
+    logger.info(`Generated path certificate ${certificate.verificationCode} for user ${userId} path ${id}`);
+
+    res.status(201).json({
       success: true,
       message: 'Certificate generated successfully',
-      data: certificate,
+      data: {
+        id: certificate.certificateId,
+        pathId: id,
+        userId,
+        pathTitle: certificate.pathTitle,
+        userName: certificate.userName,
+        completedAt: certificate.completedAt,
+        issuedAt: certificate.issuedAt,
+        certificateUrl: `https://cloudmastershub.com/certificates/${certificate.certificateId}`,
+        verificationCode: certificate.verificationCode,
+        skills: certificate.skills,
+        finalScore: certificate.finalScore,
+        creditsEarned: certificate.creditsEarned,
+        linkedInShareUrl: certificate.linkedInShareUrl
+      },
     });
   } catch (error: any) {
     logger.error('Error generating certificate:', error);
