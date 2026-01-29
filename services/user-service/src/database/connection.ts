@@ -2,9 +2,12 @@ import { Pool, PoolClient, QueryResult } from 'pg';
 import logger from '../utils/logger';
 
 // Database connection configuration
+// SSL is disabled by default for internal Kubernetes cluster connections
+// Set DB_SSL=true to enable SSL for external/cloud PostgreSQL connections
+const sslEnabled = process.env.DB_SSL === 'true';
 const connectionConfig = {
   connectionString: process.env.DATABASE_URL || 'postgresql://cloudmaster:cloudpass@localhost:5432/cloudmastershub',
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ssl: sslEnabled ? { rejectUnauthorized: false } : false,
   max: 20, // Maximum number of connections in the pool
   idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
   connectionTimeoutMillis: 10000, // Connection timeout: 10 seconds
