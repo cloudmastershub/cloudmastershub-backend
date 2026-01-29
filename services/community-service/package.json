@@ -1,0 +1,38 @@
+{
+  "name": "@cloudmastershub/community-service",
+  "version": "1.0.0",
+  "description": "Community service for CloudMastersHub - forums, posts, groups, Q&A, connections, events",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "nodemon --exec ts-node src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "jest --passWithNoTests",
+    "lint": "eslint src/**/*.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "helmet": "^7.1.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "winston": "^3.11.0",
+    "mongoose": "^7.5.0",
+    "redis": "^4.6.12",
+    "uuid": "^9.0.0",
+    "express-validator": "^7.0.1",
+    "@cloudmastershub/types": "file:../../shared/types",
+    "@cloudmastershub/middleware": "file:../../shared/middleware",
+    "@cloudmastershub/utils": "file:../../shared/utils"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/cors": "^2.8.17",
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.2",
+    "nodemon": "^3.0.2",
+    "ts-node": "^10.9.2",
+    "jest": "^29.7.0",
+    "@types/jest": "^29.5.11"
+  }
+}
