@@ -205,6 +205,15 @@ const serviceRoutes = {
       '^/api/admin/content': '/admin/content'
     }
   },
+  '/admin/video-popups': {
+    target: process.env.ADMIN_SERVICE_URL || 'http://admin-service:3005',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/admin/video-popups': '/admin/video-popups'
+    }
+  },
   '/admin': {
     target: process.env.ADMIN_SERVICE_URL || 'http://admin-service:3005',
     changeOrigin: true,
@@ -222,6 +231,16 @@ const serviceRoutes = {
     proxyTimeout: 30000,
     pathRewrite: {
       '^/api/pages': '/pages'
+    }
+  },
+  // Public video popups (no authentication required)
+  '/video-popups': {
+    target: process.env.ADMIN_SERVICE_URL || 'http://admin-service:3005',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/video-popups': '/video-popups'
     }
   },
   // Marketing Service routes - Funnels, Challenges, Email
