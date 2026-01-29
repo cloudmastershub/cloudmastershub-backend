@@ -36,6 +36,7 @@ RUN npm run build --workspace=@cloudmastershub/lab-service
 RUN npm run build --workspace=@cloudmastershub/admin-service
 RUN npm run build --workspace=@cloudmastershub/payment-service
 RUN npm run build --workspace=@cloudmastershub/marketing-service
+RUN npm run build --workspace=@cloudmastershub/community-service
 
 FROM base AS production
 
@@ -64,6 +65,8 @@ COPY --from=builder /app/services/payment-service/dist ./services/payment-servic
 COPY --from=builder /app/services/payment-service/package.json ./services/payment-service/
 COPY --from=builder /app/services/marketing-service/dist ./services/marketing-service/dist
 COPY --from=builder /app/services/marketing-service/package.json ./services/marketing-service/
+COPY --from=builder /app/services/community-service/dist ./services/community-service/dist
+COPY --from=builder /app/services/community-service/package.json ./services/community-service/
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs
