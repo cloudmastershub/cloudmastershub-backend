@@ -1,9 +1,24 @@
 import { Request, Response, NextFunction } from 'express';
-import { Certificate } from '../models/Certificate';
+import { Certificate, ICertificate } from '../models/Certificate';
 import { CourseProgress } from '../models/CourseProgress';
 import { Course } from '../models/Course';
 import { LearningPath, LearningPathProgress } from '../models/LearningPath';
 import logger from '../utils/logger';
+
+// Helper function to generate LinkedIn share URL
+const generateLinkedInUrl = (certificate: ICertificate): string => {
+  const baseUrl = 'https://www.linkedin.com/profile/add';
+  const params = new URLSearchParams({
+    startTask: 'CERTIFICATION_NAME',
+    name: certificate.courseTitle || certificate.pathTitle || 'CloudMastersHub Certificate',
+    organizationName: 'CloudMastersHub',
+    issueYear: certificate.issuedAt.getFullYear().toString(),
+    issueMonth: (certificate.issuedAt.getMonth() + 1).toString(),
+    certUrl: `https://cloudmastershub.com/certificates/verify/${certificate.verificationCode}`,
+    certId: certificate.verificationCode
+  });
+  return `${baseUrl}?${params.toString()}`;
+};
 
 /**
  * Verify a certificate by its verification code (PUBLIC - no auth required)
@@ -265,7 +280,7 @@ export const generateCourseCertificate = async (
     });
 
     // Generate LinkedIn share URL
-    certificate.generateLinkedInShareUrl();
+    certificate.linkedInShareUrl = generateLinkedInUrl(certificate);
 
     await certificate.save();
 
@@ -379,15 +394,15 @@ export const generatePathCertificate = async (
       completedAt: progress.completedAt || new Date(),
       skills,
       finalScore: progress.progress,
-      creditsEarned: learningPath.estimatedHours || 0,
+      creditsEarned: learningPath.estimatedDurationHours || 0,
       metadata: {
-        totalLessons: learningPath.steps?.length || 0,
-        totalWatchTime: progress.totalTimeSpentMinutes * 60
+        totalLessons: learningPath.pathway?.length || 0,
+        totalWatchTime: (progress.totalTimeSpentMinutes || 0) * 60
       }
     });
 
     // Generate LinkedIn share URL
-    certificate.generateLinkedInShareUrl();
+    certificate.linkedInShareUrl = generateLinkedInUrl(certificate);
 
     await certificate.save();
 
@@ -428,7 +443,7 @@ export const getLinkedInShareUrl = async (
 
     // Generate URL if not exists
     if (!certificate.linkedInShareUrl) {
-      certificate.generateLinkedInShareUrl();
+      certificate.linkedInShareUrl = generateLinkedInUrl(certificate);
       await certificate.save();
     }
 

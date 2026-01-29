@@ -380,15 +380,25 @@ export const getLearningPathCertificate = async (
       completedAt: progress.completedAt || new Date(),
       skills: learningPath.skills || [],
       finalScore: progress.progress || 100,
-      creditsEarned: learningPath.estimatedHours || Math.round((learningPath.steps?.length || 0) * 2),
+      creditsEarned: learningPath.estimatedDurationHours || Math.round((learningPath.pathway?.length || 0) * 2),
       metadata: {
-        totalLessons: learningPath.steps?.length || 0,
+        totalLessons: learningPath.pathway?.length || 0,
         totalWatchTime: (progress.totalTimeSpentMinutes || 0) * 60
       }
     });
 
     // Generate LinkedIn share URL
-    certificate.generateLinkedInShareUrl();
+    const baseUrl = 'https://www.linkedin.com/profile/add';
+    const params = new URLSearchParams({
+      startTask: 'CERTIFICATION_NAME',
+      name: certificate.pathTitle || 'CloudMastersHub Certificate',
+      organizationName: 'CloudMastersHub',
+      issueYear: certificate.issuedAt.getFullYear().toString(),
+      issueMonth: (certificate.issuedAt.getMonth() + 1).toString(),
+      certUrl: `https://cloudmastershub.com/certificates/verify/${certificate.verificationCode}`,
+      certId: certificate.verificationCode
+    });
+    certificate.linkedInShareUrl = `${baseUrl}?${params.toString()}`;
 
     await certificate.save();
 
