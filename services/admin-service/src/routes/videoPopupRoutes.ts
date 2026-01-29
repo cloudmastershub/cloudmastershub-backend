@@ -13,12 +13,12 @@ import {
   recordPopupDismiss,
   getPopupAnalytics
 } from '../controllers/videoPopupController';
-import { authenticateAdmin } from '../middleware/adminAuth';
+import { requireAdmin } from '../middleware/adminAuth';
 
 // Admin routes (protected)
 const router = Router();
 
-router.use(authenticateAdmin);
+router.use(requireAdmin);
 
 router.get('/', listVideoPopups);
 router.get('/:id', getVideoPopup);
