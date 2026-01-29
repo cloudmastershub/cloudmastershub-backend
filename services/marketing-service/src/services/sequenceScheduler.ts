@@ -91,6 +91,13 @@ class SequenceSchedulerService {
     emailQueue.process(async (job) => {
       const { jobId } = job.data;
 
+      // Handle recurring "process-pending" job - this triggers processing of pending emails
+      if (jobId === 'process-pending') {
+        const count = await this.processPendingJobs();
+        logger.debug(`Processed ${count} pending email jobs`);
+        return { success: true, processed: count };
+      }
+
       try {
         const emailJob = await EmailQueueJob.findById(jobId);
         if (!emailJob) {
@@ -246,11 +253,21 @@ class SequenceSchedulerService {
             );
 
           case 'check_conditions':
+            // Skip if this is the recurring cleanup job (empty IDs)
+            if (!leadId || !sequenceId) {
+              return { success: true, skipped: true, reason: 'Cleanup job - no action needed' };
+            }
             return await this.checkSequenceConditions(
               new mongoose.Types.ObjectId(sequenceId),
               new mongoose.Types.ObjectId(leadId),
               currentEmailOrder || 0
             );
+
+          case 'cleanup':
+            // Handle daily cleanup job
+            logger.info('Running daily cleanup job');
+            await this.cleanupOldJobs();
+            return { success: true };
 
           default:
             logger.warn(`Unknown sequence processor type: ${type}`);
@@ -278,7 +295,7 @@ class SequenceSchedulerService {
 
     // Clean up old jobs daily
     await sequenceProcessorQueue.add(
-      { type: 'check_conditions', leadId: '', sequenceId: '' },
+      { type: 'cleanup' as any, leadId: '', sequenceId: '' },
       {
         repeat: { cron: '0 3 * * *' }, // 3 AM daily
         jobId: 'cleanup-old-jobs',
@@ -782,6 +799,30 @@ class SequenceSchedulerService {
       email: emailCounts,
       sequence: sequenceCounts,
     };
+  }
+
+  /**
+   * Cleanup old completed/failed jobs from the database
+   */
+  private async cleanupOldJobs(): Promise<void> {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    // Delete old completed jobs
+    const completedResult = await EmailQueueJob.deleteMany({
+      status: { $in: [EmailJobStatus.SENT, EmailJobStatus.DELIVERED, EmailJobStatus.OPENED, EmailJobStatus.CLICKED] },
+      createdAt: { $lt: thirtyDaysAgo },
+    });
+
+    // Delete old failed jobs
+    const failedResult = await EmailQueueJob.deleteMany({
+      status: { $in: [EmailJobStatus.FAILED, EmailJobStatus.BOUNCED, EmailJobStatus.CANCELLED, EmailJobStatus.SKIPPED] },
+      createdAt: { $lt: thirtyDaysAgo },
+    });
+
+    logger.info('Cleanup completed', {
+      deletedCompleted: completedResult.deletedCount,
+      deletedFailed: failedResult.deletedCount,
+    });
   }
 
   /**
