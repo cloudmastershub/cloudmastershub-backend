@@ -754,26 +754,6 @@ export const captureBootcampInterest = async (
   }
 };
 
-export default {
-  createLead,
-  getLead,
-  listLeads,
-  updateLead,
-  deleteLead,
-  searchLeads,
-  getAllTags,
-  addTag,
-  removeTag,
-  bulkUpdate,
-  bulkDelete,
-  getStats,
-  importLeads,
-  exportLeads,
-  mergeLeads,
-  captureBootcampInterest,
-  subscribeNewsletter,
-};
-
 /**
  * Subscribe to newsletter - PUBLIC endpoint
  * POST /leads/newsletter
@@ -850,4 +830,24 @@ export const subscribeNewsletter = async (
     logger.error('Error subscribing to newsletter:', error);
     next(error);
   }
+};
+
+export default {
+  createLead,
+  getLead,
+  listLeads,
+  updateLead,
+  deleteLead,
+  searchLeads,
+  getAllTags,
+  addTag,
+  removeTag,
+  bulkUpdate,
+  bulkDelete,
+  getStats,
+  importLeads,
+  exportLeads,
+  mergeLeads,
+  captureBootcampInterest,
+  subscribeNewsletter,
 };
