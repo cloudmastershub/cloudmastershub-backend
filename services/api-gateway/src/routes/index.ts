@@ -370,6 +370,97 @@ const serviceRoutes = {
       '^/api/marketing/track': '/track'
     }
   },
+  // Community Service routes
+  '/community/forums': {
+    target: process.env.COMMUNITY_SERVICE_URL || 'http://community-service:3007',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/community/forums': '/forums'
+    }
+  },
+  '/community/threads': {
+    target: process.env.COMMUNITY_SERVICE_URL || 'http://community-service:3007',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/community/threads': '/threads'
+    }
+  },
+  '/community/posts': {
+    target: process.env.COMMUNITY_SERVICE_URL || 'http://community-service:3007',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/community/posts': '/posts'
+    }
+  },
+  '/community/groups': {
+    target: process.env.COMMUNITY_SERVICE_URL || 'http://community-service:3007',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/community/groups': '/groups'
+    }
+  },
+  '/community/questions': {
+    target: process.env.COMMUNITY_SERVICE_URL || 'http://community-service:3007',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/community/questions': '/questions'
+    }
+  },
+  '/community/answers': {
+    target: process.env.COMMUNITY_SERVICE_URL || 'http://community-service:3007',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/community/answers': '/answers'
+    }
+  },
+  '/community/events': {
+    target: process.env.COMMUNITY_SERVICE_URL || 'http://community-service:3007',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/community/events': '/events'
+    }
+  },
+  '/community/connections': {
+    target: process.env.COMMUNITY_SERVICE_URL || 'http://community-service:3007',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/community/connections': '/connections'
+    }
+  },
+  '/community/users': {
+    target: process.env.COMMUNITY_SERVICE_URL || 'http://community-service:3007',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/community/users': '/users'
+    }
+  },
+  '/community/health': {
+    target: process.env.COMMUNITY_SERVICE_URL || 'http://community-service:3007',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/community/health': '/health'
+    }
+  },
 };
 
 // Handle specific routes first with exact path matching
