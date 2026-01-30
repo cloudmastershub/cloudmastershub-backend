@@ -59,7 +59,19 @@ export const handleStripeWebhook = async (req: Request, res: Response) => {
       case 'payment_intent.payment_failed':
         await handlePaymentIntentFailed(event);
         break;
-      
+
+      case 'customer.subscription.trial_will_end':
+        await handleTrialWillEnd(event);
+        break;
+
+      case 'customer.subscription.paused':
+        await handleSubscriptionPaused(event);
+        break;
+
+      case 'customer.subscription.resumed':
+        await handleSubscriptionResumed(event);
+        break;
+
       default:
         logger.info(`Unhandled webhook event type: ${event.type}`);
     }
@@ -439,6 +451,50 @@ const handleSubscriptionCreated = async (event: Stripe.Event) => {
       if (subscription.status === 'active' || subscription.status === 'trialing') {
         await grantUserAccess(client, userId, 'subscription', subscriptionId, 'platform', null);
       }
+
+      // Schedule trial reminders if this is a trial subscription
+      if (subscription.status === 'trialing' && subscription.trial_end) {
+        const trialEndDate = new Date(subscription.trial_end * 1000);
+        const reminderDays = [7, 10, 12, 13]; // Days to send reminders
+
+        for (const day of reminderDays) {
+          const reminderDate = new Date(subscription.created * 1000);
+          reminderDate.setDate(reminderDate.getDate() + day);
+
+          // Only schedule if reminder date is before trial end
+          if (reminderDate < trialEndDate) {
+            await client.query(`
+              INSERT INTO trial_reminders (
+                subscription_id, user_id, reminder_day, scheduled_for,
+                email_template, status
+              ) VALUES ($1, $2, $3, $4, $5, 'pending')
+              ON CONFLICT DO NOTHING
+            `, [
+              subscriptionId,
+              userId,
+              day,
+              reminderDate,
+              `trial-reminder-day-${day}`
+            ]);
+          }
+        }
+
+        logger.info('Scheduled trial reminders', {
+          subscriptionId,
+          trialEndDate: trialEndDate.toISOString(),
+          reminderDays
+        });
+
+        // Publish trial started event
+        await publishEvent('trial.started', {
+          user_id: userId,
+          subscription_id: subscriptionId,
+          plan_id: planId,
+          trial_ends_at: trialEndDate.toISOString(),
+          trial_days: Math.ceil((trialEndDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)),
+          timestamp: new Date().toISOString()
+        });
+      }
     });
 
     // Publish event
@@ -611,6 +667,158 @@ const handlePaymentIntentFailed = async (event: Stripe.Event) => {
 
   } catch (error) {
     logger.error('Error handling payment intent failure:', error);
+    throw error;
+  }
+};
+
+// ============================================================================
+// TRIAL AND PAUSE HANDLERS
+// ============================================================================
+
+const handleTrialWillEnd = async (event: Stripe.Event) => {
+  try {
+    const subscription = event.data.object as Stripe.Subscription;
+
+    logger.info('Processing trial will end notification', {
+      subscriptionId: subscription.id,
+      trialEnd: subscription.trial_end
+    });
+
+    await executeTransaction(async (client: PoolClient) => {
+      // Get our subscription record
+      const result = await client.query(`
+        SELECT s.id, s.user_id, sp.name as plan_name
+        FROM subscriptions s
+        JOIN subscription_plans sp ON s.plan_id = sp.id
+        WHERE s.stripe_subscription_id = $1
+      `, [subscription.id]);
+
+      if (result.rows.length === 0) {
+        logger.warn('Subscription not found for trial will end event', {
+          stripeSubscriptionId: subscription.id
+        });
+        return;
+      }
+
+      const { id: subscriptionId, user_id: userId, plan_name: planName } = result.rows[0];
+
+      // Schedule the final trial reminder (Day 13 - last day before trial ends)
+      const trialEndDate = subscription.trial_end
+        ? new Date(subscription.trial_end * 1000)
+        : new Date();
+
+      await client.query(`
+        INSERT INTO trial_reminders (
+          subscription_id, user_id, reminder_day, scheduled_for,
+          email_template, status
+        ) VALUES ($1, $2, 13, $3, 'trial-reminder-day-13', 'pending')
+        ON CONFLICT DO NOTHING
+      `, [subscriptionId, userId, trialEndDate]);
+
+      // Publish event for marketing service to send email
+      await publishEvent('trial.ending_soon', {
+        user_id: userId,
+        subscription_id: subscriptionId,
+        plan_name: planName,
+        trial_ends_at: trialEndDate.toISOString(),
+        days_remaining: 3, // Stripe sends this 3 days before trial end
+        timestamp: new Date().toISOString()
+      });
+    });
+
+  } catch (error) {
+    logger.error('Error handling trial will end event:', error);
+    throw error;
+  }
+};
+
+const handleSubscriptionPaused = async (event: Stripe.Event) => {
+  try {
+    const subscription = event.data.object as Stripe.Subscription;
+
+    logger.info('Processing subscription paused webhook', {
+      subscriptionId: subscription.id
+    });
+
+    await executeTransaction(async (client: PoolClient) => {
+      const result = await client.query(`
+        UPDATE subscriptions
+        SET
+          status = 'paused',
+          paused_at = NOW(),
+          updated_at = NOW()
+        WHERE stripe_subscription_id = $1
+        RETURNING id, user_id
+      `, [subscription.id]);
+
+      if (result.rows.length === 0) {
+        logger.warn('Subscription not found for pause event', {
+          stripeSubscriptionId: subscription.id
+        });
+        return;
+      }
+
+      const { id: subscriptionId, user_id: userId } = result.rows[0];
+
+      // Publish event
+      await publishEvent('subscription.paused', {
+        user_id: userId,
+        subscription_id: subscriptionId,
+        source: 'stripe_webhook',
+        timestamp: new Date().toISOString()
+      });
+    });
+
+  } catch (error) {
+    logger.error('Error handling subscription paused event:', error);
+    throw error;
+  }
+};
+
+const handleSubscriptionResumed = async (event: Stripe.Event) => {
+  try {
+    const subscription = event.data.object as Stripe.Subscription;
+
+    logger.info('Processing subscription resumed webhook', {
+      subscriptionId: subscription.id
+    });
+
+    await executeTransaction(async (client: PoolClient) => {
+      const result = await client.query(`
+        UPDATE subscriptions
+        SET
+          status = 'active',
+          paused_at = NULL,
+          pause_expires_at = NULL,
+          pause_reason = NULL,
+          updated_at = NOW()
+        WHERE stripe_subscription_id = $1
+        RETURNING id, user_id
+      `, [subscription.id]);
+
+      if (result.rows.length === 0) {
+        logger.warn('Subscription not found for resume event', {
+          stripeSubscriptionId: subscription.id
+        });
+        return;
+      }
+
+      const { id: subscriptionId, user_id: userId } = result.rows[0];
+
+      // Re-grant access
+      await grantUserAccess(client, userId, 'subscription', subscriptionId, 'platform', null);
+
+      // Publish event
+      await publishEvent('subscription.resumed', {
+        user_id: userId,
+        subscription_id: subscriptionId,
+        source: 'stripe_webhook',
+        timestamp: new Date().toISOString()
+      });
+    });
+
+  } catch (error) {
+    logger.error('Error handling subscription resumed event:', error);
     throw error;
   }
 };

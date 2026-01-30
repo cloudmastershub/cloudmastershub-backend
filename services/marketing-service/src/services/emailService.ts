@@ -705,5 +705,243 @@ class EmailService {
   }
 }
 
+  // ==========================================
+  // Trial Subscription Email Helpers
+  // ==========================================
+
+  /**
+   * Send trial started welcome email
+   */
+  async sendTrialStartedEmail(
+    email: string,
+    planName: string,
+    trialDays: number,
+    trialEndsAt: Date,
+    firstName?: string,
+    templateId?: string
+  ): Promise<void> {
+    const context: TemplateContext = {
+      firstName: firstName || 'there',
+      email,
+      planName,
+      trialDays,
+      trialEndsAt: trialEndsAt.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      }),
+      dashboardLink: `${process.env.APP_URL}/dashboard`,
+      subscriptionLink: `${process.env.APP_URL}/profile/subscription`,
+    };
+
+    if (templateId) {
+      await this.sendTemplatedEmail(templateId, email, context, {
+        tags: ['trial', 'welcome', 'subscription'],
+      });
+    } else {
+      await this.sendEmail({
+        to: email,
+        toName: firstName,
+        subject: `Your ${trialDays}-day free trial has started! 🚀`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h1>Welcome to CloudMastersHub ${planName}!</h1>
+            <p>Hi ${firstName || 'there'},</p>
+            <p>Your ${trialDays}-day free trial is now active. You have full access to all ${planName} features until <strong>${context.trialEndsAt}</strong>.</p>
+            <h3>What you can do now:</h3>
+            <ul>
+              <li>Access all ${planName} courses</li>
+              <li>Start hands-on cloud labs</li>
+              <li>Track your learning progress</li>
+              <li>Join our community</li>
+            </ul>
+            <p><a href="${context.dashboardLink}" style="background: #40E0D0; color: black; padding: 12px 24px; border-radius: 6px; text-decoration: none; display: inline-block; font-weight: bold;">Go to Dashboard</a></p>
+            <p style="color: #666; font-size: 14px; margin-top: 24px;">
+              Your card won't be charged until the trial ends. You can cancel anytime from your <a href="${context.subscriptionLink}">subscription settings</a>.
+            </p>
+            <p>Happy learning!</p>
+            <p>The CloudMastersHub Team</p>
+          </div>
+        `,
+        tags: ['trial', 'welcome', 'subscription'],
+      });
+    }
+  }
+
+  /**
+   * Send trial reminder email
+   */
+  async sendTrialReminderEmail(
+    email: string,
+    planName: string,
+    daysRemaining: number,
+    trialEndsAt: Date,
+    firstName?: string,
+    templateId?: string
+  ): Promise<void> {
+    const context: TemplateContext = {
+      firstName: firstName || 'there',
+      email,
+      planName,
+      daysRemaining,
+      trialEndsAt: trialEndsAt.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      }),
+      subscriptionLink: `${process.env.APP_URL}/profile/subscription`,
+      dashboardLink: `${process.env.APP_URL}/dashboard`,
+    };
+
+    const urgencyPrefix = daysRemaining <= 1 ? '⚠️ ' : daysRemaining <= 3 ? '⏰ ' : '';
+    const subjectLine = daysRemaining === 1
+      ? `${urgencyPrefix}Your trial ends tomorrow!`
+      : `${urgencyPrefix}${daysRemaining} days left in your ${planName} trial`;
+
+    if (templateId) {
+      await this.sendTemplatedEmail(templateId, email, context, {
+        tags: ['trial', 'reminder', 'subscription'],
+      });
+    } else {
+      await this.sendEmail({
+        to: email,
+        toName: firstName,
+        subject: subjectLine,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h1>${daysRemaining === 1 ? 'Last Day!' : `${daysRemaining} Days Remaining`}</h1>
+            <p>Hi ${firstName || 'there'},</p>
+            <p>Just a friendly reminder that your ${planName} trial ends on <strong>${context.trialEndsAt}</strong>.</p>
+            ${daysRemaining <= 3 ? `
+              <div style="background: #FFF3CD; border: 1px solid #FFE69C; padding: 16px; border-radius: 8px; margin: 16px 0;">
+                <p style="margin: 0; color: #664D03;"><strong>Don't lose access!</strong> Your subscription will automatically continue after the trial to ensure uninterrupted access to your courses and progress.</p>
+              </div>
+            ` : ''}
+            <h3>Make the most of your remaining trial:</h3>
+            <ul>
+              <li>Complete any courses you've started</li>
+              <li>Try out the hands-on labs</li>
+              <li>Explore advanced features</li>
+            </ul>
+            <p><a href="${context.dashboardLink}" style="background: #40E0D0; color: black; padding: 12px 24px; border-radius: 6px; text-decoration: none; display: inline-block; font-weight: bold;">Continue Learning</a></p>
+            <p style="color: #666; font-size: 14px; margin-top: 24px;">
+              Want to cancel? You can manage your subscription anytime from your <a href="${context.subscriptionLink}">account settings</a>.
+            </p>
+            <p>The CloudMastersHub Team</p>
+          </div>
+        `,
+        tags: ['trial', 'reminder', 'subscription'],
+      });
+    }
+  }
+
+  /**
+   * Send subscription paused confirmation
+   */
+  async sendSubscriptionPausedEmail(
+    email: string,
+    planName: string,
+    pauseExpiresAt: Date,
+    firstName?: string,
+    templateId?: string
+  ): Promise<void> {
+    const context: TemplateContext = {
+      firstName: firstName || 'there',
+      email,
+      planName,
+      pauseExpiresAt: pauseExpiresAt.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      }),
+      subscriptionLink: `${process.env.APP_URL}/profile/subscription`,
+    };
+
+    if (templateId) {
+      await this.sendTemplatedEmail(templateId, email, context, {
+        tags: ['subscription', 'paused'],
+      });
+    } else {
+      await this.sendEmail({
+        to: email,
+        toName: firstName,
+        subject: `Your ${planName} subscription is paused`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h1>Subscription Paused</h1>
+            <p>Hi ${firstName || 'there'},</p>
+            <p>Your ${planName} subscription has been paused. You won't be charged during this time.</p>
+            <div style="background: #E8F4FD; border: 1px solid #B8DAFF; padding: 16px; border-radius: 8px; margin: 16px 0;">
+              <p style="margin: 0;"><strong>Important:</strong> Your pause period expires on <strong>${context.pauseExpiresAt}</strong>. After this date, your subscription will automatically resume.</p>
+            </div>
+            <p>During the pause period:</p>
+            <ul>
+              <li>You won't be charged</li>
+              <li>Your course progress is saved</li>
+              <li>You can resume anytime</li>
+            </ul>
+            <p><a href="${context.subscriptionLink}" style="background: #40E0D0; color: black; padding: 12px 24px; border-radius: 6px; text-decoration: none; display: inline-block; font-weight: bold;">Resume Now</a></p>
+            <p>We hope to see you back soon!</p>
+            <p>The CloudMastersHub Team</p>
+          </div>
+        `,
+        tags: ['subscription', 'paused'],
+      });
+    }
+  }
+
+  /**
+   * Send subscription resumed confirmation
+   */
+  async sendSubscriptionResumedEmail(
+    email: string,
+    planName: string,
+    nextBillingDate: Date | null,
+    firstName?: string,
+    templateId?: string
+  ): Promise<void> {
+    const context: TemplateContext = {
+      firstName: firstName || 'there',
+      email,
+      planName,
+      nextBillingDate: nextBillingDate?.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      }) || 'your next billing cycle',
+      dashboardLink: `${process.env.APP_URL}/dashboard`,
+    };
+
+    if (templateId) {
+      await this.sendTemplatedEmail(templateId, email, context, {
+        tags: ['subscription', 'resumed'],
+      });
+    } else {
+      await this.sendEmail({
+        to: email,
+        toName: firstName,
+        subject: `Welcome back! Your ${planName} subscription is active 🎉`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h1>Welcome Back! 🎉</h1>
+            <p>Hi ${firstName || 'there'},</p>
+            <p>Great news! Your ${planName} subscription is now active again.</p>
+            <p>You have full access to all your courses, labs, and progress.</p>
+            ${nextBillingDate ? `<p style="color: #666;">Your next billing date is <strong>${context.nextBillingDate}</strong>.</p>` : ''}
+            <p><a href="${context.dashboardLink}" style="background: #40E0D0; color: black; padding: 12px 24px; border-radius: 6px; text-decoration: none; display: inline-block; font-weight: bold;">Go to Dashboard</a></p>
+            <p>Happy learning!</p>
+            <p>The CloudMastersHub Team</p>
+          </div>
+        `,
+        tags: ['subscription', 'resumed'],
+      });
+    }
+  }
+}
+
 export const emailService = new EmailService();
 export default emailService;

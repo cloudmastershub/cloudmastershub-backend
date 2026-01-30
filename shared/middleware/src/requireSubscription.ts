@@ -84,6 +84,22 @@ export const requireSubscription = (requirement: SubscriptionRequirement = {}) =
         // Attach to request for use in controllers
         request.subscription = subscriptionStatus;
 
+        // Check if subscription is paused
+        if (isSubscriptionPaused(subscriptionStatus)) {
+          response.status(403).json({
+            success: false,
+            error: {
+              message: 'Your subscription is currently paused. Please resume to access this content.',
+              code: 'SUBSCRIPTION_PAUSED',
+              details: {
+                status: 'paused',
+                resumeUrl: '/profile/subscription'
+              }
+            }
+          });
+          return;
+        }
+
         // Check if user has required access
         if (await hasRequiredAccess(subscriptionStatus, req)) {
           next();
@@ -175,7 +191,7 @@ export const requireSubscription = (requirement: SubscriptionRequirement = {}) =
 };
 
 async function hasRequiredAccess(
-  subscription: SubscriptionStatus, 
+  subscription: SubscriptionStatus,
   requirement: SubscriptionRequirement
 ): Promise<boolean> {
   // If no subscription required, allow access
@@ -188,11 +204,17 @@ async function hasRequiredAccess(
     return false;
   }
 
+  // Check if subscription is paused - paused subscriptions don't have access
+  if (subscription.subscription?.status === 'paused') {
+    return false;
+  }
+
   // Check plan level
   const planHierarchy: Record<string, number> = {
     'free': 0,
-    'premium': 1,
-    'enterprise': 2
+    'basic': 1,
+    'premium': 2,
+    'enterprise': 3
   };
 
   const userPlanLevel = planHierarchy[subscription.accessLevel] || 0;
@@ -208,6 +230,11 @@ async function hasRequiredAccess(
   }
 
   return false;
+}
+
+// Check if subscription is paused
+function isSubscriptionPaused(subscription: SubscriptionStatus): boolean {
+  return subscription.subscription?.status === 'paused';
 }
 
 // Specific subscription requirement presets

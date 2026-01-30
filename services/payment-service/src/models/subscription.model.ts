@@ -24,6 +24,9 @@ export interface SubscriptionPlan {
   max_storage_gb?: number | null;
   active: boolean;
   tier: 'free' | 'basic' | 'premium' | 'enterprise';
+  // Trial configuration
+  trial_days: number;
+  trial_available: boolean;
   created_at: Date;
   updated_at: Date;
 }
@@ -32,12 +35,17 @@ export interface Subscription {
   id: string;
   user_id: string;
   plan_id: string;
-  status: 'active' | 'cancelled' | 'past_due' | 'trialing' | 'incomplete';
+  status: 'active' | 'cancelled' | 'past_due' | 'trialing' | 'incomplete' | 'paused' | 'incomplete_expired';
   started_at: Date;
   expires_at: Date | null;
   cancelled_at: Date | null;
   stripe_subscription_id: string;
+  stripe_customer_id?: string;
   trial_ends_at: Date | null;
+  // Pause tracking
+  paused_at: Date | null;
+  pause_expires_at: Date | null;
+  pause_reason: string | null;
   created_at: Date;
   updated_at: Date;
 }

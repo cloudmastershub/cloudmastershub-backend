@@ -55,10 +55,12 @@ export const createCheckoutSession = async (params: {
   cancel_url: string;
   metadata?: Record<string, string>;
   mode?: 'payment' | 'subscription';
+  trial_period_days?: number;
 }): Promise<Stripe.Checkout.Session> => {
   try {
     const stripeClient = getStripe();
-    const session = await stripeClient.checkout.sessions.create({
+
+    const sessionParams: Stripe.Checkout.SessionCreateParams = {
       customer: params.customer_id,
       payment_method_types: ['card'],
       line_items: [
@@ -73,7 +75,17 @@ export const createCheckoutSession = async (params: {
       metadata: params.metadata || {},
       billing_address_collection: 'required',
       automatic_tax: { enabled: false },
-    });
+    };
+
+    // Add trial period for subscription mode
+    if (params.mode === 'subscription' && params.trial_period_days && params.trial_period_days > 0) {
+      sessionParams.subscription_data = {
+        trial_period_days: params.trial_period_days,
+      };
+      logger.info(`Adding ${params.trial_period_days} day trial to checkout session`);
+    }
+
+    const session = await stripeClient.checkout.sessions.create(sessionParams);
 
     logger.info(`Created Stripe checkout session: ${session.id}`);
     return session;
@@ -130,6 +142,61 @@ export const retrieveSubscription = async (
     return await stripeClient.subscriptions.retrieve(subscriptionId);
   } catch (error) {
     logger.error('Failed to retrieve Stripe subscription:', error);
+    throw error;
+  }
+};
+
+export const pauseSubscription = async (
+  subscriptionId: string,
+  behavior: 'keep_as_draft' | 'mark_uncollectible' | 'void' = 'mark_uncollectible'
+): Promise<Stripe.Subscription> => {
+  try {
+    const stripeClient = getStripe();
+    const subscription = await stripeClient.subscriptions.update(subscriptionId, {
+      pause_collection: {
+        behavior,
+      },
+    });
+
+    logger.info(`Paused Stripe subscription: ${subscriptionId}`);
+    return subscription;
+  } catch (error) {
+    logger.error('Failed to pause Stripe subscription:', error);
+    throw error;
+  }
+};
+
+export const resumeSubscription = async (
+  subscriptionId: string
+): Promise<Stripe.Subscription> => {
+  try {
+    const stripeClient = getStripe();
+    const subscription = await stripeClient.subscriptions.update(subscriptionId, {
+      pause_collection: null,
+    });
+
+    logger.info(`Resumed Stripe subscription: ${subscriptionId}`);
+    return subscription;
+  } catch (error) {
+    logger.error('Failed to resume Stripe subscription:', error);
+    throw error;
+  }
+};
+
+export const extendTrialPeriod = async (
+  subscriptionId: string,
+  newTrialEnd: number | 'now'
+): Promise<Stripe.Subscription> => {
+  try {
+    const stripeClient = getStripe();
+    const subscription = await stripeClient.subscriptions.update(subscriptionId, {
+      trial_end: newTrialEnd,
+    });
+
+    logger.info(`Extended trial period for subscription: ${subscriptionId}`);
+    return subscription;
+  } catch (error) {
+    logger.error('Failed to extend trial period:', error);
     throw error;
   }
 };

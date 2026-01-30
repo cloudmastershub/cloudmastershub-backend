@@ -4,13 +4,17 @@ import { AuthRequest } from '@cloudmastershub/types';
 import { executeQuery, executeTransaction } from '../services/database.service';
 import { convertToUuid } from '../utils/userIdConverter';
 import { setCache, getCache, deleteCache } from '../services/redis.service';
-import { 
-  createCheckoutSession as createStripeCheckoutSession, 
+import {
+  createCheckoutSession as createStripeCheckoutSession,
   createCustomer,
   cancelSubscription as cancelStripeSubscription,
   retrieveSubscription,
-  getStripe
+  getStripe,
+  pauseSubscription as pauseStripeSubscription,
+  resumeSubscription as resumeStripeSubscription,
+  extendTrialPeriod
 } from '../services/stripe.service';
+import { publishEvent } from '../services/redis.service';
 import {
   SubscriptionPlan,
   Subscription,
@@ -198,8 +202,10 @@ export const createCheckoutSession = async (req: AuthRequest, res: Response) => 
       type
     };
 
+    let trialDays: number | undefined;
+
     if (type === 'subscription') {
-      // Get plan details
+      // Get plan details including trial configuration
       const plans = await executeQuery<SubscriptionPlan>(
         'SELECT * FROM subscription_plans WHERE id = $1 AND active = true',
         [plan_id]
@@ -230,6 +236,26 @@ export const createCheckoutSession = async (req: AuthRequest, res: Response) => 
       }
 
       metadata.plan_id = plan_id!;
+
+      // Check if plan offers trial and user hasn't used trial before
+      if (plan.trial_available && plan.trial_days > 0) {
+        // Check if user has already had a trial subscription
+        const previousTrials = await executeQuery(
+          `SELECT id FROM subscriptions
+           WHERE user_id = $1 AND trial_ends_at IS NOT NULL
+           LIMIT 1`,
+          [convertToUuid(userId)]
+        );
+
+        if (previousTrials.length === 0) {
+          trialDays = plan.trial_days;
+          metadata.has_trial = 'true';
+          metadata.trial_days = String(plan.trial_days);
+          logger.info(`User ${userId} eligible for ${plan.trial_days}-day trial on ${plan.tier} plan`);
+        } else {
+          logger.info(`User ${userId} not eligible for trial - already used trial before`);
+        }
+      }
     } else if (type === 'purchase') {
       // Handle individual purchase
       if (!purchasable_type || !purchasable_id) {
@@ -283,7 +309,8 @@ export const createCheckoutSession = async (req: AuthRequest, res: Response) => 
       success_url,
       cancel_url,
       metadata,
-      mode: type === 'subscription' ? 'subscription' : 'payment'
+      mode: type === 'subscription' ? 'subscription' : 'payment',
+      trial_period_days: trialDays
     });
 
     res.json({
@@ -616,6 +643,415 @@ export const updateSubscription = async (req: AuthRequest, res: Response) => {
     res.status(500).json({
       success: false,
       message: 'Failed to update subscription'
+    });
+  }
+};
+
+// Maximum pause duration in days
+const MAX_PAUSE_DAYS = 30;
+
+export const pauseSubscription = async (req: AuthRequest, res: Response) => {
+  try {
+    const { subscriptionId } = req.params;
+    const { reason } = req.body;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized'
+      });
+    }
+
+    await executeTransaction(async (client: PoolClient) => {
+      // Verify subscription belongs to user and is active
+      const subscriptions = await client.query<Subscription>(
+        'SELECT * FROM subscriptions WHERE id = $1 AND user_id = $2 FOR UPDATE',
+        [subscriptionId, userId]
+      );
+
+      if (subscriptions.rows.length === 0) {
+        throw new Error('Subscription not found');
+      }
+
+      const subscription = subscriptions.rows[0];
+
+      if (subscription.status === 'paused') {
+        throw new Error('Subscription is already paused');
+      }
+
+      if (!['active', 'trialing'].includes(subscription.status)) {
+        throw new Error('Only active or trialing subscriptions can be paused');
+      }
+
+      if (!subscription.stripe_subscription_id) {
+        throw new Error('No Stripe subscription ID found');
+      }
+
+      // Pause in Stripe
+      await pauseStripeSubscription(subscription.stripe_subscription_id);
+
+      const pausedAt = new Date();
+      const pauseExpiresAt = new Date(pausedAt.getTime() + MAX_PAUSE_DAYS * 24 * 60 * 60 * 1000);
+
+      // Update local database
+      await client.query(`
+        UPDATE subscriptions
+        SET
+          status = 'paused',
+          paused_at = $1,
+          pause_expires_at = $2,
+          pause_reason = $3,
+          updated_at = NOW()
+        WHERE id = $4
+      `, [pausedAt, pauseExpiresAt, reason || null, subscriptionId]);
+
+      // Record in pause history
+      await client.query(`
+        INSERT INTO subscription_pause_history (
+          subscription_id, user_id, paused_at, pause_reason, pause_duration_days,
+          stripe_pause_collection_behavior
+        ) VALUES ($1, $2, $3, $4, $5, $6)
+      `, [subscriptionId, userId, pausedAt, reason || null, MAX_PAUSE_DAYS, 'mark_uncollectible']);
+
+      // Clear cache
+      await deleteCache(`subscription_status:${userId}`);
+
+      // Publish event
+      await publishEvent('subscription.paused', {
+        user_id: userId,
+        subscription_id: subscriptionId,
+        paused_at: pausedAt.toISOString(),
+        pause_expires_at: pauseExpiresAt.toISOString(),
+        reason: reason || null,
+        timestamp: new Date().toISOString()
+      });
+
+      res.json({
+        success: true,
+        message: 'Subscription paused successfully',
+        data: {
+          subscription_id: subscriptionId,
+          paused_at: pausedAt.toISOString(),
+          pause_expires_at: pauseExpiresAt.toISOString(),
+          max_pause_days: MAX_PAUSE_DAYS
+        }
+      });
+    });
+  } catch (error: any) {
+    logger.error('Error pausing subscription:', error);
+
+    if (error.message === 'Subscription not found') {
+      return res.status(404).json({
+        success: false,
+        message: 'Subscription not found'
+      });
+    }
+
+    if (error.message === 'Subscription is already paused') {
+      return res.status(400).json({
+        success: false,
+        message: 'Subscription is already paused'
+      });
+    }
+
+    if (error.message === 'Only active or trialing subscriptions can be paused') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only active or trialing subscriptions can be paused'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to pause subscription'
+    });
+  }
+};
+
+export const resumeSubscription = async (req: AuthRequest, res: Response) => {
+  try {
+    const { subscriptionId } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized'
+      });
+    }
+
+    await executeTransaction(async (client: PoolClient) => {
+      // Verify subscription belongs to user and is paused
+      const subscriptions = await client.query<Subscription>(
+        'SELECT * FROM subscriptions WHERE id = $1 AND user_id = $2 FOR UPDATE',
+        [subscriptionId, userId]
+      );
+
+      if (subscriptions.rows.length === 0) {
+        throw new Error('Subscription not found');
+      }
+
+      const subscription = subscriptions.rows[0];
+
+      if (subscription.status !== 'paused') {
+        throw new Error('Subscription is not paused');
+      }
+
+      if (!subscription.stripe_subscription_id) {
+        throw new Error('No Stripe subscription ID found');
+      }
+
+      // Resume in Stripe
+      const stripeSubscription = await resumeStripeSubscription(subscription.stripe_subscription_id);
+
+      const resumedAt = new Date();
+
+      // Update local database - restore to active status
+      await client.query(`
+        UPDATE subscriptions
+        SET
+          status = 'active',
+          paused_at = NULL,
+          pause_expires_at = NULL,
+          pause_reason = NULL,
+          updated_at = NOW()
+        WHERE id = $1
+      `, [subscriptionId]);
+
+      // Update pause history with resume timestamp
+      await client.query(`
+        UPDATE subscription_pause_history
+        SET resumed_at = $1
+        WHERE subscription_id = $2 AND resumed_at IS NULL
+      `, [resumedAt, subscriptionId]);
+
+      // Clear cache
+      await deleteCache(`subscription_status:${userId}`);
+
+      // Publish event
+      await publishEvent('subscription.resumed', {
+        user_id: userId,
+        subscription_id: subscriptionId,
+        resumed_at: resumedAt.toISOString(),
+        timestamp: new Date().toISOString()
+      });
+
+      res.json({
+        success: true,
+        message: 'Subscription resumed successfully',
+        data: {
+          subscription_id: subscriptionId,
+          resumed_at: resumedAt.toISOString(),
+          status: 'active',
+          next_billing_date: stripeSubscription.current_period_end
+            ? new Date(stripeSubscription.current_period_end * 1000).toISOString()
+            : null
+        }
+      });
+    });
+  } catch (error: any) {
+    logger.error('Error resuming subscription:', error);
+
+    if (error.message === 'Subscription not found') {
+      return res.status(404).json({
+        success: false,
+        message: 'Subscription not found'
+      });
+    }
+
+    if (error.message === 'Subscription is not paused') {
+      return res.status(400).json({
+        success: false,
+        message: 'Subscription is not paused'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to resume subscription'
+    });
+  }
+};
+
+export const getTrialStatus = async (req: AuthRequest, res: Response) => {
+  try {
+    const { subscriptionId } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized'
+      });
+    }
+
+    // Get subscription with plan info
+    const subscriptions = await executeQuery<Subscription & { tier: string; trial_days: number }>(
+      `SELECT s.*, sp.tier, sp.trial_days
+       FROM subscriptions s
+       JOIN subscription_plans sp ON s.plan_id = sp.id
+       WHERE s.id = $1 AND s.user_id = $2`,
+      [subscriptionId, userId]
+    );
+
+    if (subscriptions.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Subscription not found'
+      });
+    }
+
+    const subscription = subscriptions[0];
+    const isTrialing = subscription.status === 'trialing';
+    const trialEndsAt = subscription.trial_ends_at ? new Date(subscription.trial_ends_at) : null;
+
+    let daysRemaining = 0;
+    if (isTrialing && trialEndsAt) {
+      const now = new Date();
+      daysRemaining = Math.max(0, Math.ceil((trialEndsAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+    }
+
+    res.json({
+      success: true,
+      data: {
+        subscription_id: subscriptionId,
+        is_trialing: isTrialing,
+        trial_ends_at: trialEndsAt?.toISOString() || null,
+        days_remaining: daysRemaining,
+        trial_days_total: subscription.trial_days,
+        tier: subscription.tier,
+        status: subscription.status
+      }
+    });
+  } catch (error) {
+    logger.error('Error getting trial status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get trial status'
+    });
+  }
+};
+
+export const extendTrial = async (req: AuthRequest, res: Response) => {
+  try {
+    const { subscriptionId } = req.params;
+    const { days } = req.body;
+    const userId = req.user?.id;
+    const userRoles = req.user?.roles || [];
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized'
+      });
+    }
+
+    // Only admins can extend trials
+    if (!userRoles.includes('admin')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only administrators can extend trial periods'
+      });
+    }
+
+    if (!days || days < 1 || days > 30) {
+      return res.status(400).json({
+        success: false,
+        message: 'days must be between 1 and 30'
+      });
+    }
+
+    await executeTransaction(async (client: PoolClient) => {
+      // Get subscription (admin can extend any subscription)
+      const subscriptions = await client.query<Subscription>(
+        'SELECT * FROM subscriptions WHERE id = $1 FOR UPDATE',
+        [subscriptionId]
+      );
+
+      if (subscriptions.rows.length === 0) {
+        throw new Error('Subscription not found');
+      }
+
+      const subscription = subscriptions.rows[0];
+
+      if (subscription.status !== 'trialing') {
+        throw new Error('Subscription is not in trial period');
+      }
+
+      if (!subscription.stripe_subscription_id) {
+        throw new Error('No Stripe subscription ID found');
+      }
+
+      // Calculate new trial end date
+      const currentTrialEnd = subscription.trial_ends_at
+        ? new Date(subscription.trial_ends_at)
+        : new Date();
+      const newTrialEnd = new Date(currentTrialEnd.getTime() + days * 24 * 60 * 60 * 1000);
+      const newTrialEndTimestamp = Math.floor(newTrialEnd.getTime() / 1000);
+
+      // Extend in Stripe
+      await extendTrialPeriod(subscription.stripe_subscription_id, newTrialEndTimestamp);
+
+      // Update local database
+      await client.query(`
+        UPDATE subscriptions
+        SET
+          trial_ends_at = $1,
+          updated_at = NOW()
+        WHERE id = $2
+      `, [newTrialEnd, subscriptionId]);
+
+      // Update trial reminders if any are scheduled
+      await client.query(`
+        UPDATE trial_reminders
+        SET status = 'skipped'
+        WHERE subscription_id = $1 AND status = 'pending'
+      `, [subscriptionId]);
+
+      // Clear cache for subscription owner
+      await deleteCache(`subscription_status:${subscription.user_id}`);
+
+      // Publish event
+      await publishEvent('subscription.trial_extended', {
+        subscription_id: subscriptionId,
+        user_id: subscription.user_id,
+        extended_by: userId,
+        days_extended: days,
+        new_trial_end: newTrialEnd.toISOString(),
+        timestamp: new Date().toISOString()
+      });
+
+      res.json({
+        success: true,
+        message: `Trial extended by ${days} days`,
+        data: {
+          subscription_id: subscriptionId,
+          new_trial_ends_at: newTrialEnd.toISOString(),
+          days_extended: days
+        }
+      });
+    });
+  } catch (error: any) {
+    logger.error('Error extending trial:', error);
+
+    if (error.message === 'Subscription not found') {
+      return res.status(404).json({
+        success: false,
+        message: 'Subscription not found'
+      });
+    }
+
+    if (error.message === 'Subscription is not in trial period') {
+      return res.status(400).json({
+        success: false,
+        message: 'Subscription is not in trial period'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to extend trial'
     });
   }
 };

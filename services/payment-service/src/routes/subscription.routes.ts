@@ -7,7 +7,11 @@ import {
   getSubscriptionPlans,
   getPlanByStripePrice,
   createSubscription,
-  updateSubscription
+  updateSubscription,
+  pauseSubscription,
+  resumeSubscription,
+  getTrialStatus,
+  extendTrial
 } from '../controllers/subscription.controller';
 
 const router = Router();
@@ -24,5 +28,13 @@ router.post('/checkout-session', createCheckoutSession);
 router.post('/create', createSubscription);
 router.post('/:subscriptionId/cancel', cancelSubscription);
 router.put('/:subscriptionId', updateSubscription);
+
+// Pause and resume subscription
+router.post('/:subscriptionId/pause', pauseSubscription);
+router.post('/:subscriptionId/resume', resumeSubscription);
+
+// Trial management
+router.get('/:subscriptionId/trial-status', getTrialStatus);
+router.post('/:subscriptionId/extend-trial', extendTrial);
 
 export default router;
