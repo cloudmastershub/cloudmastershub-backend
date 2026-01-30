@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import emailService from './emailService';
 import {
   Challenge,
   IChallenge,
@@ -710,6 +711,30 @@ class ChallengeService {
     challenge.metrics.totalRegistrations += 1;
     challenge.metrics.activeParticipants += 1;
     await challenge.save();
+
+    // Send welcome email with access link
+    try {
+      await emailService.sendChallengeWelcomeEmail(
+        input.email,
+        challenge.name,
+        challenge.slug,
+        challenge.totalDays,
+        input.firstName
+      );
+
+      // Record that welcome email was sent
+      participant.emailsReceived.push({
+        type: 'welcome',
+        sentAt: new Date(),
+        templateId: 'challenge-welcome',
+      });
+      await participant.save();
+
+      logger.info(`Welcome email sent to ${input.email} for challenge ${challenge.name}`);
+    } catch (emailError) {
+      // Don't fail registration if email fails - log and continue
+      logger.error(`Failed to send welcome email to ${input.email}:`, emailError);
+    }
 
     logger.info(`Participant registered: ${input.email} for challenge ${challenge.name}`);
     return participant;

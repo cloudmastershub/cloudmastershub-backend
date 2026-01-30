@@ -521,14 +521,19 @@ class EmailService {
   async sendChallengeWelcomeEmail(
     email: string,
     challengeName: string,
+    challengeSlug: string,
+    totalDays: number,
     firstName?: string,
     welcomeTemplateId?: string
   ): Promise<void> {
+    const accessLink = `${process.env.APP_URL}/challenge/${challengeSlug}/access?email=${encodeURIComponent(email)}`;
+
     const context: TemplateContext = {
       firstName: firstName || 'there',
       email,
       challengeName,
-      accessLink: `${process.env.APP_URL}/challenge/${challengeName.toLowerCase().replace(/\s+/g, '-')}/day/1`,
+      totalDays,
+      accessLink,
     };
 
     if (welcomeTemplateId) {
@@ -543,11 +548,27 @@ class EmailService {
         subject: `Welcome to ${challengeName}! 🚀`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h1>Welcome to ${challengeName}!</h1>
+            <h1 style="color: #40E0D0;">Welcome to ${challengeName}!</h1>
             <p>Hi ${firstName || 'there'},</p>
-            <p>You're all set to start your journey! Day 1 is now available.</p>
-            <p><a href="${context.accessLink}" style="background: #4F46E5; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; display: inline-block;">Start Day 1</a></p>
-            <p>Let's do this!</p>
+            <p>Congratulations on taking the first step! You're now registered for the <strong>${challengeName}</strong>.</p>
+
+            <div style="background: #f8f9fa; border-left: 4px solid #40E0D0; padding: 16px; margin: 24px 0;">
+              <p style="margin: 0;"><strong>${totalDays}-Day Challenge</strong></p>
+              <p style="margin: 8px 0 0 0; color: #666;">Day 1 is now available and ready for you!</p>
+            </div>
+
+            <p><a href="${accessLink}" style="background: linear-gradient(135deg, #40E0D0 0%, #4682B4 100%); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: bold;">🚀 Start Day 1 Now</a></p>
+
+            <p style="margin-top: 24px;">Here's what to expect:</p>
+            <ul>
+              <li>New content unlocked daily</li>
+              <li>Hands-on exercises and tasks</li>
+              <li>Track your progress as you go</li>
+            </ul>
+
+            <p>Bookmark your challenge dashboard: <a href="${accessLink}">${accessLink}</a></p>
+
+            <p style="margin-top: 24px;">Let's do this! 💪</p>
             <p>The CloudMastersHub Team</p>
           </div>
         `,
