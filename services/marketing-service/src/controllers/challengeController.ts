@@ -576,6 +576,33 @@ export const getLeaderboard = async (
 // ==========================================
 
 /**
+ * List published challenges (public)
+ * GET /challenge/list
+ */
+export const listPublicChallenges = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { page = '1', limit = '20' } = req.query;
+
+    const result = await challengeService.listPublished({
+      page: parseInt(page as string, 10),
+      limit: Math.min(parseInt(limit as string, 10), 50),
+    });
+
+    res.json({
+      success: true,
+      data: result.data,
+      pagination: result.pagination,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * Get published challenge by slug (public)
  * GET /challenge/:slug
  */

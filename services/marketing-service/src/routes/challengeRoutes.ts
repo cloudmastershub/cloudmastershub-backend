@@ -416,6 +416,12 @@ router.get(
 
 const publicRouter = Router();
 
+// List published challenges (public)
+publicRouter.get(
+  '/list',
+  challengeController.listPublicChallenges
+);
+
 // Get published challenge by slug
 publicRouter.get(
   '/:slug',

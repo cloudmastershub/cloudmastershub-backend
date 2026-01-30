@@ -301,6 +301,50 @@ class ChallengeService {
   }
 
   /**
+   * List published challenges for public view
+   */
+  async listPublished(options: { page?: number; limit?: number } = {}): Promise<PaginatedResult<Partial<IChallenge>>> {
+    const { page = 1, limit = 20 } = options;
+    const skip = (page - 1) * limit;
+
+    const query = { status: ChallengeStatus.PUBLISHED };
+
+    const [rawChallenges, total] = await Promise.all([
+      Challenge.find(query)
+        .sort({ 'metrics.totalRegistrations': -1, createdAt: -1 })
+        .skip(skip)
+        .limit(Math.min(limit, 50))
+        .lean(),
+      Challenge.countDocuments(query),
+    ]);
+
+    // Return limited public data
+    const challenges = rawChallenges.map((challenge: any) => ({
+      id: challenge._id.toString(),
+      name: challenge.name,
+      slug: challenge.slug,
+      description: challenge.description,
+      tagline: challenge.tagline,
+      totalDays: challenge.totalDays,
+      status: challenge.status,
+      participantCount: challenge.community?.showParticipantCount
+        ? challenge.metrics?.totalRegistrations
+        : undefined,
+      imageUrl: challenge.imageUrl,
+    }));
+
+    return {
+      data: challenges as Partial<IChallenge>[],
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  /**
    * Update challenge
    */
   async update(id: string, input: UpdateChallengeInput): Promise<IChallenge | null> {
