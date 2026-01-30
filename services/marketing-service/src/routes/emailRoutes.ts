@@ -284,4 +284,28 @@ router.post(
   emailController.sendBulkEmail
 );
 
+// ==========================================
+// Internal Service Routes (no authentication)
+// ==========================================
+
+// Internal email sending for service-to-service communication
+// Requires x-internal-service header
+router.post(
+  '/internal/send',
+  [
+    body('to')
+      .notEmpty()
+      .withMessage('Recipient email is required')
+      .isEmail()
+      .withMessage('Invalid email format'),
+    body('subject')
+      .notEmpty()
+      .withMessage('Subject is required'),
+    body('html')
+      .notEmpty()
+      .withMessage('HTML content is required'),
+  ],
+  emailController.sendInternalEmail
+);
+
 export default router;

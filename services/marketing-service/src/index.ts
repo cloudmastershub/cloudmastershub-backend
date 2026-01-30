@@ -96,6 +96,11 @@ app.use('/admin/workflows', workflowRoutes);
 // app.use('/admin/analytics', analyticsRoutes);
 
 // ============================================
+// Internal Routes (service-to-service, no auth)
+// ============================================
+app.use('/internal', emailRoutes);             // Internal email sending
+
+// ============================================
 // Public Routes (no auth required)
 // ============================================
 app.use('/f', publicFunnelRouter);             // /f/:funnelSlug

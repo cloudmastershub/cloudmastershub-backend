@@ -804,6 +804,58 @@ export const sendBulkEmail = async (
   }
 };
 
+/**
+ * Internal email sending for service-to-service communication
+ * POST /internal/send
+ * Requires x-internal-service header
+ */
+export const sendInternalEmail = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    // Verify internal service header
+    const internalHeader = req.headers['x-internal-service'];
+    if (internalHeader !== 'true') {
+      res.status(403).json({
+        success: false,
+        error: { message: 'Internal service access required' },
+      });
+      return;
+    }
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Validation failed', details: errors.array() },
+      });
+      return;
+    }
+
+    const { to, toName, subject, html, tags } = req.body;
+
+    const result = await emailService.sendEmail({
+      to,
+      toName,
+      subject,
+      html,
+      tags: tags || ['internal', 'transactional'],
+    });
+
+    logger.info('Internal email sent', { to, subject, messageId: result.messageId });
+
+    res.json({
+      success: true,
+      data: { messageId: result.messageId },
+    });
+  } catch (error) {
+    logger.error('Internal email send failed:', error);
+    next(error);
+  }
+};
+
 export default {
   // Templates
   createTemplate,
@@ -820,6 +872,8 @@ export default {
   // Direct sending
   sendEmail,
   sendBulkEmail,
+  // Internal
+  sendInternalEmail,
   // Dashboard
   getEmailDashboardStats,
 };

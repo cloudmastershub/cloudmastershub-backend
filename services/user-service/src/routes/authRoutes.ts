@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { body } from 'express-validator';
-import { register, login, logout, refreshToken, googleAuth } from '../controllers/authController';
+import { body, param } from 'express-validator';
+import { register, login, logout, refreshToken, googleAuth, forgotPassword, resetPassword, verifyResetToken } from '../controllers/authController';
 import { validateRequest } from '../middleware/validateRequest';
 
 const router = Router();
@@ -40,6 +40,48 @@ router.post(
   ],
   validateRequest,
   googleAuth
+);
+
+// Password Reset Routes
+router.post(
+  '/forgot-password',
+  [
+    body('email')
+      .isEmail()
+      .normalizeEmail()
+      .withMessage('Please provide a valid email address'),
+  ],
+  validateRequest,
+  forgotPassword
+);
+
+router.post(
+  '/reset-password',
+  [
+    body('token')
+      .notEmpty()
+      .isLength({ min: 64, max: 64 })
+      .withMessage('Invalid reset token'),
+    body('password')
+      .isLength({ min: 8 })
+      .withMessage('Password must be at least 8 characters')
+      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+      .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number'),
+  ],
+  validateRequest,
+  resetPassword
+);
+
+router.get(
+  '/verify-reset-token/:token',
+  [
+    param('token')
+      .notEmpty()
+      .isLength({ min: 64, max: 64 })
+      .withMessage('Invalid reset token'),
+  ],
+  validateRequest,
+  verifyResetToken
 );
 
 export default router;

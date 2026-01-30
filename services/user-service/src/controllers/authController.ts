@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-// import bcrypt from 'bcryptjs'; // TODO: Uncomment when implementing actual password hashing
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import axios from 'axios';
 import logger from '../utils/logger';
@@ -388,5 +389,195 @@ export const refreshToken = async (
       success: false,
       error: { message: 'Invalid or expired refresh token' },
     });
+  }
+};
+
+// Password Reset - Request reset email
+export const forgotPassword = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { email } = req.body;
+
+    // Find user by email
+    const user = await User.findOne({ email: email.toLowerCase() });
+
+    // Always return success to prevent email enumeration attacks
+    if (!user) {
+      logger.info('Password reset requested for non-existent email', { email });
+      res.json({
+        success: true,
+        message: 'If an account with that email exists, a password reset link has been sent.',
+      });
+      return;
+    }
+
+    // Generate secure reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+    // Set token expiry to 1 hour
+    const tokenExpiry = new Date(Date.now() + 60 * 60 * 1000);
+
+    // Save hashed token to user document
+    user.passwordResetToken = hashedToken;
+    user.passwordResetExpires = tokenExpiry;
+    await user.save();
+
+    // Build reset URL
+    const frontendUrl = process.env.FRONTEND_URL || 'https://cloudmastershub.com';
+    const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
+
+    // Send reset email via marketing service
+    try {
+      const marketingServiceUrl = process.env.MARKETING_SERVICE_URL || 'http://marketing-service:3006';
+      await axios.post(`${marketingServiceUrl}/internal/send`, {
+        to: user.email,
+        toName: user.firstName,
+        subject: 'Reset Your CloudMastersHub Password',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h1 style="color: #1a1a2e; margin-bottom: 24px;">Reset Your Password</h1>
+            <p style="color: #444; font-size: 16px; line-height: 1.6;">Hi ${user.firstName || 'there'},</p>
+            <p style="color: #444; font-size: 16px; line-height: 1.6;">
+              You requested to reset your password. Click the button below to set a new password:
+            </p>
+            <div style="text-align: center; margin: 32px 0;">
+              <a href="${resetUrl}"
+                 style="background: linear-gradient(to right, #06b6d4, #3b82f6);
+                        color: white;
+                        padding: 14px 32px;
+                        border-radius: 8px;
+                        text-decoration: none;
+                        font-weight: 600;
+                        display: inline-block;">
+                Reset Password
+              </a>
+            </div>
+            <p style="color: #666; font-size: 14px; line-height: 1.6;">
+              This link will expire in 1 hour. If you didn't request this, you can safely ignore this email.
+            </p>
+            <p style="color: #666; font-size: 14px; line-height: 1.6;">
+              If the button doesn't work, copy and paste this URL into your browser:
+              <br/>
+              <a href="${resetUrl}" style="color: #3b82f6;">${resetUrl}</a>
+            </p>
+            <hr style="border: none; border-top: 1px solid #eee; margin: 32px 0;"/>
+            <p style="color: #999; font-size: 12px;">
+              &copy; ${new Date().getFullYear()} CloudMastersHub. All rights reserved.
+            </p>
+          </div>
+        `,
+        tags: ['password-reset', 'transactional'],
+      }, {
+        headers: { 'x-internal-service': 'true' },
+        timeout: 10000,
+      });
+
+      logger.info('Password reset email sent', { userId: user._id.toString(), email: user.email });
+    } catch (emailError: any) {
+      logger.error('Failed to send password reset email', {
+        userId: user._id.toString(),
+        email: user.email,
+        error: emailError.message
+      });
+      // Still return success to prevent email enumeration
+    }
+
+    res.json({
+      success: true,
+      message: 'If an account with that email exists, a password reset link has been sent.',
+    });
+  } catch (error) {
+    logger.error('Forgot password error:', error);
+    next(error);
+  }
+};
+
+// Password Reset - Set new password
+export const resetPassword = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { token, password } = req.body;
+
+    // Hash the provided token to compare with stored hash
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    // Find user with valid reset token
+    const user = await User.findOne({
+      passwordResetToken: hashedToken,
+      passwordResetExpires: { $gt: new Date() },
+    });
+
+    if (!user) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Invalid or expired reset token. Please request a new password reset.' },
+      });
+      return;
+    }
+
+    // Hash the new password
+    const saltRounds = 12;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    // Update user with new password and clear reset token
+    user.password = hashedPassword;
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+    user.updatedAt = new Date();
+    await user.save();
+
+    // Publish password changed event
+    const eventPublisher = getUserEventPublisher();
+    eventPublisher.publishEvent({
+      type: 'user.password.changed',
+      userId: user._id.toString(),
+      data: { passwordChangedAt: new Date().toISOString() },
+    }).catch(error => {
+      logger.warn('Failed to publish password changed event', {
+        error: error.message,
+        userId: user._id.toString()
+      });
+    });
+
+    logger.info('Password reset successful', { userId: user._id.toString(), email: user.email });
+
+    res.json({
+      success: true,
+      message: 'Password has been reset successfully. You can now log in with your new password.',
+    });
+  } catch (error) {
+    logger.error('Reset password error:', error);
+    next(error);
+  }
+};
+
+// Verify reset token validity
+export const verifyResetToken = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { token } = req.params;
+
+    // Hash the provided token
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    // Check if a user exists with this valid token
+    const user = await User.findOne({
+      passwordResetToken: hashedToken,
+      passwordResetExpires: { $gt: new Date() },
+    });
+
+    if (!user) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Invalid or expired reset token.' },
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      data: { valid: true },
+    });
+  } catch (error) {
+    logger.error('Verify reset token error:', error);
+    next(error);
   }
 };
