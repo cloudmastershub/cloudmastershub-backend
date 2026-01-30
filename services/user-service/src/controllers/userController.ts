@@ -19,7 +19,10 @@ export const getProfile = async (
     const userId = req.userId;
     const userEmail = req.userEmail;
 
+    logger.info('getProfile called', { userId, userEmail });
+
     if (!userId) {
+      logger.warn('getProfile: User ID is required');
       res.status(400).json({
         success: false,
         error: { message: 'User ID is required' }
@@ -32,7 +35,9 @@ export const getProfile = async (
     let subscriptionInfo = null;
 
     if (userEmail) {
+      logger.info('getProfile: Searching MongoDB for user by email', { email: userEmail.toLowerCase() });
       const mongoUser = await User.findOne({ email: userEmail.toLowerCase() });
+      logger.info('getProfile: MongoDB search result', { found: !!mongoUser, mongoUserId: mongoUser?._id?.toString() });
       if (mongoUser) {
         // Found in MongoDB (Google OAuth user)
         user = {
@@ -69,12 +74,15 @@ export const getProfile = async (
     }
 
     if (!user) {
+      logger.warn('getProfile: User not found in MongoDB or PostgreSQL', { userId, userEmail });
       res.status(404).json({
         success: false,
         error: { message: 'User not found' }
       });
       return;
     }
+
+    logger.info('getProfile: User found successfully', { userId: user.id, email: user.email });
 
     const userProfile = {
       id: user.id,
