@@ -13,8 +13,9 @@ export interface User {
 
 export enum SubscriptionPlanType {
   FREE = 'free',
+  BASIC = 'basic',
   PREMIUM = 'premium',
-  ENTERPRISE = 'enterprise',
+  BOOTCAMP = 'bootcamp',
 }
 
 export enum UserRole {
