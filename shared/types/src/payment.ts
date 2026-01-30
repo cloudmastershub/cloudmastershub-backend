@@ -1,3 +1,5 @@
+import { SubscriptionPlanType } from './user';
+
 export interface SubscriptionPlan {
   id: string;
   name: string;
@@ -16,12 +18,14 @@ export interface UserSubscription {
   id: string;
   userId: string;
   planId: string;
-  status: 'active' | 'inactive' | 'cancelled' | 'past_due' | 'trialing';
+  status: 'active' | 'inactive' | 'cancelled' | 'past_due' | 'trialing' | 'paused' | 'incomplete' | 'incomplete_expired';
   startedAt: Date;
   expiresAt: Date | null;
   cancelledAt: Date | null;
   stripeSubscriptionId: string;
   trialEndsAt: Date | null;
+  pausedAt: Date | null;
+  pauseExpiresAt: Date | null;
   plan: SubscriptionPlan;
 }
 
@@ -30,7 +34,7 @@ export interface SubscriptionStatus {
   hasActiveSubscription: boolean;
   subscription: UserSubscription | null;
   plan: SubscriptionPlan | null;
-  accessLevel: 'free' | 'premium' | 'enterprise';
+  accessLevel: 'free' | 'basic' | 'premium' | 'enterprise' | 'bootcamp';
   maxCourses: number | null;
   maxLabs: number | null;
   canAccessPremiumContent: boolean;
@@ -159,12 +163,12 @@ export interface AccessVerificationRequest {
   userId: string;
   resourceType: 'course' | 'learning_path' | 'lab' | 'platform';
   resourceId?: string;
-  requiredPlan?: 'free' | 'premium' | 'enterprise';
+  requiredPlan?: SubscriptionPlanType;
 }
 
 export interface AccessVerificationResponse {
   hasAccess: boolean;
-  accessLevel: 'free' | 'premium' | 'enterprise';
+  accessLevel: 'free' | 'basic' | 'premium' | 'enterprise' | 'bootcamp';
   source: 'subscription' | 'purchase' | 'trial' | 'admin_grant' | 'none';
   subscription?: UserSubscription;
   purchase?: Purchase;
@@ -220,6 +224,9 @@ export enum SubscriptionStatusType {
   CANCELLED = 'cancelled',
   PAST_DUE = 'past_due',
   TRIALING = 'trialing',
+  PAUSED = 'paused',
+  INCOMPLETE = 'incomplete',
+  INCOMPLETE_EXPIRED = 'incomplete_expired',
 }
 
 export enum AccessType {

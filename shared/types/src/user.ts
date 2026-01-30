@@ -16,6 +16,7 @@ export enum SubscriptionPlanType {
   BASIC = 'basic',
   PREMIUM = 'premium',
   BOOTCAMP = 'bootcamp',
+  ENTERPRISE = 'enterprise',
 }
 
 export enum UserRole {
