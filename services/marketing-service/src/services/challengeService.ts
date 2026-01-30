@@ -722,12 +722,8 @@ class ChallengeService {
         input.firstName
       );
 
-      // Record that welcome email was sent
-      participant.emailsReceived.push({
-        type: 'welcome',
-        sentAt: new Date(),
-        templateId: 'challenge-welcome',
-      });
+      // Record that welcome email was sent (store template ID)
+      participant.emailsReceived.push('challenge-welcome');
       await participant.save();
 
       logger.info(`Welcome email sent to ${input.email} for challenge ${challenge.name}`);
