@@ -527,11 +527,7 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
 
     // Publish password changed event
     const eventPublisher = getUserEventPublisher();
-    eventPublisher.publishEvent({
-      type: 'user.password.changed',
-      userId: user._id.toString(),
-      data: { passwordChangedAt: new Date().toISOString() },
-    }).catch(error => {
+    eventPublisher.publishPasswordChanged(user._id.toString()).catch((error: Error) => {
       logger.warn('Failed to publish password changed event', {
         error: error.message,
         userId: user._id.toString()
