@@ -4,6 +4,7 @@ import {
   getProfile,
   updateProfile,
   getProgress,
+  getStreaks,
   updateSubscription,
   getUserCourses,
 } from '../controllers/userController';
@@ -28,6 +29,8 @@ router.put(
 );
 
 router.get('/progress', getProgress);
+
+router.get('/progress/streaks', getStreaks);
 
 router.post('/subscription', updateSubscription);
 

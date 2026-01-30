@@ -272,6 +272,65 @@ export const updateSubscription = async (
   }
 };
 
+export const getStreaks = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.userId;
+
+    if (!userId) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'User ID is required' }
+      });
+      return;
+    }
+
+    logger.info(`Fetching streaks for user ${userId}`);
+
+    // Call the course service to get user's streak data
+    try {
+      const courseServiceUrl = process.env.COURSE_SERVICE_URL || 'http://course-service:3002';
+      const response = await axios.get(`${courseServiceUrl}/progress/user/${userId}/streaks`, {
+        headers: {
+          'x-user-id': userId,
+          'x-internal-service': 'true'
+        },
+        timeout: 10000
+      });
+
+      res.json({
+        success: true,
+        data: response.data.data || {
+          currentStreak: 0,
+          longestStreak: 0,
+          lastActivityDate: null
+        }
+      });
+    } catch (courseServiceError: any) {
+      logger.warn('Error fetching streaks from course service:', {
+        message: courseServiceError.message,
+        status: courseServiceError.response?.status
+      });
+
+      // Return default streak data if course service is unavailable
+      res.json({
+        success: true,
+        data: {
+          currentStreak: 0,
+          longestStreak: 0,
+          lastActivityDate: null
+        }
+      });
+    }
+  } catch (error) {
+    logger.error('Error in getStreaks:', error);
+    next(error);
+  }
+};
+
 export const getUserCourses = async (
   req: AuthRequest,
   res: Response,

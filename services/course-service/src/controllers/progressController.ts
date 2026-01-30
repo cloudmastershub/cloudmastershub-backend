@@ -209,6 +209,110 @@ export const getCourseProgress = async (
   }
 };
 
+export const getUserStreaks = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'User ID is required' }
+      });
+      return;
+    }
+
+    // Fetch all course progress records for this user
+    const progressRecords = await CourseProgress.find({ userId })
+      .sort({ lastAccessedAt: -1 })
+      .lean();
+
+    // Calculate current streak (consecutive days with activity)
+    let currentStreak = 0;
+    let longestStreak = 0;
+    let lastActivityDate: Date | null = null;
+
+    if (progressRecords.length > 0) {
+      // Get most recent activity date
+      const sortedByActivity = [...progressRecords]
+        .filter(p => p.lastAccessedAt)
+        .sort((a, b) => new Date(b.lastAccessedAt!).getTime() - new Date(a.lastAccessedAt!).getTime());
+
+      if (sortedByActivity.length > 0) {
+        lastActivityDate = new Date(sortedByActivity[0].lastAccessedAt!);
+      }
+
+      // Get unique dates of activity (normalized to midnight)
+      const activityDates = new Set<string>();
+      progressRecords.forEach(p => {
+        if (p.lastAccessedAt) {
+          const date = new Date(p.lastAccessedAt);
+          activityDates.add(date.toISOString().split('T')[0]);
+        }
+        if (p.enrolledAt) {
+          const date = new Date(p.enrolledAt);
+          activityDates.add(date.toISOString().split('T')[0]);
+        }
+      });
+
+      const sortedDates = Array.from(activityDates).sort().reverse();
+      const today = new Date().toISOString().split('T')[0];
+      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+      // Calculate current streak (must include today or yesterday to be "active")
+      if (sortedDates.length > 0 && (sortedDates[0] === today || sortedDates[0] === yesterday)) {
+        currentStreak = 1;
+        for (let i = 1; i < sortedDates.length; i++) {
+          const currentDate = new Date(sortedDates[i - 1]);
+          const prevDate = new Date(sortedDates[i]);
+          const diffDays = Math.round((currentDate.getTime() - prevDate.getTime()) / 86400000);
+
+          if (diffDays === 1) {
+            currentStreak++;
+          } else {
+            break;
+          }
+        }
+      }
+
+      // Calculate longest streak from all activity
+      let tempStreak = 1;
+      longestStreak = 1;
+      const allSortedDates = Array.from(activityDates).sort();
+
+      for (let i = 1; i < allSortedDates.length; i++) {
+        const prevDate = new Date(allSortedDates[i - 1]);
+        const currentDate = new Date(allSortedDates[i]);
+        const diffDays = Math.round((currentDate.getTime() - prevDate.getTime()) / 86400000);
+
+        if (diffDays === 1) {
+          tempStreak++;
+          longestStreak = Math.max(longestStreak, tempStreak);
+        } else {
+          tempStreak = 1;
+        }
+      }
+    }
+
+    logger.info(`Fetched streaks for user ${userId}: current=${currentStreak}, longest=${longestStreak}`);
+
+    res.json({
+      success: true,
+      data: {
+        currentStreak,
+        longestStreak,
+        lastActivityDate: lastActivityDate?.toISOString() || null
+      },
+    });
+  } catch (error: any) {
+    logger.error('Error fetching user streaks:', error);
+    next(error);
+  }
+};
+
 export const getCompletedCourses = async (
   req: Request,
   res: Response,
