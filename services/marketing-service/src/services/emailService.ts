@@ -703,7 +703,6 @@ class EmailService {
       });
     }
   }
-}
 
   // ==========================================
   // Trial Subscription Email Helpers
