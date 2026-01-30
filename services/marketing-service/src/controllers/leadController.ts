@@ -771,4 +771,83 @@ export default {
   exportLeads,
   mergeLeads,
   captureBootcampInterest,
+  subscribeNewsletter,
+};
+
+/**
+ * Subscribe to newsletter - PUBLIC endpoint
+ * POST /leads/newsletter
+ *
+ * This endpoint allows visitors to subscribe to the newsletter
+ * without authentication.
+ */
+export const subscribeNewsletter = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { email } = req.body;
+
+    // Validate required fields
+    if (!email) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Email is required' },
+      });
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Invalid email format' },
+      });
+      return;
+    }
+
+    // Try to find existing lead
+    const Lead = (await import('../models/Lead')).default;
+    let lead = await Lead.findOne({ email: email.toLowerCase().trim() });
+
+    if (lead) {
+      // Update existing lead with newsletter subscription
+      if (!lead.tags.includes('newsletter')) {
+        lead.tags.push('newsletter');
+      }
+      lead.emailConsent = true;
+      lead.lastActivityAt = new Date();
+      await lead.save();
+
+      logger.info(`Existing lead subscribed to newsletter: ${email}`);
+    } else {
+      // Create new lead
+      lead = new Lead({
+        email: email.toLowerCase().trim(),
+        source: {
+          type: 'organic',
+          name: 'Footer Newsletter',
+          page: '/',
+        },
+        tags: ['newsletter'],
+        emailConsent: true,
+        status: 'new',
+        capturedAt: new Date(),
+        lastActivityAt: new Date(),
+      });
+      await lead.save();
+
+      logger.info(`New newsletter subscriber captured: ${email}`);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Successfully subscribed to newsletter',
+    });
+  } catch (error) {
+    logger.error('Error subscribing to newsletter:', error);
+    next(error);
+  }
 };

@@ -292,6 +292,20 @@ router.post(
   leadController.captureBootcampInterest
 );
 
+// Newsletter subscription - PUBLIC endpoint
+const newsletterValidation = [
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Valid email is required'),
+];
+
+router.post(
+  '/newsletter',
+  newsletterValidation,
+  leadController.subscribeNewsletter
+);
+
 // ==========================================
 // Protected Lead Routes
 // ==========================================
