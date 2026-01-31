@@ -261,6 +261,8 @@ export const OPERATORS_BY_TYPE: Record<string, { value: string; label: string }[
     { value: 'contains', label: 'Contains' },
     { value: 'not_contains', label: 'Does not contain' },
     { value: 'in', label: 'Contains any of' },
+    { value: 'is_empty', label: 'Has no tags' },
+    { value: 'is_not_empty', label: 'Has any tags' },
   ],
   boolean: [
     { value: 'equals', label: 'Is' },
