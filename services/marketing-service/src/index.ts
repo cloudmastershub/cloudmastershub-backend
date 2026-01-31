@@ -19,6 +19,7 @@ import workflowRoutes from './routes/workflowRoutes';
 import trackingRoutes from './routes/trackingRoutes';
 import webhookRoutes from './routes/webhookRoutes';
 import { sequenceScheduler } from './services/sequenceScheduler';
+import { workflowProcessor } from './services/workflowProcessor';
 
 // Import middleware
 import { authenticate, requireAdmin } from './middleware/auth';
@@ -287,6 +288,15 @@ const startServer = async () => {
       // Continue without scheduler - emails can still be sent manually
     }
 
+    // Initialize workflow processor (workflow automation)
+    try {
+      await workflowProcessor.initialize();
+      logger.info('Workflow processor initialized');
+    } catch (error) {
+      logger.warn('Failed to initialize workflow processor (Redis may not be available):', error);
+      // Continue without processor - workflows can still be managed but won't auto-execute
+    }
+
     // Start server
     app.listen(PORT, () => {
       logger.info(`Marketing Service running on port ${PORT}`);
@@ -309,6 +319,10 @@ const gracefulShutdown = async (signal: string) => {
     // Shutdown sequence scheduler (close Bull queues)
     await sequenceScheduler.shutdown();
     logger.info('Sequence scheduler shutdown complete');
+
+    // Shutdown workflow processor (close Bull queues)
+    await workflowProcessor.shutdown();
+    logger.info('Workflow processor shutdown complete');
 
     // Close MongoDB connection
     const mongoConnection = MongoConnection.getInstance();

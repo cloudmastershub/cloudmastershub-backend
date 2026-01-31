@@ -109,6 +109,7 @@ export interface IWorkflowTrigger {
     eventName?: string;
     // For scheduled
     schedule?: string; // cron expression
+    segmentId?: string; // segment to enroll leads from
     // For webhook
     webhookSecret?: string;
   };
@@ -390,6 +391,7 @@ const WorkflowTriggerSchema = new Schema<IWorkflowTrigger>({
     dayNumber: { type: Number },
     eventName: { type: String },
     schedule: { type: String },
+    segmentId: { type: String },
     webhookSecret: { type: String },
   },
 }, { _id: false });

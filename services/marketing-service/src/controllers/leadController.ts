@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { validationResult } from 'express-validator';
 import leadService from '../services/leadService';
 import { LeadSource, LeadStatus, LeadScoreLevel } from '../models/Lead';
+import { workflowTriggerService } from '../services/workflowTriggerService';
 import logger from '../utils/logger';
 
 /**
@@ -51,6 +52,14 @@ export const createLead = async (
       tags,
       emailConsent,
       customFields,
+    });
+
+    // Trigger workflow for new lead
+    workflowTriggerService.onLeadCreated(lead._id.toString(), {
+      email: lead.email,
+      firstName: lead.firstName,
+      source: lead.source?.type,
+      tags: lead.tags,
     });
 
     res.status(201).json({
@@ -184,6 +193,10 @@ export const updateLead = async (
       timezone,
     } = req.body;
 
+    // Get current lead to check for score change
+    const currentLead = await leadService.getLead(id);
+    const oldScore = currentLead?.score;
+
     const lead = await leadService.updateLead(id, {
       firstName,
       lastName,
@@ -206,6 +219,11 @@ export const updateLead = async (
         error: { message: 'Lead not found' },
       });
       return;
+    }
+
+    // Trigger workflow if score changed
+    if (score !== undefined && oldScore !== undefined && oldScore !== score) {
+      workflowTriggerService.onScoreChanged(id, oldScore, score);
     }
 
     res.json({
@@ -342,9 +360,11 @@ export const addTag = async (
       return;
     }
 
-    // Add each tag
+    // Add each tag and trigger workflow
     for (const tag of tags) {
       lead = await leadService.addTag(id, tag);
+      // Trigger workflow for tag added
+      workflowTriggerService.onTagAdded(id, tag);
     }
 
     res.json({
@@ -389,9 +409,11 @@ export const removeTags = async (
       return;
     }
 
-    // Remove each tag
+    // Remove each tag and trigger workflow
     for (const tag of tags) {
       lead = await leadService.removeTag(id, tag);
+      // Trigger workflow for tag removed
+      workflowTriggerService.onTagRemoved(id, tag);
     }
 
     res.json({
