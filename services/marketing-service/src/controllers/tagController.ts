@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { validationResult } from 'express-validator';
 import { tagService } from '../services/tagService';
 import { TagCategory } from '../models/Tag';
 import logger from '../utils/logger';
@@ -53,6 +54,15 @@ export const getAllTags = async (req: Request, res: Response): Promise<void> => 
  */
 export const getTagById = async (req: Request, res: Response): Promise<void> => {
   try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Validation failed', details: errors.array() },
+      });
+      return;
+    }
+
     const { id } = req.params;
     const tag = await tagService.getTagById(id);
 
@@ -85,6 +95,15 @@ export const getTagById = async (req: Request, res: Response): Promise<void> => 
  */
 export const createTag = async (req: Request, res: Response): Promise<void> => {
   try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Validation failed', details: errors.array() },
+      });
+      return;
+    }
+
     const { name, description, category, color } = req.body;
     const userId = (req as any).userId || 'system';
 
@@ -127,6 +146,15 @@ export const createTag = async (req: Request, res: Response): Promise<void> => {
  */
 export const updateTag = async (req: Request, res: Response): Promise<void> => {
   try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Validation failed', details: errors.array() },
+      });
+      return;
+    }
+
     const { id } = req.params;
     const { name, description, category, color } = req.body;
     const userId = (req as any).userId || 'system';
@@ -188,6 +216,15 @@ export const updateTag = async (req: Request, res: Response): Promise<void> => {
  */
 export const deleteTag = async (req: Request, res: Response): Promise<void> => {
   try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Validation failed', details: errors.array() },
+      });
+      return;
+    }
+
     const { id } = req.params;
     const deleted = await tagService.deleteTag(id);
 
@@ -275,6 +312,15 @@ export const getTagStats = async (req: Request, res: Response): Promise<void> =>
  */
 export const mergeTags = async (req: Request, res: Response): Promise<void> => {
   try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Validation failed', details: errors.array() },
+      });
+      return;
+    }
+
     const { id: sourceId } = req.params;
     const { targetId } = req.body;
     const userId = (req as any).userId || 'system';

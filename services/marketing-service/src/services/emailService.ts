@@ -528,10 +528,30 @@ class EmailService {
         tagName?: string;
       };
       emails?: Array<{
+        id?: string;
         order: number;
+        name?: string;
         templateId: string;
         delayHours: number;
         subject?: string;
+        sendTime?: SendTimeOption;
+        conditions?: {
+          onlyIfOpened?: boolean;
+          onlyIfClicked?: boolean;
+          skipIfConverted?: boolean;
+          skipIfUnsubscribed?: boolean;
+          requireTag?: string;
+          excludeTag?: string;
+        };
+        metrics?: {
+          sent: number;
+          delivered: number;
+          opened: number;
+          clicked: number;
+          bounced: number;
+          unsubscribed: number;
+        };
+        isActive?: boolean;
       }>;
       tags?: string[];
       updatedBy: string;

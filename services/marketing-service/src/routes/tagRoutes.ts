@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { body, param, query } from 'express-validator';
-import { validateRequest } from '../middleware/validateRequest';
 import {
   getAllTags,
   getTagById,
@@ -19,6 +18,7 @@ const router = Router();
 /**
  * Tag Routes
  * All routes require authentication (handled by API Gateway)
+ * Validation is handled inline in controllers using validationResult
  */
 
 // Search tags (for autocomplete) - must be before /:id route
@@ -28,7 +28,6 @@ router.get(
     query('q').optional().isString().trim(),
     query('limit').optional().isInt({ min: 1, max: 50 }),
   ],
-  validateRequest,
   searchTags
 );
 
@@ -49,7 +48,6 @@ router.get(
     query('page').optional().isInt({ min: 1 }),
     query('limit').optional().isInt({ min: 1, max: 100 }),
   ],
-  validateRequest,
   getAllTags
 );
 
@@ -79,7 +77,6 @@ router.post(
       .matches(/^#[0-9A-Fa-f]{6}$/)
       .withMessage('Color must be a valid hex color (e.g., #6B7280)'),
   ],
-  validateRequest,
   createTag
 );
 
@@ -87,7 +84,6 @@ router.post(
 router.get(
   '/:id',
   [param('id').isMongoId().withMessage('Invalid tag ID')],
-  validateRequest,
   getTagById
 );
 
@@ -117,7 +113,6 @@ router.put(
       .matches(/^#[0-9A-Fa-f]{6}$/)
       .withMessage('Color must be a valid hex color (e.g., #6B7280)'),
   ],
-  validateRequest,
   updateTag
 );
 
@@ -125,7 +120,6 @@ router.put(
 router.delete(
   '/:id',
   [param('id').isMongoId().withMessage('Invalid tag ID')],
-  validateRequest,
   deleteTag
 );
 
@@ -136,7 +130,6 @@ router.post(
     param('id').isMongoId().withMessage('Invalid source tag ID'),
     body('targetId').isMongoId().withMessage('Invalid target tag ID'),
   ],
-  validateRequest,
   mergeTags
 );
 
