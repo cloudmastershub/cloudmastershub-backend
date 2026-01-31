@@ -473,24 +473,44 @@ router.get('/analytics/overview', async (req: AuthRequest, res: Response, next: 
   }
 });
 
+// Helper function to extract lessons from curriculum
+function extractLessonsFromCurriculum(curriculum: any[]): { lessonId: string; title: string; sectionTitle: string; duration: number }[] {
+  const lessons: { lessonId: string; title: string; sectionTitle: string; duration: number }[] = [];
+  if (!curriculum) return lessons;
+
+  for (const section of curriculum) {
+    if (section.lessons && Array.isArray(section.lessons)) {
+      for (const lesson of section.lessons) {
+        lessons.push({
+          lessonId: lesson.id,
+          title: lesson.title,
+          sectionTitle: section.title,
+          duration: lesson.duration || 0
+        });
+      }
+    }
+  }
+  return lessons;
+}
+
 // Get course-specific analytics
 router.get('/analytics/courses/:courseId', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { courseId } = req.params;
     const instructorId = req.userId;
-    
+
     // Find course by ObjectId or slug
     let course = null;
     const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(courseId);
-    
+
     if (isValidObjectId) {
       course = await Course.findById(courseId).lean();
     }
-    
+
     if (!course) {
       course = await Course.findOne({ slug: courseId }).lean();
     }
-    
+
     if (!course) {
       res.status(404).json({
         success: false,
@@ -499,7 +519,7 @@ router.get('/analytics/courses/:courseId', async (req: AuthRequest, res: Respons
       });
       return;
     }
-    
+
     // Check permission
     if (course.instructor.id !== instructorId) {
       res.status(403).json({
@@ -509,21 +529,82 @@ router.get('/analytics/courses/:courseId', async (req: AuthRequest, res: Respons
       });
       return;
     }
-    
+
+    // Get real enrollment data for analytics
+    const { CourseProgress } = await import('../models');
+    const enrollments = await CourseProgress.find({
+      courseId: course._id.toString()
+    }).lean();
+
+    const totalEnrolled = enrollments.length;
+    const completedEnrollments = enrollments.filter(e => e.completedAt);
+    const completionRate = totalEnrolled > 0
+      ? Math.round((completedEnrollments.length / totalEnrolled) * 100)
+      : 0;
+
+    // Calculate average watch time
+    const totalWatchTime = enrollments.reduce((sum, e) => sum + (e.watchedTime || 0), 0);
+    const averageWatchTime = totalEnrolled > 0
+      ? Math.round(totalWatchTime / totalEnrolled)
+      : 0;
+
+    // Aggregate lesson completion data for top performing lessons
+    const lessonCompletionMap: Record<string, number> = {};
+    for (const enrollment of enrollments) {
+      if (enrollment.completedLessons && Array.isArray(enrollment.completedLessons)) {
+        for (const lessonId of enrollment.completedLessons) {
+          lessonCompletionMap[lessonId] = (lessonCompletionMap[lessonId] || 0) + 1;
+        }
+      }
+    }
+
+    // Extract lesson details and merge with completion counts
+    const lessons = extractLessonsFromCurriculum(course.curriculum);
+    const lessonStats = lessons.map(lesson => ({
+      lessonId: lesson.lessonId,
+      title: lesson.title,
+      section: lesson.sectionTitle,
+      completions: lessonCompletionMap[lesson.lessonId] || 0,
+      completionRate: totalEnrolled > 0
+        ? Math.round(((lessonCompletionMap[lesson.lessonId] || 0) / totalEnrolled) * 100)
+        : 0
+    }));
+
+    // Get top performing lessons (by completion rate)
+    const topPerformingLessons = [...lessonStats]
+      .sort((a, b) => b.completionRate - a.completionRate)
+      .slice(0, 5);
+
+    // Calculate enrollments by month (last 6 months)
+    const enrollmentsByMonth: { month: string; count: number }[] = [];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59);
+      const count = enrollments.filter(e => {
+        const enrolledAt = new Date(e.enrolledAt);
+        return enrolledAt >= monthStart && enrolledAt <= monthEnd;
+      }).length;
+      enrollmentsByMonth.push({
+        month: monthStart.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+        count
+      });
+    }
+
     const analytics = {
       courseId: course._id,
       title: course.title,
-      totalStudents: course.enrollmentCount || 0,
+      totalStudents: totalEnrolled,
       rating: course.rating || 0,
-      completionRate: 0, // Placeholder - would require progress analysis
-      averageWatchTime: 0, // Placeholder - would require analytics data
-      revenue: 0, // Placeholder - would integrate with payment service
-      enrollmentsByMonth: [], // Placeholder - would require time-series data
-      topPerformingLessons: [], // Placeholder - would require lesson analytics
-      studentFeedback: [], // Placeholder - would require review data
+      completionRate,
+      averageWatchTime,
+      revenue: (course.price || 0) * totalEnrolled * 0.7, // Estimate 70% instructor share
+      enrollmentsByMonth,
+      topPerformingLessons,
+      studentFeedback: [], // Would require review data integration
       timestamp: new Date().toISOString()
     };
-    
+
     res.json({
       success: true,
       data: analytics
@@ -538,6 +619,136 @@ router.get('/analytics/courses/:courseId', async (req: AuthRequest, res: Respons
       success: false,
       error: {
         message: 'Failed to fetch course analytics',
+        details: error.message
+      }
+    });
+  }
+});
+
+// Get lesson-level analytics for a specific course
+router.get('/analytics/courses/:courseId/lessons', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { courseId } = req.params;
+    const instructorId = req.userId;
+
+    // Find course by ObjectId or slug
+    let course = null;
+    const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(courseId);
+
+    if (isValidObjectId) {
+      course = await Course.findById(courseId).lean();
+    }
+
+    if (!course) {
+      course = await Course.findOne({ slug: courseId }).lean();
+    }
+
+    if (!course) {
+      res.status(404).json({
+        success: false,
+        message: 'Course not found',
+        error: { code: 'COURSE_NOT_FOUND' }
+      });
+      return;
+    }
+
+    // Check permission
+    if (course.instructor.id !== instructorId) {
+      res.status(403).json({
+        success: false,
+        message: 'Access denied',
+        error: { code: 'COURSE_ACCESS_DENIED' }
+      });
+      return;
+    }
+
+    // Get enrollment data
+    const { CourseProgress } = await import('../models');
+    const enrollments = await CourseProgress.find({
+      courseId: course._id.toString()
+    }).lean();
+
+    const totalEnrolled = enrollments.length;
+
+    // Aggregate lesson completion counts
+    const lessonCompletionMap: Record<string, Set<string>> = {};
+    for (const enrollment of enrollments) {
+      if (enrollment.completedLessons && Array.isArray(enrollment.completedLessons)) {
+        for (const lessonId of enrollment.completedLessons) {
+          if (!lessonCompletionMap[lessonId]) {
+            lessonCompletionMap[lessonId] = new Set();
+          }
+          lessonCompletionMap[lessonId].add(enrollment.userId);
+        }
+      }
+    }
+
+    // Extract lesson details from curriculum
+    const lessons = extractLessonsFromCurriculum(course.curriculum);
+
+    // Build lesson analytics with stats
+    const lessonAnalytics = lessons.map((lesson, index) => {
+      const uniqueViewers = lessonCompletionMap[lesson.lessonId]?.size || 0;
+      const completions = lessonCompletionMap[lesson.lessonId]?.size || 0;
+
+      return {
+        lessonId: lesson.lessonId,
+        title: lesson.title,
+        section: lesson.sectionTitle,
+        duration: lesson.duration,
+        order: index + 1,
+        completions,
+        uniqueViewers,
+        completionRate: totalEnrolled > 0
+          ? Math.round((completions / totalEnrolled) * 100)
+          : 0,
+        dropOffRate: index > 0
+          ? (() => {
+              const prevLesson = lessons[index - 1];
+              const prevCompletions = lessonCompletionMap[prevLesson.lessonId]?.size || 0;
+              if (prevCompletions === 0) return 0;
+              return Math.round(((prevCompletions - completions) / prevCompletions) * 100);
+            })()
+          : 0
+      };
+    });
+
+    // Calculate summary statistics
+    const avgCompletionRate = lessonAnalytics.length > 0
+      ? Math.round(lessonAnalytics.reduce((sum, l) => sum + l.completionRate, 0) / lessonAnalytics.length)
+      : 0;
+
+    const highestDropOff = lessonAnalytics
+      .filter(l => l.order > 1)
+      .sort((a, b) => b.dropOffRate - a.dropOffRate)[0];
+
+    res.json({
+      success: true,
+      data: {
+        courseId: course._id,
+        courseTitle: course.title,
+        totalEnrolled,
+        totalLessons: lessons.length,
+        averageCompletionRate: avgCompletionRate,
+        highestDropOffLesson: highestDropOff ? {
+          lessonId: highestDropOff.lessonId,
+          title: highestDropOff.title,
+          dropOffRate: highestDropOff.dropOffRate
+        } : null,
+        lessons: lessonAnalytics,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error: any) {
+    logger.error('Error fetching lesson analytics:', {
+      error: error.message,
+      courseId: req.params.courseId,
+      instructorId: req.userId
+    });
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to fetch lesson analytics',
         details: error.message
       }
     });

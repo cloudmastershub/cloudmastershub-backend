@@ -181,6 +181,15 @@ export const generateReport = async (
       timestamp: new Date().toISOString(),
     });
 
+    // Handle file downloads for CSV and PDF
+    if (result.data?.type === 'file') {
+      res.setHeader('Content-Type', result.data.contentType);
+      res.setHeader('Content-Disposition', `attachment; filename="${result.data.filename}"`);
+      res.send(result.data.content);
+      return;
+    }
+
+    // Return JSON response for JSON format
     res.status(200).json({
       success: true,
       message: 'Report generated successfully',

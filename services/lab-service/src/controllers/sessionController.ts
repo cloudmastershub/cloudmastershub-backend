@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import { labQueue } from '../services/queueService';
 import logger from '../utils/logger';
 import { getLabEventPublisher } from '../events/labEventPublisher';
+import LabSession from '../models/LabSession';
+import Lab from '../models/Lab';
 
 export const startLabSession = async (
   req: Request,
@@ -50,6 +52,23 @@ export const startLabSession = async (
   }
 };
 
+// Helper function to get resource display name
+function getResourceDisplayName(type: string): string {
+  const names: Record<string, string> = {
+    'ec2-instance': 'EC2 Instance',
+    's3-bucket': 'S3 Bucket',
+    'vpc': 'VPC Network',
+    'rds-instance': 'RDS Database',
+    'lambda-function': 'Lambda Function',
+    'iam-role': 'IAM Role',
+    'security-group': 'Security Group',
+    'elastic-ip': 'Elastic IP',
+    'load-balancer': 'Load Balancer',
+    'ecs-cluster': 'ECS Cluster'
+  };
+  return names[type] || type;
+}
+
 export const getSessionStatus = async (
   req: Request,
   res: Response,
@@ -58,35 +77,71 @@ export const getSessionStatus = async (
   try {
     const { sessionId } = req.params;
 
-    // TODO: Fetch session status from database/cache
+    // Fetch session from database
+    const session = await LabSession.findOne({ sessionId }).lean();
 
-    // Mock session status
-    const session = {
-      sessionId,
-      status: 'running', // provisioning, running, stopping, stopped, error
-      labId: 'lab-aws-ec2-basics',
-      userId: 'user123',
-      startedAt: new Date(Date.now() - 5 * 60 * 1000), // 5 minutes ago
+    if (!session) {
+      res.status(404).json({
+        success: false,
+        error: {
+          message: 'Session not found',
+          code: 'SESSION_NOT_FOUND'
+        }
+      });
+      return;
+    }
+
+    // Get lab details to calculate time remaining
+    const lab = await Lab.findById(session.labId).lean();
+
+    // Calculate time remaining
+    const elapsed = Date.now() - new Date(session.startTime).getTime();
+    const timeLimit = (lab?.resources?.timeLimit || 60) * 60 * 1000; // Convert minutes to ms
+    const timeRemaining = Math.max(0, Math.floor((timeLimit - elapsed) / 1000)); // In seconds
+
+    // Map status from model to API response
+    const statusMap: Record<string, string> = {
+      'pending': 'provisioning',
+      'provisioning': 'provisioning',
+      'active': 'running',
+      'completed': 'stopped',
+      'failed': 'error',
+      'terminated': 'stopped'
+    };
+
+    const response = {
+      sessionId: session.sessionId,
+      status: statusMap[session.status] || session.status,
+      labId: session.labId,
+      userId: session.userId,
+      startedAt: session.startTime,
       environment: {
-        consoleUrl: 'https://console.aws.amazon.com',
-        credentials: {
-          accessKeyId: 'MOCK_ACCESS_KEY',
-          region: 'us-east-1',
-        },
-        resources: [
-          {
-            type: 'ec2-instance',
-            id: 'i-1234567890',
-            status: 'running',
-          },
-        ],
+        provider: session.environment?.provider,
+        region: session.environment?.region,
+        consoleUrl: session.environment?.connectionDetails?.url,
+        credentials: session.environment?.connectionDetails?.credentials ? {
+          accessKeyId: session.environment.connectionDetails.credentials.username,
+          region: session.environment?.region
+        } : undefined,
+        publicIp: session.environment?.publicIp,
+        connectionDetails: session.environment?.connectionDetails
       },
-      timeRemaining: 3300, // seconds
+      resources: session.resources.map(r => ({
+        id: r.id,
+        type: r.type,
+        name: getResourceDisplayName(r.type),
+        status: r.status,
+        details: r.metadata
+      })),
+      progress: session.progress,
+      timeRemaining,
+      estimatedCost: session.costs?.estimatedCost || 0,
+      actualCost: session.costs?.actualCost
     };
 
     res.json({
       success: true,
-      data: session,
+      data: response,
     });
   } catch (error) {
     next(error);
@@ -138,30 +193,33 @@ export const getSessionLogs = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    // TODO: Use sessionId from req.params to fetch logs from CloudWatch/monitoring service
-    // const { sessionId } = req.params;
+    const { sessionId } = req.params;
 
-    const logs = [
-      {
-        timestamp: new Date(Date.now() - 4 * 60 * 1000),
-        level: 'info',
-        message: 'Lab environment provisioned successfully',
-      },
-      {
-        timestamp: new Date(Date.now() - 3 * 60 * 1000),
-        level: 'info',
-        message: 'EC2 instance i-1234567890 launched',
-      },
-      {
-        timestamp: new Date(Date.now() - 2 * 60 * 1000),
-        level: 'info',
-        message: 'User connected to instance via SSH',
-      },
-    ];
+    // Fetch session from database
+    const session = await LabSession.findOne({ sessionId }).lean();
+
+    if (!session) {
+      res.status(404).json({
+        success: false,
+        error: {
+          message: 'Session not found',
+          code: 'SESSION_NOT_FOUND'
+        }
+      });
+      return;
+    }
+
+    // Return logs from the session document
+    const logs = session.logs || [];
 
     res.json({
       success: true,
-      data: logs,
+      data: logs.map(log => ({
+        timestamp: log.timestamp,
+        level: log.level,
+        message: log.message,
+        metadata: log.metadata
+      })),
     });
   } catch (error) {
     next(error);

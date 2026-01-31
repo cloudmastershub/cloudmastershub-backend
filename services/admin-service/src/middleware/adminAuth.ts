@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { verify } from 'jsonwebtoken';
 import { UserRole, AdminPermission } from '@cloudmastershub/types';
 import logger from '../utils/logger';
+import { AuditLog } from '../models/AuditLog';
 
 export interface AdminRequest extends Request {
   adminId?: string;
@@ -172,6 +173,10 @@ export const requirePermission = (permission: AdminPermission) => {
 
 export const logAdminAction = (action: string) => {
   return (req: AdminRequest, res: Response, next: NextFunction): void => {
+    const timestamp = new Date();
+    const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+    const userAgent = req.get('User-Agent') || 'Unknown';
+
     // Log the admin action
     logger.info('Admin action initiated', {
       action,
@@ -182,22 +187,47 @@ export const logAdminAction = (action: string) => {
       body: req.body,
       query: req.query,
       params: req.params,
-      ip: req.ip,
-      userAgent: req.get('User-Agent'),
-      timestamp: new Date().toISOString(),
+      ip,
+      userAgent,
+      timestamp: timestamp.toISOString(),
     });
 
     // Store original send function
     const originalSend = res.send;
 
-    // Override send to log the result
+    // Override send to log the result and persist to database
     res.send = function (body) {
+      const success = res.statusCode < 400;
+
       logger.info('Admin action completed', {
         action,
         adminId: req.adminId,
         statusCode: res.statusCode,
-        success: res.statusCode < 400,
+        success,
         timestamp: new Date().toISOString(),
+      });
+
+      // Persist to database asynchronously (don't block the response)
+      AuditLog.create({
+        timestamp,
+        event: action,
+        severity: 'low',
+        source: 'Admin Panel',
+        adminId: req.adminId,
+        user: req.adminEmail,
+        ip,
+        userAgent,
+        details: `${req.method} ${req.originalUrl} - ${success ? 'Success' : 'Failed'} (${res.statusCode})`,
+        status: 'resolved',
+        metadata: {
+          method: req.method,
+          endpoint: req.originalUrl,
+          statusCode: res.statusCode,
+          params: req.params,
+          query: req.query
+        }
+      }).catch(err => {
+        logger.error('Failed to persist audit log', { error: err.message, action });
       });
 
       // Call original send

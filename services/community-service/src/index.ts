@@ -9,6 +9,7 @@ import groupRoutes from './routes/groupRoutes';
 import questionRoutes, { answerRouter } from './routes/questionRoutes';
 import connectionRoutes, { userProfileRouter } from './routes/connectionRoutes';
 import eventRoutes from './routes/eventRoutes';
+import moderationRoutes from './routes/moderationRoutes';
 import { errorHandler } from './middleware/errorHandler';
 import logger from './utils/logger';
 
@@ -79,6 +80,7 @@ app.use('/answers', answerRouter);
 app.use('/connections', connectionRoutes);
 app.use('/users', userProfileRouter);
 app.use('/events', eventRoutes);
+app.use('/moderation', moderationRoutes);
 
 // Error handler
 app.use(errorHandler);

@@ -1,6 +1,7 @@
 import logger from '../utils/logger';
 import userService from './userService';
 import contentService from './contentService';
+import { generateCSV, generatePDF, getReportColumns, flattenData, ExportResult } from './exportService';
 
 interface ServiceResponse<T = any> {
   success: boolean;
@@ -145,18 +146,54 @@ class AnalyticsServiceClient {
         return reportData;
       }
 
-      // In a real implementation, you would format the data according to the requested format
-      const report = {
-        type,
-        timeframe,
-        format,
-        filters,
-        data: reportData.data,
-        generatedAt: new Date().toISOString(),
-        downloadUrl: `${process.env.ADMIN_SERVICE_URL || 'http://localhost:3005'}/admin/reports/download/${type}-${Date.now()}.${format}`,
-      };
+      // For JSON format, return structured data
+      if (format === 'json') {
+        const report = {
+          type,
+          timeframe,
+          format,
+          filters,
+          data: reportData.data,
+          generatedAt: new Date().toISOString(),
+        };
+        return { success: true, data: report };
+      }
 
-      return { success: true, data: report };
+      // For CSV/PDF formats, generate file content
+      const flatData = flattenData(reportData.data);
+      const columns = getReportColumns(type);
+      const fields = columns.map(c => c.key);
+      const timestamp = Date.now();
+      const filename = `${type}-report-${timestamp}`;
+
+      if (format === 'csv') {
+        const csvContent = generateCSV(flatData, fields);
+        return {
+          success: true,
+          data: {
+            type: 'file',
+            content: csvContent,
+            contentType: 'text/csv',
+            filename: `${filename}.csv`,
+          },
+        };
+      }
+
+      if (format === 'pdf') {
+        const reportTitle = this.getReportTitle(type, timeframe);
+        const pdfBuffer = await generatePDF(reportTitle, flatData, columns);
+        return {
+          success: true,
+          data: {
+            type: 'file',
+            content: pdfBuffer,
+            contentType: 'application/pdf',
+            filename: `${filename}.pdf`,
+          },
+        };
+      }
+
+      return { success: false, error: 'Invalid format. Use json, csv, or pdf.' };
     } catch (error) {
       logger.error('Failed to generate report:', error);
       return {
@@ -164,6 +201,16 @@ class AnalyticsServiceClient {
         error: 'Failed to generate report',
       };
     }
+  }
+
+  private getReportTitle(type: string, timeframe: string): string {
+    const typeNames: Record<string, string> = {
+      user_activity: 'User Activity Report',
+      revenue: 'Revenue Report',
+      content_performance: 'Content Performance Report',
+      subscription_analytics: 'Subscription Analytics Report',
+    };
+    return `${typeNames[type] || 'Analytics Report'} - ${timeframe}`;
   }
 
   async getSystemHealth(): Promise<ServiceResponse> {

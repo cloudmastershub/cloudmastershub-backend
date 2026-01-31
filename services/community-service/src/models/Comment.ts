@@ -2,6 +2,8 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export type CommentTargetType = 'post' | 'thread' | 'question' | 'event';
 
+export type ModerationAction = 'approved' | 'hidden' | 'deleted';
+
 export interface IComment extends Document {
   _id: mongoose.Types.ObjectId;
   targetId: mongoose.Types.ObjectId;
@@ -15,6 +17,16 @@ export interface IComment extends Document {
   replyCount: number;
   isEdited: boolean;
   editedAt?: Date;
+  // Moderation fields
+  isHidden: boolean;
+  isFlagged: boolean;
+  flagReason?: string;
+  flaggedBy?: string;
+  flaggedAt?: Date;
+  moderatedBy?: string;
+  moderatedAt?: Date;
+  moderationAction?: ModerationAction;
+  courseId?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -63,6 +75,38 @@ const CommentSchema = new Schema<IComment>({
   },
   editedAt: {
     type: Date
+  },
+  // Moderation fields
+  isHidden: {
+    type: Boolean,
+    default: false
+  },
+  isFlagged: {
+    type: Boolean,
+    default: false
+  },
+  flagReason: {
+    type: String
+  },
+  flaggedBy: {
+    type: String
+  },
+  flaggedAt: {
+    type: Date
+  },
+  moderatedBy: {
+    type: String
+  },
+  moderatedAt: {
+    type: Date
+  },
+  moderationAction: {
+    type: String,
+    enum: ['approved', 'hidden', 'deleted']
+  },
+  courseId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Course'
   }
 }, {
   timestamps: true,
@@ -72,6 +116,8 @@ const CommentSchema = new Schema<IComment>({
 CommentSchema.index({ targetId: 1, targetType: 1, createdAt: 1 });
 CommentSchema.index({ parentId: 1 });
 CommentSchema.index({ authorId: 1 });
+CommentSchema.index({ isFlagged: 1, isHidden: 1 });
+CommentSchema.index({ courseId: 1, isFlagged: 1 });
 
 CommentSchema.set('toJSON', {
   virtuals: true,

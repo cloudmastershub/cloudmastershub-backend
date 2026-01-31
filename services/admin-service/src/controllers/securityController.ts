@@ -1,20 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AdminRequest } from '../middleware/adminAuth';
 import logger from '../utils/logger';
-
-// Security Log Interface
-interface SecurityLog {
-  id: string;
-  timestamp: string;
-  event: string;
-  severity: 'low' | 'medium' | 'high' | 'critical';
-  source: string;
-  user?: string;
-  ip: string;
-  userAgent: string;
-  details: string;
-  status: 'resolved' | 'investigating' | 'open';
-}
+import { AuditLog } from '../models/AuditLog';
 
 // Security Metrics Interface
 interface SecurityMetrics {
@@ -46,68 +33,6 @@ interface SecuritySettings {
   encryptionEnabled: boolean;
 }
 
-// Mock security data - in real implementation, this would come from databases and security services
-let mockSecurityLogs: SecurityLog[] = [
-  {
-    id: '1',
-    timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-    event: 'Failed login attempt',
-    severity: 'medium',
-    source: 'Authentication',
-    user: 'unknown@example.com',
-    ip: '192.168.1.100',
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-    details: 'Multiple failed password attempts detected',
-    status: 'investigating'
-  },
-  {
-    id: '2',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-    event: 'Suspicious API activity',
-    severity: 'high',
-    source: 'API Gateway',
-    ip: '203.0.113.45',
-    userAgent: 'curl/7.68.0',
-    details: 'Unusual rate of API requests detected',
-    status: 'open'
-  },
-  {
-    id: '3',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString(),
-    event: 'Blocked malicious request',
-    severity: 'critical',
-    source: 'WAF',
-    ip: '198.51.100.75',
-    userAgent: 'sqlmap/1.4.9',
-    details: 'SQL injection attempt blocked',
-    status: 'resolved'
-  },
-  {
-    id: '4',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 6).toISOString(),
-    event: 'Admin login',
-    severity: 'low',
-    source: 'Authentication',
-    user: 'admin@cloudmastershub.com',
-    ip: '10.0.0.1',
-    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
-    details: 'Successful admin authentication',
-    status: 'resolved'
-  },
-  {
-    id: '5',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 8).toISOString(),
-    event: 'Unauthorized access attempt',
-    severity: 'high',
-    source: 'Authorization',
-    user: 'user@example.com',
-    ip: '172.16.0.50',
-    userAgent: 'Mozilla/5.0 (X11; Linux x86_64)',
-    details: 'Attempt to access admin panel without proper permissions',
-    status: 'resolved'
-  }
-];
-
 let mockSecuritySettings: SecuritySettings = {
   twoFactorRequired: false,
   passwordMinLength: 8,
@@ -134,19 +59,51 @@ export const getSecurityOverview = async (
       adminId: req.adminId,
     });
 
-    const metrics: SecurityMetrics = {
-      totalIncidents: mockSecurityLogs.length,
-      activeThreats: mockSecurityLogs.filter(log => log.status === 'open' || log.status === 'investigating').length,
-      blockedAttacks: 156,
-      suspiciousLogins: mockSecurityLogs.filter(log => log.event.includes('login') && log.severity !== 'low').length,
-      securityScore: 85,
-      lastScanTime: new Date().toISOString(),
-      vulnerabilities: {
-        critical: 0,
-        high: 1,
-        medium: 3,
-        low: 7
+    // Get real metrics from database
+    const [
+      totalIncidents,
+      activeThreats,
+      suspiciousLogins,
+      severityCounts
+    ] = await Promise.all([
+      AuditLog.countDocuments(),
+      AuditLog.countDocuments({ status: { $in: ['open', 'investigating'] } }),
+      AuditLog.countDocuments({
+        event: { $regex: /login/i },
+        severity: { $ne: 'low' }
+      }),
+      AuditLog.aggregate([
+        { $group: { _id: '$severity', count: { $sum: 1 } } }
+      ])
+    ]);
+
+    // Transform severity counts
+    const vulnerabilities = {
+      critical: 0,
+      high: 0,
+      medium: 0,
+      low: 0
+    };
+    severityCounts.forEach((item: { _id: string; count: number }) => {
+      if (item._id in vulnerabilities) {
+        vulnerabilities[item._id as keyof typeof vulnerabilities] = item.count;
       }
+    });
+
+    // Calculate security score (higher is better, based on resolved vs active threats)
+    const resolvedCount = totalIncidents - activeThreats;
+    const securityScore = totalIncidents > 0
+      ? Math.round((resolvedCount / totalIncidents) * 100)
+      : 100;
+
+    const metrics: SecurityMetrics = {
+      totalIncidents,
+      activeThreats,
+      blockedAttacks: vulnerabilities.critical + vulnerabilities.high,
+      suspiciousLogins,
+      securityScore,
+      lastScanTime: new Date().toISOString(),
+      vulnerabilities
     };
 
     res.status(200).json({
@@ -168,12 +125,12 @@ export const getSecurityLogs = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { 
-      page = 1, 
-      limit = 20, 
-      severity = '', 
-      status = '', 
-      search = '' 
+    const {
+      page = 1,
+      limit = 20,
+      severity = '',
+      status = '',
+      search = ''
     } = req.query as any;
 
     logger.info('Admin fetching security logs', {
@@ -185,43 +142,59 @@ export const getSecurityLogs = async (
       search,
     });
 
-    // Filter logs based on query parameters
-    let filteredLogs = [...mockSecurityLogs];
+    // Build query based on filters
+    const query: Record<string, any> = {};
 
-    if (severity) {
-      filteredLogs = filteredLogs.filter(log => log.severity === severity);
+    if (severity && severity !== 'all') {
+      query.severity = severity;
     }
 
-    if (status) {
-      filteredLogs = filteredLogs.filter(log => log.status === status);
+    if (status && status !== 'all') {
+      query.status = status;
     }
 
     if (search) {
-      const searchLower = search.toLowerCase();
-      filteredLogs = filteredLogs.filter(log => 
-        log.event.toLowerCase().includes(searchLower) ||
-        log.source.toLowerCase().includes(searchLower) ||
-        log.details.toLowerCase().includes(searchLower) ||
-        log.user?.toLowerCase().includes(searchLower) ||
-        log.ip.includes(search)
-      );
+      query.$or = [
+        { event: { $regex: search, $options: 'i' } },
+        { source: { $regex: search, $options: 'i' } },
+        { details: { $regex: search, $options: 'i' } },
+        { user: { $regex: search, $options: 'i' } },
+        { ip: { $regex: search, $options: 'i' } }
+      ];
     }
 
-    // Sort by timestamp (most recent first)
-    filteredLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    const pageNum = Number(page);
+    const limitNum = Number(limit);
+    const skip = (pageNum - 1) * limitNum;
 
-    // Pagination
-    const startIndex = (Number(page) - 1) * Number(limit);
-    const endIndex = startIndex + Number(limit);
-    const paginatedLogs = filteredLogs.slice(startIndex, endIndex);
+    // Query database
+    const [logs, total] = await Promise.all([
+      AuditLog.find(query)
+        .sort({ timestamp: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
+      AuditLog.countDocuments(query)
+    ]);
 
     const response = {
-      logs: paginatedLogs,
+      logs: logs.map(log => ({
+        id: log._id.toString(),
+        timestamp: log.timestamp.toISOString(),
+        event: log.event,
+        severity: log.severity,
+        source: log.source,
+        user: log.user,
+        ip: log.ip,
+        userAgent: log.userAgent,
+        details: log.details,
+        status: log.status
+      })),
       pagination: {
-        page: Number(page),
-        limit: Number(limit),
-        total: filteredLogs.length,
-        totalPages: Math.ceil(filteredLogs.length / Number(limit))
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum)
       }
     };
 
@@ -360,9 +333,9 @@ export const createSecurityLog = async (
       source,
     });
 
-    const newLog: SecurityLog = {
-      id: Date.now().toString(),
-      timestamp: new Date().toISOString(),
+    // Save to database
+    const newLog = await AuditLog.create({
+      timestamp: new Date(),
       event,
       severity,
       source,
@@ -370,17 +343,15 @@ export const createSecurityLog = async (
       userAgent: userAgent || 'Unknown',
       details,
       user: user || undefined,
+      adminId: req.adminId,
       status: 'open'
-    };
-
-    // Add to mock data (in real implementation, save to database)
-    mockSecurityLogs.unshift(newLog);
+    });
 
     // Log the security event creation
     logger.warn('Security log entry created', {
       adminId: req.adminId,
       adminEmail: req.adminEmail,
-      logId: newLog.id,
+      logId: newLog._id.toString(),
       event,
       severity,
       timestamp: new Date().toISOString(),
@@ -389,7 +360,18 @@ export const createSecurityLog = async (
     res.status(201).json({
       success: true,
       message: 'Security log entry created successfully',
-      data: newLog,
+      data: {
+        id: newLog._id.toString(),
+        timestamp: newLog.timestamp.toISOString(),
+        event: newLog.event,
+        severity: newLog.severity,
+        source: newLog.source,
+        ip: newLog.ip,
+        userAgent: newLog.userAgent,
+        details: newLog.details,
+        user: newLog.user,
+        status: newLog.status
+      },
     });
   } catch (error) {
     logger.error('Error in createSecurityLog controller:', error);
@@ -425,9 +407,14 @@ export const updateSecurityLogStatus = async (
       status,
     });
 
-    // Find and update the log
-    const logIndex = mockSecurityLogs.findIndex(log => log.id === logId);
-    if (logIndex === -1) {
+    // Find and update the log in database
+    const updatedLog = await AuditLog.findByIdAndUpdate(
+      logId,
+      { status },
+      { new: true }
+    ).lean();
+
+    if (!updatedLog) {
       res.status(404).json({
         success: false,
         error: {
@@ -437,22 +424,31 @@ export const updateSecurityLogStatus = async (
       return;
     }
 
-    mockSecurityLogs[logIndex].status = status;
-
     // Log the status update
     logger.info('Security log status updated', {
       adminId: req.adminId,
       adminEmail: req.adminEmail,
       logId,
       status,
-      event: mockSecurityLogs[logIndex].event,
+      event: updatedLog.event,
       timestamp: new Date().toISOString(),
     });
 
     res.status(200).json({
       success: true,
       message: 'Security log status updated successfully',
-      data: mockSecurityLogs[logIndex],
+      data: {
+        id: updatedLog._id.toString(),
+        timestamp: updatedLog.timestamp.toISOString(),
+        event: updatedLog.event,
+        severity: updatedLog.severity,
+        source: updatedLog.source,
+        ip: updatedLog.ip,
+        userAgent: updatedLog.userAgent,
+        details: updatedLog.details,
+        user: updatedLog.user,
+        status: updatedLog.status
+      },
     });
   } catch (error) {
     logger.error('Error in updateSecurityLogStatus controller:', error);
@@ -476,50 +472,92 @@ export const getSecurityAnalytics = async (
       timeframe,
     });
 
-    // Generate analytics based on timeframe
+    // Parse timeframe to get date range
+    const days = parseInt(timeframe.replace('d', '')) || 30;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    // Get analytics from database
+    const [
+      totalEvents,
+      criticalEvents,
+      highEvents,
+      resolvedEvents,
+      eventsBySource,
+      eventsBySeverity,
+      dailyEvents,
+      topThreats
+    ] = await Promise.all([
+      AuditLog.countDocuments({ timestamp: { $gte: startDate } }),
+      AuditLog.countDocuments({ timestamp: { $gte: startDate }, severity: 'critical' }),
+      AuditLog.countDocuments({ timestamp: { $gte: startDate }, severity: 'high' }),
+      AuditLog.countDocuments({ timestamp: { $gte: startDate }, status: 'resolved' }),
+      AuditLog.aggregate([
+        { $match: { timestamp: { $gte: startDate } } },
+        { $group: { _id: '$source', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 10 }
+      ]),
+      AuditLog.aggregate([
+        { $match: { timestamp: { $gte: startDate } } },
+        { $group: { _id: '$severity', count: { $sum: 1 } } }
+      ]),
+      AuditLog.aggregate([
+        { $match: { timestamp: { $gte: startDate } } },
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m-%d', date: '$timestamp' } },
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { _id: 1 } },
+        { $limit: 7 }
+      ]),
+      AuditLog.aggregate([
+        { $match: { timestamp: { $gte: startDate }, severity: { $in: ['high', 'critical'] } } },
+        {
+          $group: {
+            _id: '$event',
+            count: { $sum: 1 },
+            lastSeen: { $max: '$timestamp' }
+          }
+        },
+        { $sort: { count: -1 } },
+        { $limit: 5 }
+      ])
+    ]);
+
+    // Transform aggregation results
+    const sourceMap: Record<string, number> = {};
+    eventsBySource.forEach((item: { _id: string; count: number }) => {
+      sourceMap[item._id || 'Unknown'] = item.count;
+    });
+
+    const severityMap: Record<string, number> = { low: 0, medium: 0, high: 0, critical: 0 };
+    eventsBySeverity.forEach((item: { _id: string; count: number }) => {
+      if (item._id) severityMap[item._id] = item.count;
+    });
+
     const analytics = {
       timeframe,
       generatedAt: new Date().toISOString(),
       summary: {
-        totalEvents: mockSecurityLogs.length,
-        criticalEvents: mockSecurityLogs.filter(log => log.severity === 'critical').length,
-        highEvents: mockSecurityLogs.filter(log => log.severity === 'high').length,
-        resolvedEvents: mockSecurityLogs.filter(log => log.status === 'resolved').length,
-        averageResolutionTime: '2.3 hours', // Mock data
+        totalEvents,
+        criticalEvents,
+        highEvents,
+        resolvedEvents,
+        averageResolutionTime: 'N/A',
       },
       trends: {
-        dailyEvents: [12, 8, 15, 22, 18, 9, 14], // Last 7 days
-        eventsBySource: {
-          'Authentication': 15,
-          'API Gateway': 8,
-          'WAF': 12,
-          'Authorization': 6,
-          'Database': 2
-        },
-        eventsBySeverity: {
-          'low': 20,
-          'medium': 12,
-          'high': 8,
-          'critical': 3
-        }
+        dailyEvents: dailyEvents.map((d: { count: number }) => d.count),
+        eventsBySource: sourceMap,
+        eventsBySeverity: severityMap
       },
-      topThreats: [
-        {
-          type: 'Failed login attempts',
-          count: 15,
-          lastSeen: new Date(Date.now() - 1000 * 60 * 30).toISOString()
-        },
-        {
-          type: 'SQL injection attempts',
-          count: 8,
-          lastSeen: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString()
-        },
-        {
-          type: 'Unauthorized access',
-          count: 6,
-          lastSeen: new Date(Date.now() - 1000 * 60 * 60 * 8).toISOString()
-        }
-      ]
+      topThreats: topThreats.map((t: { _id: string; count: number; lastSeen: Date }) => ({
+        type: t._id,
+        count: t.count,
+        lastSeen: t.lastSeen.toISOString()
+      }))
     };
 
     res.status(200).json({
