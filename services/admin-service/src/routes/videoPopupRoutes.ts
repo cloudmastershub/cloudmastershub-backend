@@ -11,7 +11,8 @@ import {
   recordPopupView,
   recordPopupClick,
   recordPopupDismiss,
-  getPopupAnalytics
+  getPopupAnalytics,
+  submitPopupForm
 } from '../controllers/videoPopupController';
 import { requireAdmin } from '../middleware/adminAuth';
 
@@ -20,6 +21,7 @@ const router = Router();
 
 router.use(requireAdmin);
 
+// List all popups (supports ?type=video or ?type=lead_capture filter)
 router.get('/', listVideoPopups);
 router.get('/:id', getVideoPopup);
 router.post('/', createVideoPopup);
@@ -34,7 +36,17 @@ export default router;
 // Public routes (no authentication required)
 export const publicVideoPopupRouter = Router();
 
+// Get active popups for page (supports ?type=video or ?type=lead_capture filter)
 publicVideoPopupRouter.get('/active', getActivePopupsForPage);
+
+// Analytics tracking
 publicVideoPopupRouter.post('/:id/view', recordPopupView);
 publicVideoPopupRouter.post('/:id/click', recordPopupClick);
 publicVideoPopupRouter.post('/:id/dismiss', recordPopupDismiss);
+
+// Lead capture form submission
+publicVideoPopupRouter.post('/:id/submit', submitPopupForm);
+
+// Backward compatibility aliases
+export const publicPopupRouter = publicVideoPopupRouter;
+export const popupRouter = router;
