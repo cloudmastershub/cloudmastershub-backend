@@ -431,6 +431,78 @@ export const listSequences = async (
   }
 };
 
+/**
+ * Update email sequence
+ * PUT /admin/email/sequences/:id
+ */
+export const updateSequence = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const userId = (req as any).user?.id || 'system';
+
+    const { name, description, status, emails, tags } = req.body;
+
+    const sequence = await emailService.updateSequence(id, {
+      name,
+      description,
+      status,
+      emails,
+      tags,
+      updatedBy: userId,
+    });
+
+    if (!sequence) {
+      res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'Sequence not found' },
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      data: sequence,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Delete email sequence
+ * DELETE /admin/email/sequences/:id
+ */
+export const deleteSequence = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    const deleted = await emailService.deleteSequence(id);
+
+    if (!deleted) {
+      res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'Sequence not found' },
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      message: 'Sequence deleted successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // ==========================================
 // Email Dashboard Stats
 // ==========================================
@@ -869,6 +941,8 @@ export default {
   createSequence,
   getSequence,
   listSequences,
+  updateSequence,
+  deleteSequence,
   // Direct sending
   sendEmail,
   sendBulkEmail,

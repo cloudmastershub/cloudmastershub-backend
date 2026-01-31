@@ -167,6 +167,8 @@ app.get('/', (req, res) => {
             list: 'GET /admin/email/sequences',
             create: 'POST /admin/email/sequences',
             get: 'GET /admin/email/sequences/:id',
+            update: 'PUT /admin/email/sequences/:id',
+            delete: 'DELETE /admin/email/sequences/:id',
           },
           send: 'POST /admin/email/send',
           bulk: 'POST /admin/email/bulk',

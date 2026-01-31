@@ -511,6 +511,72 @@ class EmailService {
     return { data: data as IEmailSequence[], total };
   }
 
+  /**
+   * Update an email sequence
+   */
+  async updateSequence(
+    id: string,
+    input: {
+      name?: string;
+      description?: string;
+      status?: 'draft' | 'active' | 'paused' | 'archived';
+      emails?: Array<{
+        order: number;
+        templateId: string;
+        delayHours: number;
+        subject?: string;
+      }>;
+      tags?: string[];
+      updatedBy: string;
+    }
+  ): Promise<IEmailSequence | null> {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw ApiError.badRequest('Invalid sequence ID');
+    }
+
+    const sequence = await EmailSequence.findById(id);
+    if (!sequence) {
+      return null;
+    }
+
+    // Update fields if provided
+    if (input.name !== undefined) sequence.name = input.name;
+    if (input.description !== undefined) sequence.description = input.description;
+    if (input.status !== undefined) sequence.status = input.status;
+    if (input.tags !== undefined) sequence.tags = input.tags;
+    if (input.emails !== undefined) {
+      sequence.emails = input.emails.map((email, index) => ({
+        order: email.order ?? index,
+        templateId: new mongoose.Types.ObjectId(email.templateId),
+        delayHours: email.delayHours,
+        subject: email.subject,
+      }));
+    }
+
+    sequence.updatedBy = input.updatedBy;
+    await sequence.save();
+
+    logger.info(`Email sequence updated: ${sequence.name} (${id})`);
+    return sequence;
+  }
+
+  /**
+   * Delete an email sequence
+   */
+  async deleteSequence(id: string): Promise<boolean> {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw ApiError.badRequest('Invalid sequence ID');
+    }
+
+    const sequence = await EmailSequence.findByIdAndDelete(id);
+    if (!sequence) {
+      return false;
+    }
+
+    logger.info(`Email sequence deleted: ${sequence.name} (${id})`);
+    return true;
+  }
+
   // ==========================================
   // Challenge Email Helpers
   // ==========================================

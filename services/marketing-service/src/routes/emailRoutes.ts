@@ -260,6 +260,26 @@ router.get(
   emailController.getSequence
 );
 
+// Update sequence
+router.put(
+  '/sequences/:id',
+  authenticate,
+  requireAdmin,
+  logAdminAction('UPDATE_EMAIL_SEQUENCE'),
+  idParamValidation,
+  emailController.updateSequence
+);
+
+// Delete sequence
+router.delete(
+  '/sequences/:id',
+  authenticate,
+  requireAdmin,
+  logAdminAction('DELETE_EMAIL_SEQUENCE'),
+  idParamValidation,
+  emailController.deleteSequence
+);
+
 // ==========================================
 // Direct Email Sending Routes
 // ==========================================
