@@ -4,6 +4,7 @@ import Handlebars from 'handlebars';
 import { v4 as uuidv4 } from 'uuid';
 import mongoose from 'mongoose';
 import { EmailTemplate, IEmailTemplate, EmailSequence, IEmailSequence, Lead, ILead } from '../models';
+import { EmailSequenceStatus, SendTimeOption, ISequenceEmail } from '../models/EmailSequence';
 import logger from '../utils/logger';
 import { ApiError } from '../middleware/errorHandler';
 
@@ -548,8 +549,7 @@ class EmailService {
     // Update fields if provided
     if (input.name !== undefined) sequence.name = input.name;
     if (input.description !== undefined) sequence.description = input.description;
-    if (input.status !== undefined) sequence.status = input.status;
-    if (input.tags !== undefined) sequence.tags = input.tags;
+    if (input.status !== undefined) sequence.status = input.status as EmailSequenceStatus;
 
     // Only allow trigger type change when sequence is in draft status
     if (input.triggerType !== undefined) {
@@ -569,10 +569,25 @@ class EmailService {
 
     if (input.emails !== undefined) {
       sequence.emails = input.emails.map((email, index) => ({
+        id: email.id || `email-${Date.now()}-${index}`,
         order: email.order ?? index,
-        templateId: new mongoose.Types.ObjectId(email.templateId),
+        name: email.name || `Email ${index + 1}`,
+        templateId: email.templateId,
         delayHours: email.delayHours,
-        subject: email.subject,
+        sendTime: email.sendTime || SendTimeOption.IMMEDIATE,
+        conditions: email.conditions || {
+          skipIfConverted: true,
+          skipIfUnsubscribed: true,
+        },
+        metrics: email.metrics || {
+          sent: 0,
+          delivered: 0,
+          opened: 0,
+          clicked: 0,
+          bounced: 0,
+          unsubscribed: 0,
+        },
+        isActive: email.isActive !== undefined ? email.isActive : true,
       }));
     }
 
