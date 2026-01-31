@@ -520,6 +520,12 @@ class EmailService {
       name?: string;
       description?: string;
       status?: 'draft' | 'active' | 'paused' | 'archived';
+      triggerType?: string;
+      triggerConfig?: {
+        funnelId?: string;
+        challengeId?: string;
+        tagName?: string;
+      };
       emails?: Array<{
         order: number;
         templateId: string;
@@ -544,6 +550,23 @@ class EmailService {
     if (input.description !== undefined) sequence.description = input.description;
     if (input.status !== undefined) sequence.status = input.status;
     if (input.tags !== undefined) sequence.tags = input.tags;
+
+    // Only allow trigger type change when sequence is in draft status
+    if (input.triggerType !== undefined) {
+      if (sequence.status !== 'draft') {
+        throw ApiError.badRequest('Trigger type can only be changed when sequence is in draft status');
+      }
+      sequence.trigger = input.triggerType as any;
+    }
+
+    // Allow trigger config updates (for funnelId, challengeId, tagName, etc.)
+    if (input.triggerConfig !== undefined) {
+      sequence.triggerConfig = {
+        ...sequence.triggerConfig,
+        ...input.triggerConfig,
+      };
+    }
+
     if (input.emails !== undefined) {
       sequence.emails = input.emails.map((email, index) => ({
         order: email.order ?? index,

@@ -444,12 +444,14 @@ export const updateSequence = async (
     const { id } = req.params;
     const userId = (req as any).user?.id || 'system';
 
-    const { name, description, status, emails, tags } = req.body;
+    const { name, description, status, triggerType, triggerConfig, emails, tags } = req.body;
 
     const sequence = await emailService.updateSequence(id, {
       name,
       description,
       status,
+      triggerType,
+      triggerConfig,
       emails,
       tags,
       updatedBy: userId,
