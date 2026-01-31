@@ -17,6 +17,7 @@ import mailingListRoutes from './routes/mailingListRoutes';
 import leadRoutes from './routes/leadRoutes';
 import workflowRoutes from './routes/workflowRoutes';
 import trackingRoutes from './routes/trackingRoutes';
+import tagRoutes from './routes/tagRoutes';
 import webhookRoutes from './routes/webhookRoutes';
 import { sequenceScheduler } from './services/sequenceScheduler';
 import { workflowProcessor } from './services/workflowProcessor';
@@ -93,6 +94,7 @@ app.use('/admin/segments', segmentRoutes);
 app.use('/admin/mailing-lists', mailingListRoutes);
 app.use('/admin/leads', leadRoutes);
 app.use('/admin/workflows', workflowRoutes);
+app.use('/admin/tags', tagRoutes);
 // These will be implemented in subsequent phases:
 // app.use('/admin/analytics', analyticsRoutes);
 
@@ -229,6 +231,17 @@ app.get('/', (req, res) => {
           import: 'POST /admin/leads/import',
           export: 'GET /admin/leads/export',
           merge: 'POST /admin/leads/merge',
+        },
+        tags: {
+          list: 'GET /admin/tags',
+          create: 'POST /admin/tags',
+          get: 'GET /admin/tags/:id',
+          update: 'PUT /admin/tags/:id',
+          delete: 'DELETE /admin/tags/:id',
+          search: 'GET /admin/tags/search?q=',
+          stats: 'GET /admin/tags/stats',
+          merge: 'POST /admin/tags/:id/merge',
+          sync: 'POST /admin/tags/sync',
         },
         analytics: '/admin/analytics (coming soon)',
       },
