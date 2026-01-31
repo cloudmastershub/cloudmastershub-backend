@@ -3,6 +3,8 @@ import { validationResult } from 'express-validator';
 import leadService from '../services/leadService';
 import { LeadSource, LeadStatus, LeadScoreLevel } from '../models/Lead';
 import { workflowTriggerService } from '../services/workflowTriggerService';
+import sequenceScheduler from '../services/sequenceScheduler';
+import { SequenceTrigger } from '../models/EmailSequence';
 import logger from '../utils/logger';
 
 /**
@@ -842,6 +844,31 @@ export const subscribeNewsletter = async (
       await lead.save();
 
       logger.info(`New newsletter subscriber captured: ${email}`);
+    }
+
+    // Trigger newsletter welcome email sequence
+    // Flow: Subscribe → Tag added → Sequence starts → Email sent
+    try {
+      const triggerResult = await sequenceScheduler.triggerSequence(
+        SequenceTrigger.TAG_ADDED,
+        lead._id,
+        {
+          tagName: 'newsletter',
+          email: lead.email,
+          firstName: lead.firstName,
+          source: 'footer_newsletter',
+        }
+      );
+
+      if (triggerResult.enrolled.length > 0) {
+        logger.info(`Newsletter welcome sequence triggered for: ${email}`, {
+          leadId: lead._id.toString(),
+          sequences: triggerResult.enrolled,
+        });
+      }
+    } catch (seqError) {
+      // Don't fail the subscription if sequence trigger fails
+      logger.error('Failed to trigger newsletter welcome sequence:', seqError);
     }
 
     res.status(200).json({
