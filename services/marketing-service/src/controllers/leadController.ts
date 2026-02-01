@@ -881,6 +881,168 @@ export const subscribeNewsletter = async (
   }
 };
 
+/**
+ * Capture popup lead - PUBLIC endpoint (no auth required)
+ * POST /leads/popup
+ *
+ * This endpoint is called by the admin-service when a popup form is submitted.
+ * It creates or updates a lead with the popup form data.
+ */
+export const capturePopupLead = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const {
+      email,
+      firstName,
+      lastName,
+      phone,
+      company,
+      source,
+      tags,
+      score,
+      customFields,
+    } = req.body;
+
+    // Validate required fields
+    if (!email) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Email is required' },
+      });
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Invalid email format' },
+      });
+      return;
+    }
+
+    // Try to find existing lead
+    const Lead = (await import('../models/Lead')).default;
+    let lead = await Lead.findOne({ email: email.toLowerCase().trim() });
+
+    if (lead) {
+      // Update existing lead
+      if (firstName && !lead.firstName) lead.firstName = firstName;
+      if (lastName && !lead.lastName) lead.lastName = lastName;
+      if (phone && !lead.phone) lead.phone = phone;
+      if (company && !lead.company) lead.company = company;
+
+      // Add new tags
+      if (tags && Array.isArray(tags)) {
+        const existingTags = new Set(lead.tags || []);
+        tags.forEach((tag: string) => existingTags.add(tag));
+        lead.tags = Array.from(existingTags);
+      }
+
+      // Update score if higher
+      if (score && typeof score === 'number' && score > (lead.score || 0)) {
+        lead.score = score;
+      }
+
+      // Merge custom fields
+      if (customFields && typeof customFields === 'object') {
+        lead.customFields = { ...(lead.customFields || {}), ...customFields };
+      }
+
+      // Record activity
+      lead.activityHistory = lead.activityHistory || [];
+      lead.activityHistory.push({
+        type: 'popup_submission',
+        timestamp: new Date(),
+        metadata: {
+          popupId: source?.popupId,
+          popupName: source?.popupName,
+        },
+      });
+
+      lead.lastActivityAt = new Date();
+      await lead.save();
+
+      logger.info(`Popup lead updated: ${email} from popup ${source?.popupName || 'unknown'}`);
+    } else {
+      // Create new lead
+      lead = new Lead({
+        email: email.toLowerCase().trim(),
+        firstName,
+        lastName,
+        phone,
+        company,
+        source: {
+          type: LeadSource.POPUP,
+          popupId: source?.popupId,
+          popupName: source?.popupName,
+        },
+        status: LeadStatus.NEW,
+        tags: tags || [],
+        score: score || 10,
+        emailConsent: true,
+        customFields: customFields || {},
+        capturedAt: new Date(),
+        activityHistory: [{
+          type: 'created',
+          timestamp: new Date(),
+          metadata: {
+            source: 'popup_submission',
+            popupId: source?.popupId,
+            popupName: source?.popupName,
+          },
+        }],
+      });
+
+      await lead.save();
+
+      logger.info(`Popup lead created: ${email} from popup ${source?.popupName || 'unknown'}`);
+
+      // Trigger workflow for new lead
+      try {
+        workflowTriggerService.onLeadCreated(lead._id.toString(), {
+          email: lead.email,
+          firstName: lead.firstName,
+          source: LeadSource.POPUP,
+          tags: lead.tags,
+        });
+      } catch (workflowError) {
+        logger.warn('Failed to trigger workflow for popup lead:', workflowError);
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Lead captured successfully',
+      data: {
+        id: lead._id,
+        email: lead.email,
+        isNew: !lead.activityHistory || lead.activityHistory.length <= 1,
+      },
+    });
+  } catch (error: any) {
+    logger.error('Error capturing popup lead:', {
+      error: error.message,
+      stack: error.stack,
+    });
+
+    // Handle duplicate email error gracefully
+    if (error.code === 11000 || error.message?.includes('duplicate')) {
+      res.status(200).json({
+        success: true,
+        message: 'Lead captured successfully',
+      });
+      return;
+    }
+
+    next(error);
+  }
+};
+
 export default {
   createLead,
   getLead,
@@ -899,4 +1061,5 @@ export default {
   mergeLeads,
   captureBootcampInterest,
   subscribeNewsletter,
+  capturePopupLead,
 };

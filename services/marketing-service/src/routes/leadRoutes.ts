@@ -306,6 +306,48 @@ router.post(
   leadController.subscribeNewsletter
 );
 
+// Popup lead capture - PUBLIC endpoint (called by admin-service)
+const popupLeadValidation = [
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Valid email is required'),
+  body('firstName')
+    .optional()
+    .isLength({ max: 100 })
+    .withMessage('First name must be less than 100 characters'),
+  body('lastName')
+    .optional()
+    .isLength({ max: 100 })
+    .withMessage('Last name must be less than 100 characters'),
+  body('phone')
+    .optional()
+    .isLength({ max: 50 })
+    .withMessage('Phone must be less than 50 characters'),
+  body('company')
+    .optional()
+    .isLength({ max: 200 })
+    .withMessage('Company must be less than 200 characters'),
+  body('source')
+    .optional()
+    .isObject()
+    .withMessage('Source must be an object'),
+  body('tags')
+    .optional()
+    .isArray()
+    .withMessage('Tags must be an array'),
+  body('score')
+    .optional()
+    .isInt({ min: 0, max: 100 })
+    .withMessage('Score must be between 0 and 100'),
+];
+
+router.post(
+  '/popup',
+  popupLeadValidation,
+  leadController.capturePopupLead
+);
+
 // ==========================================
 // Protected Lead Routes
 // ==========================================

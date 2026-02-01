@@ -796,11 +796,10 @@ export const submitPopupForm = async (req: Request, res: Response): Promise<void
         }
       }
 
-      // Call marketing service to create lead
-      await axios.post(`${MARKETING_SERVICE_URL}/api/leads`, leadData, {
+      // Call marketing service public endpoint to create lead
+      await axios.post(`${MARKETING_SERVICE_URL}/api/leads/popup`, leadData, {
         headers: {
           'Content-Type': 'application/json',
-          'X-Internal-Request': 'true'
         },
         timeout: 5000
       });
