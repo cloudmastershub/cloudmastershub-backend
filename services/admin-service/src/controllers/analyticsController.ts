@@ -343,19 +343,16 @@ export const getRealTimeMetrics = async (
     ]);
 
     // Process user metrics
-    const userData = userMetrics.status === 'fulfilled' && userMetrics.value?.success
-      ? userMetrics.value.data
-      : {};
+    const userResult = userMetrics.status === 'fulfilled' ? userMetrics.value as any : null;
+    const userData = userResult?.success ? userResult.data : {};
 
     // Process course/enrollment metrics
-    const courseData = courseMetrics.status === 'fulfilled' && courseMetrics.value?.success
-      ? courseMetrics.value.data
-      : {};
+    const courseResult = courseMetrics.status === 'fulfilled' ? courseMetrics.value as any : null;
+    const courseData = courseResult?.success ? courseResult.data : {};
 
     // Process system health
-    const healthData = systemHealth.status === 'fulfilled' && systemHealth.value?.success
-      ? systemHealth.value.data
-      : {};
+    const healthResult = systemHealth.status === 'fulfilled' ? systemHealth.value : null;
+    const healthData = healthResult?.success ? healthResult.data : {};
 
     // Get system resource metrics using Node.js os module
     const os = await import('os');
