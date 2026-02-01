@@ -2,6 +2,7 @@ import { Response, NextFunction } from 'express';
 import { AdminRequest } from '../middleware/adminAuth';
 import logger from '../utils/logger';
 import { AuditLog } from '../models/AuditLog';
+import { PlatformSettings } from '../models/PlatformSettings';
 
 // Security Metrics Interface
 interface SecurityMetrics {
@@ -32,19 +33,6 @@ interface SecuritySettings {
   auditLogging: boolean;
   encryptionEnabled: boolean;
 }
-
-let mockSecuritySettings: SecuritySettings = {
-  twoFactorRequired: false,
-  passwordMinLength: 8,
-  maxLoginAttempts: 5,
-  sessionTimeout: 30,
-  ipWhitelisting: false,
-  bruteForceProtection: true,
-  rateLimiting: true,
-  securityHeadersEnabled: true,
-  auditLogging: true,
-  encryptionEnabled: true
-};
 
 /**
  * Get security overview and metrics
@@ -209,7 +197,7 @@ export const getSecurityLogs = async (
 };
 
 /**
- * Get security settings
+ * Get security settings from database
  */
 export const getSecuritySettings = async (
   req: AdminRequest,
@@ -221,9 +209,27 @@ export const getSecuritySettings = async (
       adminId: req.adminId,
     });
 
+    // Get security settings from PlatformSettings database
+    const settings = await PlatformSettings.getSettings();
+    const securitySettings = settings.security;
+
+    // Transform to frontend-expected format
+    const response: SecuritySettings = {
+      twoFactorRequired: securitySettings.twoFactorRequired ?? false,
+      passwordMinLength: securitySettings.passwordMinLength ?? 8,
+      maxLoginAttempts: securitySettings.maxLoginAttempts ?? 5,
+      sessionTimeout: securitySettings.sessionTimeout ?? 480,
+      ipWhitelisting: securitySettings.ipWhitelisting ?? false,
+      bruteForceProtection: securitySettings.bruteForceProtection ?? true,
+      rateLimiting: securitySettings.rateLimiting ?? true,
+      securityHeadersEnabled: securitySettings.securityHeadersEnabled ?? true,
+      auditLogging: securitySettings.auditLogging ?? true,
+      encryptionEnabled: securitySettings.encryptionEnabled ?? true,
+    };
+
     res.status(200).json({
       success: true,
-      data: mockSecuritySettings,
+      data: response,
     });
   } catch (error) {
     logger.error('Error in getSecuritySettings controller:', error);
@@ -232,7 +238,7 @@ export const getSecuritySettings = async (
 };
 
 /**
- * Update security settings
+ * Update security settings in database
  */
 export const updateSecuritySettings = async (
   req: AdminRequest,
@@ -247,56 +253,87 @@ export const updateSecuritySettings = async (
       updates: Object.keys(updates),
     });
 
-    // Validate and update settings
-    const updatedSettings = { ...mockSecuritySettings };
+    // Build update object for nested security fields
+    const updateData: Record<string, any> = {};
 
-    // Update individual settings if provided
-    if (typeof updates.twoFactorRequired === 'boolean') {
-      updatedSettings.twoFactorRequired = updates.twoFactorRequired;
-    }
-    if (typeof updates.passwordMinLength === 'number' && updates.passwordMinLength >= 6 && updates.passwordMinLength <= 20) {
-      updatedSettings.passwordMinLength = updates.passwordMinLength;
-    }
-    if (typeof updates.maxLoginAttempts === 'number' && updates.maxLoginAttempts >= 3 && updates.maxLoginAttempts <= 10) {
-      updatedSettings.maxLoginAttempts = updates.maxLoginAttempts;
-    }
-    if (typeof updates.sessionTimeout === 'number' && updates.sessionTimeout >= 15 && updates.sessionTimeout <= 1440) {
-      updatedSettings.sessionTimeout = updates.sessionTimeout;
-    }
-    if (typeof updates.ipWhitelisting === 'boolean') {
-      updatedSettings.ipWhitelisting = updates.ipWhitelisting;
-    }
-    if (typeof updates.bruteForceProtection === 'boolean') {
-      updatedSettings.bruteForceProtection = updates.bruteForceProtection;
-    }
-    if (typeof updates.rateLimiting === 'boolean') {
-      updatedSettings.rateLimiting = updates.rateLimiting;
-    }
-    if (typeof updates.securityHeadersEnabled === 'boolean') {
-      updatedSettings.securityHeadersEnabled = updates.securityHeadersEnabled;
-    }
-    if (typeof updates.auditLogging === 'boolean') {
-      updatedSettings.auditLogging = updates.auditLogging;
-    }
-    if (typeof updates.encryptionEnabled === 'boolean') {
-      updatedSettings.encryptionEnabled = updates.encryptionEnabled;
-    }
+    // Map and validate security settings
+    const securityFields: Array<{ key: string; validator?: (val: any) => boolean }> = [
+      { key: 'twoFactorRequired', validator: (v) => typeof v === 'boolean' },
+      { key: 'passwordMinLength', validator: (v) => typeof v === 'number' && v >= 6 && v <= 32 },
+      { key: 'maxLoginAttempts', validator: (v) => typeof v === 'number' && v >= 3 && v <= 10 },
+      { key: 'sessionTimeout', validator: (v) => typeof v === 'number' && v >= 15 && v <= 1440 },
+      { key: 'ipWhitelisting', validator: (v) => typeof v === 'boolean' },
+      { key: 'bruteForceProtection', validator: (v) => typeof v === 'boolean' },
+      { key: 'rateLimiting', validator: (v) => typeof v === 'boolean' },
+      { key: 'securityHeadersEnabled', validator: (v) => typeof v === 'boolean' },
+      { key: 'auditLogging', validator: (v) => typeof v === 'boolean' },
+      { key: 'encryptionEnabled', validator: (v) => typeof v === 'boolean' },
+    ];
 
-    // Update mock data (in real implementation, save to database)
-    mockSecuritySettings = updatedSettings;
+    securityFields.forEach(({ key, validator }) => {
+      if (updates[key] !== undefined) {
+        if (!validator || validator(updates[key])) {
+          updateData[`security.${key}`] = updates[key];
+        } else {
+          logger.warn(`Invalid value for security setting: ${key}`, { value: updates[key] });
+        }
+      }
+    });
 
-    // Log the security settings update
+    updateData.updatedBy = req.adminEmail || req.adminId;
+
+    // Update database
+    const settings = await PlatformSettings.findOneAndUpdate(
+      { settingsKey: 'platform_settings' },
+      { $set: updateData },
+      { new: true, upsert: true, runValidators: true }
+    );
+
+    // Log the security settings update for audit trail
     logger.warn('Security settings updated', {
       adminId: req.adminId,
       adminEmail: req.adminEmail,
-      updatedSettings: Object.keys(updates),
+      updatedFields: Object.keys(updates),
       timestamp: new Date().toISOString(),
     });
+
+    // Create audit log entry for security settings change
+    try {
+      await AuditLog.create({
+        timestamp: new Date(),
+        event: 'Security settings updated',
+        severity: 'medium',
+        source: 'admin-service',
+        ip: req.ip || 'unknown',
+        userAgent: req.headers['user-agent'] || '',
+        details: `Updated fields: ${Object.keys(updates).join(', ')}`,
+        user: req.adminEmail,
+        adminId: req.adminId,
+        status: 'resolved'
+      });
+    } catch (auditError) {
+      logger.error('Failed to create audit log for security settings update:', auditError);
+    }
+
+    // Return updated settings in frontend format
+    const securitySettings = settings?.security || {};
+    const response: SecuritySettings = {
+      twoFactorRequired: securitySettings.twoFactorRequired ?? false,
+      passwordMinLength: securitySettings.passwordMinLength ?? 8,
+      maxLoginAttempts: securitySettings.maxLoginAttempts ?? 5,
+      sessionTimeout: securitySettings.sessionTimeout ?? 480,
+      ipWhitelisting: securitySettings.ipWhitelisting ?? false,
+      bruteForceProtection: securitySettings.bruteForceProtection ?? true,
+      rateLimiting: securitySettings.rateLimiting ?? true,
+      securityHeadersEnabled: securitySettings.securityHeadersEnabled ?? true,
+      auditLogging: securitySettings.auditLogging ?? true,
+      encryptionEnabled: securitySettings.encryptionEnabled ?? true,
+    };
 
     res.status(200).json({
       success: true,
       message: 'Security settings updated successfully',
-      data: mockSecuritySettings,
+      data: response,
     });
   } catch (error) {
     logger.error('Error in updateSecuritySettings controller:', error);
@@ -571,7 +608,7 @@ export const getSecurityAnalytics = async (
 };
 
 /**
- * Run security scan
+ * Run security scan - checks platform security configuration and recent threats
  */
 export const runSecurityScan = async (
   req: AdminRequest,
@@ -579,56 +616,217 @@ export const runSecurityScan = async (
   next: NextFunction
 ): Promise<void> => {
   try {
+    const startTime = Date.now();
+
     logger.info('Admin initiating security scan', {
       adminId: req.adminId,
     });
 
-    // Mock security scan results
+    // Get current security settings from database
+    const settings = await PlatformSettings.getSettings();
+    const securitySettings = settings.security;
+
+    // Get recent security incidents
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const [recentIncidents, criticalIncidents, unresolvedIncidents] = await Promise.all([
+      AuditLog.countDocuments({ timestamp: { $gte: thirtyDaysAgo } }),
+      AuditLog.countDocuments({ timestamp: { $gte: thirtyDaysAgo }, severity: 'critical' }),
+      AuditLog.countDocuments({ status: { $in: ['open', 'investigating'] } }),
+    ]);
+
+    // Analyze security configuration and generate findings
+    const findings: Array<{
+      severity: 'critical' | 'high' | 'medium' | 'low';
+      category: string;
+      description: string;
+      recommendation: string;
+    }> = [];
+
+    const recommendations: string[] = [];
+    const vulnerabilities = { critical: 0, high: 0, medium: 0, low: 0 };
+
+    // Check password policy
+    if (securitySettings.passwordMinLength < 10) {
+      findings.push({
+        severity: securitySettings.passwordMinLength < 8 ? 'high' : 'medium',
+        category: 'Authentication',
+        description: `Password minimum length is ${securitySettings.passwordMinLength} characters`,
+        recommendation: 'Increase minimum password length to at least 12 characters for better security',
+      });
+      vulnerabilities[securitySettings.passwordMinLength < 8 ? 'high' : 'medium']++;
+    }
+
+    // Check 2FA
+    if (!securitySettings.twoFactorRequired) {
+      findings.push({
+        severity: 'medium',
+        category: 'Authentication',
+        description: 'Two-factor authentication is not required',
+        recommendation: 'Enable mandatory two-factor authentication for admin users',
+      });
+      vulnerabilities.medium++;
+      recommendations.push('Enable two-factor authentication for all admin users');
+    }
+
+    // Check brute force protection
+    if (!securitySettings.bruteForceProtection) {
+      findings.push({
+        severity: 'high',
+        category: 'Authentication',
+        description: 'Brute force protection is disabled',
+        recommendation: 'Enable brute force protection to prevent password guessing attacks',
+      });
+      vulnerabilities.high++;
+    }
+
+    // Check rate limiting
+    if (!securitySettings.rateLimiting) {
+      findings.push({
+        severity: 'medium',
+        category: 'Network',
+        description: 'API rate limiting is disabled',
+        recommendation: 'Enable rate limiting to prevent API abuse and DDoS attacks',
+      });
+      vulnerabilities.medium++;
+    }
+
+    // Check security headers
+    if (!securitySettings.securityHeadersEnabled) {
+      findings.push({
+        severity: 'medium',
+        category: 'Headers',
+        description: 'Security headers are not enabled',
+        recommendation: 'Enable security headers (HSTS, CSP, X-Frame-Options) for all responses',
+      });
+      vulnerabilities.medium++;
+    }
+
+    // Check audit logging
+    if (!securitySettings.auditLogging) {
+      findings.push({
+        severity: 'high',
+        category: 'Compliance',
+        description: 'Audit logging is disabled',
+        recommendation: 'Enable audit logging for compliance and security monitoring',
+      });
+      vulnerabilities.high++;
+    }
+
+    // Check encryption
+    if (!securitySettings.encryptionEnabled) {
+      findings.push({
+        severity: 'critical',
+        category: 'Data Protection',
+        description: 'Data encryption is disabled',
+        recommendation: 'Enable encryption for sensitive data at rest',
+      });
+      vulnerabilities.critical++;
+    }
+
+    // Check session timeout (very long sessions are a risk)
+    if (securitySettings.sessionTimeout > 720) {
+      findings.push({
+        severity: 'low',
+        category: 'Session Management',
+        description: `Session timeout is ${securitySettings.sessionTimeout} minutes (12+ hours)`,
+        recommendation: 'Consider reducing session timeout to 8 hours or less for better security',
+      });
+      vulnerabilities.low++;
+    }
+
+    // Check max login attempts
+    if (securitySettings.maxLoginAttempts > 5) {
+      findings.push({
+        severity: 'low',
+        category: 'Authentication',
+        description: `Maximum login attempts is set to ${securitySettings.maxLoginAttempts}`,
+        recommendation: 'Consider reducing maximum login attempts to 5 or fewer',
+      });
+      vulnerabilities.low++;
+    }
+
+    // Check for unresolved security incidents
+    if (unresolvedIncidents > 0) {
+      findings.push({
+        severity: unresolvedIncidents > 10 ? 'high' : 'medium',
+        category: 'Incident Response',
+        description: `${unresolvedIncidents} unresolved security incident(s)`,
+        recommendation: 'Review and resolve pending security incidents',
+      });
+      vulnerabilities[unresolvedIncidents > 10 ? 'high' : 'medium']++;
+      recommendations.push(`Investigate and resolve ${unresolvedIncidents} pending security incident(s)`);
+    }
+
+    // Check for critical incidents
+    if (criticalIncidents > 0) {
+      findings.push({
+        severity: 'high',
+        category: 'Threat Detection',
+        description: `${criticalIncidents} critical security incident(s) in the last 30 days`,
+        recommendation: 'Review critical incidents and implement additional security measures',
+      });
+      recommendations.push('Review root cause of critical security incidents');
+    }
+
+    // Add general recommendations based on configuration
+    if (!securitySettings.ipWhitelisting) {
+      recommendations.push('Consider implementing IP whitelisting for admin access');
+    }
+    recommendations.push('Conduct regular security awareness training for staff');
+    recommendations.push('Review and update security policies periodically');
+
+    // Calculate scan duration
+    const duration = Date.now() - startTime;
+
+    // Calculate security score based on findings
+    const totalVulns = vulnerabilities.critical * 10 + vulnerabilities.high * 5 + vulnerabilities.medium * 2 + vulnerabilities.low;
+    const securityScore = Math.max(0, Math.min(100, 100 - totalVulns * 3));
+
     const scanResults = {
-      scanId: Date.now().toString(),
-      startTime: new Date().toISOString(),
+      scanId: `scan-${Date.now()}`,
+      startTime: new Date(startTime).toISOString(),
+      completedTime: new Date().toISOString(),
       status: 'completed',
-      duration: '45 seconds',
-      vulnerabilities: {
-        critical: 0,
-        high: 1,
-        medium: 3,
-        low: 7
+      duration: `${duration}ms`,
+      securityScore,
+      vulnerabilities,
+      findings,
+      recommendations: recommendations.slice(0, 10), // Limit to top 10 recommendations
+      statistics: {
+        recentIncidents,
+        criticalIncidents,
+        unresolvedIncidents,
+        checksPerformed: 10,
       },
-      findings: [
-        {
-          severity: 'high',
-          category: 'Authentication',
-          description: 'Weak password policy detected',
-          recommendation: 'Increase minimum password length to 12 characters'
-        },
-        {
-          severity: 'medium',
-          category: 'Network',
-          description: 'Some endpoints missing rate limiting',
-          recommendation: 'Implement rate limiting on all public endpoints'
-        },
-        {
-          severity: 'medium',
-          category: 'Headers',
-          description: 'Missing security headers on some responses',
-          recommendation: 'Ensure all responses include security headers'
-        }
-      ],
-      recommendations: [
-        'Enable two-factor authentication for all admin users',
-        'Implement IP whitelisting for admin access',
-        'Review and update security policies',
-        'Conduct regular security training for staff'
-      ]
     };
+
+    // Log the security scan to audit trail
+    try {
+      await AuditLog.create({
+        timestamp: new Date(),
+        event: 'Security scan completed',
+        severity: vulnerabilities.critical > 0 ? 'high' : vulnerabilities.high > 0 ? 'medium' : 'low',
+        source: 'admin-service',
+        ip: req.ip || 'unknown',
+        userAgent: req.headers['user-agent'] || '',
+        details: `Scan found ${findings.length} issues. Security score: ${securityScore}/100`,
+        user: req.adminEmail,
+        adminId: req.adminId,
+        status: 'resolved'
+      });
+    } catch (auditError) {
+      logger.error('Failed to create audit log for security scan:', auditError);
+    }
 
     // Log the security scan
     logger.info('Security scan completed', {
       adminId: req.adminId,
       adminEmail: req.adminEmail,
       scanId: scanResults.scanId,
-      vulnerabilities: scanResults.vulnerabilities,
+      securityScore,
+      vulnerabilities,
+      findingsCount: findings.length,
+      duration: `${duration}ms`,
       timestamp: new Date().toISOString(),
     });
 

@@ -43,6 +43,13 @@ export interface IPlatformSettings extends Document {
     sessionTimeout: number;
     twoFactorRequired: boolean;
     allowedDomains: string[];
+    // Extended security settings
+    ipWhitelisting: boolean;
+    bruteForceProtection: boolean;
+    rateLimiting: boolean;
+    securityHeadersEnabled: boolean;
+    auditLogging: boolean;
+    encryptionEnabled: boolean;
   };
 
   payment: {
@@ -139,7 +146,14 @@ const PlatformSettingsSchema = new Schema<IPlatformSettings>({
     lockoutDuration: { type: Number, default: 30 },
     sessionTimeout: { type: Number, default: 480 },
     twoFactorRequired: { type: Boolean, default: false },
-    allowedDomains: { type: [String], default: [] }
+    allowedDomains: { type: [String], default: [] },
+    // Extended security settings
+    ipWhitelisting: { type: Boolean, default: false },
+    bruteForceProtection: { type: Boolean, default: true },
+    rateLimiting: { type: Boolean, default: true },
+    securityHeadersEnabled: { type: Boolean, default: true },
+    auditLogging: { type: Boolean, default: true },
+    encryptionEnabled: { type: Boolean, default: true }
   },
 
   payment: {

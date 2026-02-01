@@ -706,6 +706,197 @@ router.get('/analytics/content', async (req: AuthRequest, res: Response, next: N
 });
 
 /**
+ * Get engagement analytics (detailed enrollment and activity metrics)
+ * @route GET /admin/analytics/engagement
+ */
+router.get('/analytics/engagement', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { timeframe = '30d' } = req.query;
+
+    // Parse timeframe to get date range
+    const match = String(timeframe).match(/^(\d+)([dwmy])$/);
+    let startDate = new Date();
+    if (match) {
+      const value = parseInt(match[1]);
+      const unit = match[2];
+      switch (unit) {
+        case 'd': startDate.setDate(startDate.getDate() - value); break;
+        case 'w': startDate.setDate(startDate.getDate() - value * 7); break;
+        case 'm': startDate.setMonth(startDate.getMonth() - value); break;
+        case 'y': startDate.setFullYear(startDate.getFullYear() - value); break;
+      }
+    } else {
+      startDate.setDate(startDate.getDate() - 30); // Default 30 days
+    }
+
+    // Import CourseProgress model for aggregations
+    const { CourseProgress } = await import('../models');
+
+    // Aggregate engagement metrics from CourseProgress
+    const [enrollmentStats, activityStats, completionByTimeframe] = await Promise.all([
+      // Overall enrollment and completion stats
+      CourseProgress.aggregate([
+        {
+          $group: {
+            _id: null,
+            totalEnrollments: { $sum: 1 },
+            completedEnrollments: {
+              $sum: { $cond: [{ $eq: ['$progress', 100] }, 1, 0] }
+            },
+            totalWatchedTime: { $sum: '$watchedTime' },
+            averageProgress: { $avg: '$progress' }
+          }
+        }
+      ]),
+
+      // User activity stats (active users by timeframe)
+      CourseProgress.aggregate([
+        {
+          $facet: {
+            // Daily active (last 24 hours)
+            dailyActive: [
+              {
+                $match: {
+                  lastAccessedAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+                }
+              },
+              { $group: { _id: '$userId' } },
+              { $count: 'count' }
+            ],
+            // Weekly active (last 7 days)
+            weeklyActive: [
+              {
+                $match: {
+                  lastAccessedAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
+                }
+              },
+              { $group: { _id: '$userId' } },
+              { $count: 'count' }
+            ],
+            // Monthly active (last 30 days)
+            monthlyActive: [
+              {
+                $match: {
+                  lastAccessedAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
+                }
+              },
+              { $group: { _id: '$userId' } },
+              { $count: 'count' }
+            ],
+            // Average session duration (estimated from watched time per access)
+            sessionStats: [
+              {
+                $match: {
+                  watchedTime: { $gt: 0 }
+                }
+              },
+              {
+                $group: {
+                  _id: null,
+                  totalSessions: { $sum: 1 },
+                  totalWatchTime: { $sum: '$watchedTime' }
+                }
+              }
+            ]
+          }
+        }
+      ]),
+
+      // Enrollments within timeframe
+      CourseProgress.aggregate([
+        {
+          $match: {
+            enrolledAt: { $gte: startDate }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            newEnrollments: { $sum: 1 },
+            completedInTimeframe: {
+              $sum: { $cond: [{ $eq: ['$progress', 100] }, 1, 0] }
+            }
+          }
+        }
+      ])
+    ]);
+
+    // Process results
+    const enrollment = enrollmentStats[0] || {
+      totalEnrollments: 0,
+      completedEnrollments: 0,
+      totalWatchedTime: 0,
+      averageProgress: 0
+    };
+
+    const activity = activityStats[0] || {
+      dailyActive: [{ count: 0 }],
+      weeklyActive: [{ count: 0 }],
+      monthlyActive: [{ count: 0 }],
+      sessionStats: [{ totalSessions: 0, totalWatchTime: 0 }]
+    };
+
+    const timeframeData = completionByTimeframe[0] || {
+      newEnrollments: 0,
+      completedInTimeframe: 0
+    };
+
+    // Calculate average session duration (watched time / sessions, converted to minutes)
+    const sessionData = activity.sessionStats?.[0] || { totalSessions: 1, totalWatchTime: 0 };
+    const averageSessionDuration = sessionData.totalSessions > 0
+      ? Math.round((sessionData.totalWatchTime / sessionData.totalSessions / 60) * 10) / 10
+      : 15; // Default 15 minutes
+
+    // Calculate bounce rate estimate (enrollments with 0 progress / total enrollments)
+    const zeroProgressCount = await CourseProgress.countDocuments({ progress: 0 });
+    const bounceRate = enrollment.totalEnrollments > 0
+      ? Math.round((zeroProgressCount / enrollment.totalEnrollments) * 100 * 10) / 10
+      : 0;
+
+    const engagementData = {
+      timeframe,
+      generatedAt: new Date().toISOString(),
+      totalEnrollments: enrollment.totalEnrollments,
+      completedEnrollments: enrollment.completedEnrollments,
+      totalWatchedTime: Math.round(enrollment.totalWatchedTime / 60), // Convert to minutes
+      averageProgress: Math.round(enrollment.averageProgress * 10) / 10,
+      completionRate: enrollment.totalEnrollments > 0
+        ? Math.round((enrollment.completedEnrollments / enrollment.totalEnrollments) * 100 * 10) / 10
+        : 0,
+      dailyActiveUsers: activity.dailyActive?.[0]?.count || 0,
+      weeklyActiveUsers: activity.weeklyActive?.[0]?.count || 0,
+      monthlyActiveUsers: activity.monthlyActive?.[0]?.count || 0,
+      averageSessionDuration,
+      bounceRate,
+      timeframeStats: {
+        newEnrollments: timeframeData.newEnrollments,
+        completedInTimeframe: timeframeData.completedInTimeframe
+      }
+    };
+
+    logger.info('Engagement analytics fetched', {
+      timeframe,
+      totalEnrollments: engagementData.totalEnrollments,
+      weeklyActiveUsers: engagementData.weeklyActiveUsers
+    });
+
+    res.json({
+      success: true,
+      data: engagementData
+    });
+  } catch (error: any) {
+    logger.error('Admin: Failed to fetch engagement analytics', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to fetch engagement analytics',
+        details: error.message
+      }
+    });
+  }
+});
+
+/**
  * Bulk moderate content
  * @route POST /admin/bulk-moderate
  */

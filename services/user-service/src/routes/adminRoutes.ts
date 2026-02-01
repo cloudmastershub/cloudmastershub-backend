@@ -104,6 +104,222 @@ router.put('/users/:userId/subscription', updateUserSubscription);
 router.put('/users/:userId/status', updateUserStatus);
 
 // ============================================================================
+// ANALYTICS ROUTES
+// ============================================================================
+
+/**
+ * @route   GET /admin/analytics/users
+ * @desc    Get user analytics and activity metrics
+ * @access  Admin only
+ * @query   timeframe (7d, 30d, 90d, 1y)
+ */
+router.get('/analytics/users', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { timeframe = '30d' } = req.query;
+
+    logger.info('Admin fetching user analytics', {
+      adminId: req.userId,
+      timeframe,
+    });
+
+    // Parse timeframe to get date range
+    const match = String(timeframe).match(/^(\d+)([dwmy])$/);
+    let startDate = new Date();
+    if (match) {
+      const value = parseInt(match[1]);
+      const unit = match[2];
+      switch (unit) {
+        case 'd': startDate.setDate(startDate.getDate() - value); break;
+        case 'w': startDate.setDate(startDate.getDate() - value * 7); break;
+        case 'm': startDate.setMonth(startDate.getMonth() - value); break;
+        case 'y': startDate.setFullYear(startDate.getFullYear() - value); break;
+      }
+    } else {
+      startDate.setDate(startDate.getDate() - 30); // Default 30 days
+    }
+
+    // Aggregate user analytics using MongoDB
+    const User = (await import('../models/User')).default;
+
+    const [userStats, activityStats, growthStats] = await Promise.all([
+      // Total user counts and subscription distribution
+      User.aggregate([
+        {
+          $facet: {
+            totals: [
+              {
+                $group: {
+                  _id: null,
+                  totalUsers: { $sum: 1 },
+                  activeUsers: {
+                    $sum: {
+                      $cond: [
+                        { $gte: ['$lastLogin', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)] },
+                        1,
+                        0
+                      ]
+                    }
+                  },
+                  verifiedUsers: {
+                    $sum: { $cond: ['$emailVerified', 1, 0] }
+                  }
+                }
+              }
+            ],
+            subscriptionDistribution: [
+              {
+                $group: {
+                  _id: '$subscription',
+                  count: { $sum: 1 }
+                }
+              }
+            ],
+            roleDistribution: [
+              { $unwind: '$roles' },
+              {
+                $group: {
+                  _id: '$roles',
+                  count: { $sum: 1 }
+                }
+              }
+            ]
+          }
+        }
+      ]),
+
+      // Activity metrics within timeframe
+      User.aggregate([
+        {
+          $facet: {
+            // Users who logged in within timeframe
+            activeInTimeframe: [
+              {
+                $match: {
+                  lastLogin: { $gte: startDate }
+                }
+              },
+              { $count: 'count' }
+            ],
+            // New users within timeframe
+            newUsers: [
+              {
+                $match: {
+                  createdAt: { $gte: startDate }
+                }
+              },
+              { $count: 'count' }
+            ],
+            // Daily active users (last 24 hours)
+            dailyActive: [
+              {
+                $match: {
+                  lastLogin: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+                }
+              },
+              { $count: 'count' }
+            ],
+            // Weekly active users (last 7 days)
+            weeklyActive: [
+              {
+                $match: {
+                  lastLogin: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
+                }
+              },
+              { $count: 'count' }
+            ]
+          }
+        }
+      ]),
+
+      // Growth trend (users per day/week in timeframe)
+      User.aggregate([
+        {
+          $match: {
+            createdAt: { $gte: startDate }
+          }
+        },
+        {
+          $group: {
+            _id: {
+              $dateToString: { format: '%Y-%m-%d', date: '$createdAt' }
+            },
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { _id: 1 } }
+      ])
+    ]);
+
+    // Process aggregation results
+    const totals = userStats[0]?.totals?.[0] || {
+      totalUsers: 0,
+      activeUsers: 0,
+      verifiedUsers: 0
+    };
+
+    const subscriptionDist: Record<string, number> = {};
+    (userStats[0]?.subscriptionDistribution || []).forEach((s: any) => {
+      subscriptionDist[s._id || 'free'] = s.count;
+    });
+
+    const roleDist: Record<string, number> = {};
+    (userStats[0]?.roleDistribution || []).forEach((r: any) => {
+      roleDist[r._id] = r.count;
+    });
+
+    const activity = activityStats[0] || {};
+
+    const analyticsData = {
+      timeframe,
+      generatedAt: new Date().toISOString(),
+      totalUsers: totals.totalUsers,
+      activeUsers: totals.activeUsers,
+      verifiedUsers: totals.verifiedUsers,
+      activeInTimeframe: activity.activeInTimeframe?.[0]?.count || 0,
+      newUsersInTimeframe: activity.newUsers?.[0]?.count || 0,
+      dailyActiveUsers: activity.dailyActive?.[0]?.count || 0,
+      weeklyActiveUsers: activity.weeklyActive?.[0]?.count || 0,
+      subscriptionDistribution: {
+        free: subscriptionDist.free || 0,
+        basic: subscriptionDist.basic || subscriptionDist.individual || 0,
+        premium: subscriptionDist.premium || subscriptionDist.professional || 0,
+        bootcamp: subscriptionDist.bootcamp || subscriptionDist.enterprise || 0,
+      },
+      roleDistribution: {
+        student: roleDist.student || 0,
+        instructor: roleDist.instructor || 0,
+        admin: roleDist.admin || 0,
+      },
+      growthTrend: growthStats.map((g: any) => ({
+        date: g._id,
+        newUsers: g.count
+      })),
+      // Calculated metrics
+      userRetentionRate: totals.totalUsers > 0
+        ? Math.round((totals.activeUsers / totals.totalUsers) * 100 * 10) / 10
+        : 0,
+      emailVerificationRate: totals.totalUsers > 0
+        ? Math.round((totals.verifiedUsers / totals.totalUsers) * 100 * 10) / 10
+        : 0,
+    };
+
+    logger.info('User analytics fetched', {
+      totalUsers: analyticsData.totalUsers,
+      activeUsers: analyticsData.activeUsers,
+      newUsersInTimeframe: analyticsData.newUsersInTimeframe,
+    });
+
+    res.json({
+      success: true,
+      data: analyticsData
+    });
+  } catch (error) {
+    logger.error('Error fetching user analytics:', error);
+    next(error);
+  }
+});
+
+// ============================================================================
 // INSTRUCTOR APPLICATION ROUTES
 // ============================================================================
 
