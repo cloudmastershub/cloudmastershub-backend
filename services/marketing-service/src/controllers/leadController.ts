@@ -954,11 +954,12 @@ export const capturePopupLead = async (
       }
 
       // Record activity
-      lead.activityHistory = lead.activityHistory || [];
-      lead.activityHistory.push({
-        type: 'popup_submission',
+      lead.activities = lead.activities || [];
+      lead.activities.push({
+        type: 'form_submit',
         timestamp: new Date(),
         metadata: {
+          source: 'popup_submission',
           popupId: source?.popupId,
           popupName: source?.popupName,
         },
@@ -987,8 +988,8 @@ export const capturePopupLead = async (
         emailConsent: true,
         customFields: customFields || {},
         capturedAt: new Date(),
-        activityHistory: [{
-          type: 'created',
+        activities: [{
+          type: 'form_submit',
           timestamp: new Date(),
           metadata: {
             source: 'popup_submission',
@@ -1021,7 +1022,7 @@ export const capturePopupLead = async (
       data: {
         id: lead._id,
         email: lead.email,
-        isNew: !lead.activityHistory || lead.activityHistory.length <= 1,
+        isNew: !lead.activities || lead.activities.length <= 1,
       },
     });
   } catch (error: any) {
