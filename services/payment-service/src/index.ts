@@ -79,6 +79,11 @@ app.use(limiter);
 
 // Body parsing middleware
 app.use(compression());
+
+// Stripe webhooks require the raw body (Buffer) for signature verification.
+// This must be registered BEFORE express.json() so the body isn't parsed into an object.
+app.use('/webhooks/stripe', express.raw({ type: 'application/json' }));
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
