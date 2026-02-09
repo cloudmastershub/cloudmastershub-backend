@@ -353,6 +353,15 @@ const serviceRoutes = {
       '^/api/marketing/admin/tags': '/admin/tags'
     }
   },
+  '/marketing/admin/analytics': {
+    target: process.env.MARKETING_SERVICE_URL || 'http://marketing-service:3006',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/marketing/admin/analytics': '/admin/analytics'
+    }
+  },
   '/marketing/f': {
     target: process.env.MARKETING_SERVICE_URL || 'http://marketing-service:3006',
     changeOrigin: true,
