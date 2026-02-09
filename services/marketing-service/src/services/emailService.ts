@@ -1086,6 +1086,95 @@ class EmailService {
     }
   }
   // ==========================================
+  // User Signup Email Helpers
+  // ==========================================
+
+  /**
+   * Send welcome email to newly signed-up users
+   */
+  async sendWelcomeEmail(
+    email: string,
+    firstName?: string,
+    templateId?: string
+  ): Promise<void> {
+    const dashboardLink = `${process.env.APP_URL || 'https://cloudmastershub.com'}/dashboard`;
+    const coursesLink = `${process.env.APP_URL || 'https://cloudmastershub.com'}/courses`;
+    const bootcampsLink = `${process.env.APP_URL || 'https://cloudmastershub.com'}/bootcamps`;
+
+    const context: TemplateContext = {
+      firstName: firstName || 'there',
+      email,
+      dashboardLink,
+      coursesLink,
+      bootcampsLink,
+    };
+
+    if (templateId) {
+      await this.sendTemplatedEmail(templateId, email, context, {
+        tags: ['welcome', 'signup', 'transactional'],
+      });
+    } else {
+      await this.sendEmail({
+        to: email,
+        toName: firstName,
+        subject: `Welcome to CloudMastersHub — let's get started!`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h1 style="color: #1a1a2e; margin-bottom: 8px;">Welcome to CloudMastersHub!</h1>
+            <p style="color: #444; font-size: 16px; line-height: 1.6;">Hi ${firstName || 'there'},</p>
+            <p style="color: #444; font-size: 16px; line-height: 1.6;">
+              Thanks for joining CloudMastersHub — your new home for mastering cloud technologies through hands-on learning.
+            </p>
+
+            <div style="background: #f0fdfa; border-left: 4px solid #40E0D0; padding: 16px; margin: 24px 0; border-radius: 0 8px 8px 0;">
+              <p style="margin: 0 0 8px 0; font-weight: 600; color: #1a1a2e;">Here's what you can do right now:</p>
+              <ul style="margin: 0; padding-left: 20px; color: #444; line-height: 1.8;">
+                <li>Browse our course library and start learning</li>
+                <li>Explore hands-on cloud labs</li>
+                <li>Join an intensive bootcamp</li>
+                <li>Track your progress on your dashboard</li>
+              </ul>
+            </div>
+
+            <div style="text-align: center; margin: 32px 0;">
+              <a href="${coursesLink}"
+                 style="background: linear-gradient(135deg, #40E0D0 0%, #4682B4 100%);
+                        color: white;
+                        padding: 14px 32px;
+                        border-radius: 8px;
+                        text-decoration: none;
+                        font-weight: 600;
+                        display: inline-block;
+                        font-size: 16px;">
+                Explore Courses
+              </a>
+            </div>
+
+            <p style="color: #444; font-size: 16px; line-height: 1.6;">
+              Or check out our <a href="${bootcampsLink}" style="color: #4682B4; text-decoration: underline;">bootcamps</a> for a structured, guided learning experience.
+            </p>
+
+            <p style="color: #444; font-size: 16px; line-height: 1.6; margin-top: 24px;">
+              We're excited to have you on board. If you have any questions, just reply to this email.
+            </p>
+
+            <p style="color: #444; font-size: 16px; line-height: 1.6;">
+              Happy learning!<br/>
+              The CloudMastersHub Team
+            </p>
+
+            <hr style="border: none; border-top: 1px solid #eee; margin: 32px 0;"/>
+            <p style="color: #999; font-size: 12px; text-align: center;">
+              &copy; ${new Date().getFullYear()} CloudMastersHub. All rights reserved.
+            </p>
+          </div>
+        `,
+        tags: ['welcome', 'signup', 'transactional'],
+      });
+    }
+  }
+
+  // ==========================================
   // Bootcamp & Payment Email Helpers
   // ==========================================
 

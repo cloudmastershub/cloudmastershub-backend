@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import axios from 'axios';
 import logger from '../utils/logger';
 import { getUserEventPublisher } from '../events/userEventPublisher';
+import { userSignupPublisher } from '../events/userSignupPublisher';
 import * as userService from '../services/userService';
 import { referralService } from '../services/referralService';
 import User from '../models/User';
@@ -223,20 +224,37 @@ export const googleAuth = async (req: Request, res: Response, next: NextFunction
       if (referralCode) {
         try {
           await referralService.recordReferralSignup(user._id.toString(), referralCode);
-          logger.info('Referral signup recorded for new user', { 
-            userId: user._id.toString(), 
+          logger.info('Referral signup recorded for new user', {
+            userId: user._id.toString(),
             email: user.email,
-            referralCode 
+            referralCode
           });
         } catch (referralError) {
-          logger.error('Failed to record referral signup for new user', { 
-            userId: user._id.toString(), 
-            referralCode, 
-            error: referralError 
+          logger.error('Failed to record referral signup for new user', {
+            userId: user._id.toString(),
+            referralCode,
+            error: referralError
           });
           // Don't fail authentication if referral tracking fails
         }
       }
+
+      // Publish signup event to Redis for marketing service (welcome email)
+      // Non-blocking: must never delay or fail authentication
+      const newUserId = user._id.toString();
+      const newUserEmail = user.email;
+      userSignupPublisher.publish(
+        newUserId,
+        newUserEmail,
+        user.firstName,
+        user.lastName
+      ).catch(error => {
+        logger.warn('Failed to publish user signup event', {
+          userId: newUserId,
+          email: newUserEmail,
+          error: error.message,
+        });
+      });
     } else {
       // Update existing user's profile and last login
       const updates: any = { lastLogin: new Date(), updatedAt: new Date() };

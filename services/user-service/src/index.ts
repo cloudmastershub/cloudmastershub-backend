@@ -11,6 +11,7 @@ import adminRoutes from './routes/adminRoutes';
 import internalRoutes from './routes/internalRoutes';
 import { errorHandler } from './middleware/errorHandler';
 import { initializePaymentEventSubscriber } from './events/paymentEventSubscriber';
+import { userSignupPublisher } from './events/userSignupPublisher';
 import { initializeDatabase, getDatabaseHealth } from './services/userService';
 import logger from './utils/logger';
 
@@ -106,7 +107,11 @@ app.listen(PORT, async () => {
     // Initialize payment event subscriber
     initializePaymentEventSubscriber();
     logger.info('Payment event subscriber initialized');
-    
+
+    // Initialize user signup publisher (for marketing welcome emails)
+    await userSignupPublisher.initialize();
+    logger.info('User signup publisher initialized');
+
     logger.info('User Service fully initialized and ready');
   } catch (error) {
     logger.error('Failed to initialize User Service:', error);

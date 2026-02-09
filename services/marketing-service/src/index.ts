@@ -22,6 +22,7 @@ import webhookRoutes from './routes/webhookRoutes';
 import { sequenceScheduler } from './services/sequenceScheduler';
 import { workflowProcessor } from './services/workflowProcessor';
 import { paymentEventSubscriber } from './services/paymentEventSubscriber';
+import { userEventSubscriber } from './services/userEventSubscriber';
 
 // Import middleware
 import { authenticate, requireAdmin } from './middleware/auth';
@@ -321,6 +322,14 @@ const startServer = async () => {
       logger.warn('Failed to initialize payment event subscriber (Redis may not be available):', error);
     }
 
+    // Initialize user event subscriber (welcome emails on signup)
+    try {
+      await userEventSubscriber.initialize();
+      logger.info('User event subscriber initialized');
+    } catch (error) {
+      logger.warn('Failed to initialize user event subscriber (Redis may not be available):', error);
+    }
+
     // Start server
     app.listen(PORT, () => {
       logger.info(`Marketing Service running on port ${PORT}`);
@@ -351,6 +360,10 @@ const gracefulShutdown = async (signal: string) => {
     // Shutdown payment event subscriber (close Redis sub + Bull queue)
     await paymentEventSubscriber.shutdown();
     logger.info('Payment event subscriber shutdown complete');
+
+    // Shutdown user event subscriber (close Redis sub + Bull queue)
+    await userEventSubscriber.shutdown();
+    logger.info('User event subscriber shutdown complete');
 
     // Close MongoDB connection
     const mongoConnection = MongoConnection.getInstance();
