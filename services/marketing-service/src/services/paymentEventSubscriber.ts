@@ -3,6 +3,7 @@ import Queue from 'bull';
 import http from 'http';
 import emailService from './emailService';
 import logger from '../utils/logger';
+import { getTenantId, runWithTenant, DEFAULT_TENANT } from '../utils/tenantContext';
 
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 const USER_SERVICE_URL = process.env.USER_SERVICE_URL || 'http://user-service:3001';
@@ -51,11 +52,13 @@ function planDisplayName(planId?: string): string {
  * Fetch user data from user-service internal endpoint.
  * Uses Node built-in http (internal K8s traffic, no TLS needed).
  */
-function fetchUser(userId: string): Promise<UserData | null> {
+function fetchUser(userId: string, tenantId?: string): Promise<UserData | null> {
   return new Promise((resolve) => {
     const url = `${USER_SERVICE_URL}/internal/users/${encodeURIComponent(userId)}`;
+    const headers: Record<string, string> = { 'x-internal-service': 'marketing-service' };
+    if (tenantId) headers['x-tenant-id'] = tenantId;
 
-    const req = http.get(url, { headers: { 'x-internal-service': 'marketing-service' }, timeout: 5000 }, (res) => {
+    const req = http.get(url, { headers, timeout: 5000 }, (res) => {
       if (res.statusCode !== 200) {
         logger.warn('User lookup returned non-200', { userId, status: res.statusCode });
         res.resume(); // drain response
@@ -157,11 +160,16 @@ class PaymentEventSubscriber {
     }
 
     const timestamp = payload.timestamp || new Date().toISOString();
+    const tenantId = payload.tenantId || DEFAULT_TENANT;
     const jobId = `evt:${channel}:${userId}:${timestamp}`;
+
+    if (!payload.tenantId) {
+      logger.warn('Payment event missing tenantId, using default', { channel, userId, default: DEFAULT_TENANT });
+    }
 
     try {
       await this.queue!.add(
-        { channel, payload, userId, timestamp },
+        { channel, payload, userId, timestamp, tenantId },
         { jobId }
       );
       logger.info('Payment event enqueued', { channel, userId, jobId });
@@ -180,28 +188,36 @@ class PaymentEventSubscriber {
    */
   private setupWorker(): void {
     this.queue!.process(async (job) => {
-      const { channel, payload, userId } = job.data as {
+      const { channel, payload, userId, tenantId } = job.data as {
         channel: PaymentChannel;
         payload: Record<string, any>;
         userId: string;
         timestamp: string;
+        tenantId?: string;
       };
 
-      // Fetch user data
-      const user = await fetchUser(userId);
-      if (!user) {
-        logger.warn('Skipping event: could not fetch user', { channel, userId });
-        return { success: false, reason: 'user_not_found' };
+      const resolvedTenant = tenantId || DEFAULT_TENANT;
+      if (!tenantId) {
+        logger.warn('Payment job missing tenantId, using default', { jobId: job.id, channel, userId });
       }
 
-      try {
-        await this.dispatchEmail(channel, payload, user);
-        logger.info('Payment event email sent', { channel, userId, email: user.email });
-        return { success: true };
-      } catch (err: any) {
-        logger.error('Failed to send payment event email', { channel, userId, error: err.message });
-        throw err; // let Bull retry
-      }
+      return runWithTenant(resolvedTenant, async () => {
+        // Fetch user data
+        const user = await fetchUser(userId, resolvedTenant);
+        if (!user) {
+          logger.warn('Skipping event: could not fetch user', { channel, userId, tenantId: resolvedTenant });
+          return { success: false, reason: 'user_not_found' };
+        }
+
+        try {
+          await this.dispatchEmail(channel, payload, user);
+          logger.info('Payment event email sent', { channel, userId, email: user.email, tenantId: resolvedTenant });
+          return { success: true };
+        } catch (err: any) {
+          logger.error('Failed to send payment event email', { channel, userId, tenantId: resolvedTenant, error: err.message });
+          throw err; // let Bull retry
+        }
+      });
     });
 
     this.queue!.on('failed', (job, err) => {

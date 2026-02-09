@@ -13,6 +13,7 @@ import {
 import { Lead, ILead } from '../models/Lead';
 import { workflowEngine } from './workflowEngine';
 import logger from '../utils/logger';
+import { getTenantId, runWithTenant, DEFAULT_TENANT } from '../utils/tenantContext';
 
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 
@@ -20,6 +21,7 @@ const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
  * Event types for workflow triggers
  */
 export interface TriggerEvent {
+  tenantId: string;
   type: WorkflowTriggerType;
   leadId: string;
   data: Record<string, any>;
@@ -69,7 +71,15 @@ class WorkflowTriggerService {
       const event = job.data as TriggerEvent;
       // Deserialize timestamp (Bull serializes Date as string)
       event.timestamp = new Date(event.timestamp);
-      await this.handleTrigger(event);
+
+      const resolvedTenant = event.tenantId || DEFAULT_TENANT;
+      if (!event.tenantId) {
+        logger.warn('Workflow trigger job missing tenantId, using default', { jobId: job.id, type: event.type, leadId: event.leadId });
+      }
+
+      return runWithTenant(resolvedTenant, async () => {
+        await this.handleTrigger(event);
+      });
     });
 
     this.queue.on('failed', (job, err) => {
@@ -359,6 +369,7 @@ class WorkflowTriggerService {
    */
   trigger(type: WorkflowTriggerType, leadId: string, data: Record<string, any> = {}): void {
     const event: TriggerEvent = {
+      tenantId: getTenantId(),
       type,
       leadId,
       data,

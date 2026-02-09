@@ -7,22 +7,26 @@ import {
 import { workflowEngine } from './workflowEngine';
 import { workflowTriggerService } from './workflowTriggerService';
 import logger from '../utils/logger';
+import { getTenantId, runWithTenant, DEFAULT_TENANT } from '../utils/tenantContext';
 
 /**
  * Job types for workflow processing
  */
 interface ProcessWaitingJob {
   type: 'process_waiting';
+  tenantId?: string;
 }
 
 interface ExecuteNodeJob {
   type: 'execute_node';
   participantId: string;
+  tenantId?: string;
 }
 
 interface ScheduledTriggerJob {
   type: 'scheduled_trigger';
   workflowId: string;
+  tenantId?: string;
 }
 
 type WorkflowJob = ProcessWaitingJob | ExecuteNodeJob | ScheduledTriggerJob;
@@ -59,9 +63,15 @@ class WorkflowProcessor {
         },
       });
 
-      // Process jobs
+      // Process jobs (tenant-aware)
       this.queue.process(async (job) => {
-        return this.processJob(job.data);
+        const resolvedTenant = job.data.tenantId || DEFAULT_TENANT;
+        if (!job.data.tenantId) {
+          logger.debug('Workflow job missing tenantId, using default', { jobId: job.id, type: job.data.type });
+        }
+        return runWithTenant(resolvedTenant, async () => {
+          return this.processJob(job.data);
+        });
       });
 
       // Event handlers
@@ -75,7 +85,7 @@ class WorkflowProcessor {
 
       // Schedule recurring job for processing waiting participants
       await this.queue.add(
-        { type: 'process_waiting' },
+        { type: 'process_waiting', tenantId: DEFAULT_TENANT },
         {
           repeat: { every: 60000 }, // Every minute
           jobId: 'process-waiting-participants',
@@ -214,7 +224,7 @@ class WorkflowProcessor {
 
     // Add new scheduled job
     await this.queue.add(
-      { type: 'scheduled_trigger', workflowId },
+      { type: 'scheduled_trigger', workflowId, tenantId: getTenantId() },
       {
         repeat: { cron: cronExpression },
         jobId,
@@ -255,7 +265,7 @@ class WorkflowProcessor {
       options.delay = delay;
     }
 
-    await this.queue.add({ type: 'execute_node', participantId }, options);
+    await this.queue.add({ type: 'execute_node', participantId, tenantId: getTenantId() }, options);
   }
 
   /**

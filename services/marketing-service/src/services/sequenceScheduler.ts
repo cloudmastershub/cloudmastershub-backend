@@ -13,6 +13,7 @@ import { Lead, LeadStatus, ILead } from '../models/Lead';
 import { EmailTemplate } from '../models/EmailTemplate';
 import emailService from './emailService';
 import logger from '../utils/logger';
+import { getTenantId, runWithTenant, DEFAULT_TENANT } from '../utils/tenantContext';
 
 // Redis connection
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
@@ -22,6 +23,7 @@ const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
  */
 const emailQueue = new Queue<{
   jobId: string;
+  tenantId?: string;
 }>('email-send', REDIS_URL, {
   defaultJobOptions: {
     attempts: 3,
@@ -43,6 +45,7 @@ const sequenceProcessorQueue = new Queue<{
   sequenceId: string;
   currentEmailOrder?: number;
   triggerData?: Record<string, any>;
+  tenantId?: string;
 }>('sequence-processor', REDIS_URL, {
   defaultJobOptions: {
     attempts: 3,
@@ -89,8 +92,13 @@ class SequenceSchedulerService {
    */
   private setupEmailProcessor(): void {
     emailQueue.process(async (job) => {
-      const { jobId } = job.data;
+      const { jobId, tenantId } = job.data;
+      const resolvedTenant = tenantId || DEFAULT_TENANT;
+      if (!tenantId) {
+        logger.debug('Email-send job missing tenantId, using default', { jobId, bullJobId: job.id });
+      }
 
+      return runWithTenant(resolvedTenant, async () => {
       // Handle recurring "process-pending" job - this triggers processing of pending emails
       if (jobId === 'process-pending') {
         const count = await this.processPendingJobs();
@@ -220,6 +228,7 @@ class SequenceSchedulerService {
 
         throw error; // Let Bull handle retry
       }
+      }); // end runWithTenant
     });
 
     emailQueue.on('failed', (job, err) => {
@@ -238,8 +247,13 @@ class SequenceSchedulerService {
    */
   private setupSequenceProcessor(): void {
     sequenceProcessorQueue.process(async (job) => {
-      const { type, leadId, sequenceId, currentEmailOrder, triggerData } = job.data;
+      const { type, leadId, sequenceId, currentEmailOrder, triggerData, tenantId } = job.data;
+      const resolvedTenant = tenantId || DEFAULT_TENANT;
+      if (!tenantId) {
+        logger.debug('Sequence-processor job missing tenantId, using default', { type, bullJobId: job.id });
+      }
 
+      return runWithTenant(resolvedTenant, async () => {
       try {
         switch (type) {
           case 'enroll':
@@ -277,6 +291,7 @@ class SequenceSchedulerService {
         logger.error('Sequence processor error:', error);
         throw error;
       }
+      }); // end runWithTenant
     });
   }
 
@@ -286,7 +301,7 @@ class SequenceSchedulerService {
   private async setupRecurringJobs(): Promise<void> {
     // Process pending emails every minute
     await emailQueue.add(
-      { jobId: 'process-pending' },
+      { jobId: 'process-pending', tenantId: DEFAULT_TENANT },
       {
         repeat: { cron: '* * * * *' }, // Every minute
         jobId: 'process-pending-emails',
@@ -295,7 +310,7 @@ class SequenceSchedulerService {
 
     // Clean up old jobs daily
     await sequenceProcessorQueue.add(
-      { type: 'cleanup', leadId: '', sequenceId: '' },
+      { type: 'cleanup', leadId: '', sequenceId: '', tenantId: DEFAULT_TENANT },
       {
         repeat: { cron: '0 3 * * *' }, // 3 AM daily
         jobId: 'cleanup-old-jobs',
@@ -350,6 +365,7 @@ class SequenceSchedulerService {
         leadId: leadObjectId.toString(),
         sequenceId: sequence._id.toString(),
         triggerData,
+        tenantId: getTenantId(),
       });
 
       enrolled.push(sequence._id.toString());
@@ -450,7 +466,7 @@ class SequenceSchedulerService {
     // Add to Bull queue with delay
     const delay = Math.max(0, scheduledFor.getTime() - Date.now());
     const bullJob = await emailQueue.add(
-      { jobId: emailJob._id.toString() },
+      { jobId: emailJob._id.toString(), tenantId: getTenantId() },
       {
         delay,
         jobId: `sequence-${sequence._id}-lead-${lead._id}-email-${sequenceEmail.order}`,
@@ -775,7 +791,7 @@ class SequenceSchedulerService {
       }
 
       // Add to queue
-      const bullJob = await emailQueue.add({ jobId: job._id.toString() });
+      const bullJob = await emailQueue.add({ jobId: job._id.toString(), tenantId: getTenantId() });
       job.bullJobId = bullJob.id.toString();
       await job.save();
     }

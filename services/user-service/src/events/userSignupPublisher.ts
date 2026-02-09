@@ -38,6 +38,7 @@ class UserSignupPublisher {
     }
 
     const payload = JSON.stringify({
+      tenantId: 'cloudmastershub',
       user_id: userId,
       email,
       first_name: firstName,

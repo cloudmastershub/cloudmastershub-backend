@@ -5,11 +5,13 @@ import { sequenceScheduler } from './sequenceScheduler';
 import { SequenceTrigger } from '../models/EmailSequence';
 import { Lead, LeadStatus } from '../models';
 import logger from '../utils/logger';
+import { getTenantId, runWithTenant, DEFAULT_TENANT } from '../utils/tenantContext';
 
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 const CHANNEL = 'user.signed_up';
 
 interface SignupPayload {
+  tenantId?: string;
   user_id: string;
   email: string;
   first_name: string;
@@ -86,6 +88,11 @@ class UserEventSubscriber {
       return;
     }
 
+    if (!payload.tenantId) {
+      logger.warn('User signup event missing tenantId, using default', { userId: payload.user_id, default: DEFAULT_TENANT });
+      payload.tenantId = DEFAULT_TENANT;
+    }
+
     // Deterministic job ID: one per user, ever.
     // No timestamp component — ensures a user can only have ONE welcome email job.
     const jobId = `signup:${payload.user_id}`;
@@ -114,9 +121,15 @@ class UserEventSubscriber {
    */
   private setupWorker(): void {
     this.queue!.process(async (job) => {
-      const { user_id, email, first_name, last_name } = job.data as SignupPayload;
+      const { tenantId, user_id, email, first_name, last_name } = job.data as SignupPayload;
 
-      logger.info('Processing user signup welcome email', { userId: user_id, email });
+      const resolvedTenant = tenantId || DEFAULT_TENANT;
+      if (!tenantId) {
+        logger.warn('Signup job missing tenantId, using default', { jobId: job.id, userId: user_id });
+      }
+
+      return runWithTenant(resolvedTenant, async () => {
+      logger.info('Processing user signup welcome email', { userId: user_id, email, tenantId: resolvedTenant });
 
       // Upsert lead in marketing database
       let lead = await Lead.findOne({ email: email.toLowerCase() });
@@ -220,6 +233,7 @@ class UserEventSubscriber {
         });
         throw err; // let Bull retry
       }
+      }); // end runWithTenant
     });
 
     this.queue!.on('failed', (job, err) => {
