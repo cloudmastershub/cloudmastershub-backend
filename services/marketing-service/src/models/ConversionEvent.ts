@@ -20,6 +20,10 @@ export enum ConversionEventType {
   // Engagement events
   EMAIL_OPEN = 'email_open',
   EMAIL_CLICK = 'email_click',
+  EMAIL_DELIVERED = 'email_delivered',
+  EMAIL_BOUNCED = 'email_bounced',
+  EMAIL_UNSUBSCRIBED = 'email_unsubscribed',
+  EMAIL_COMPLAINED = 'email_complained',
   VIDEO_START = 'video_start',
   VIDEO_PROGRESS = 'video_progress',
   VIDEO_COMPLETE = 'video_complete',

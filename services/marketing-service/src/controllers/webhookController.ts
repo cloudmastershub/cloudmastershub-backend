@@ -184,9 +184,27 @@ async function handleDelivered(
   if (emailJob) {
     await emailJob.markDelivered();
 
+    // Update sequence email metrics
+    if (emailJob.sequenceId && emailJob.sequenceEmailOrder !== undefined) {
+      await updateSequenceEmailMetrics(
+        emailJob.sequenceId.toString(),
+        emailJob.sequenceEmailOrder,
+        'delivered'
+      );
+    }
+
     // Update template stats
     if (emailJob.templateId) {
       await updateTemplateStats(emailJob.templateId, 'delivered');
+    }
+  }
+
+  // Track conversion event + update lead engagement
+  const recipient = eventData.recipient;
+  if (recipient) {
+    const lead = await Lead.findOne({ email: recipient.toLowerCase() });
+    if (lead) {
+      await trackEmailEvent(ConversionEventType.EMAIL_DELIVERED, lead, eventData);
     }
   }
 }
@@ -302,6 +320,25 @@ async function handleUnsubscribed(
     // Cancel pending sequence emails
     await EmailQueueJob.cancelPendingForLead(lead._id);
 
+    // Look up most recent email job for sequence metrics
+    const userVars = eventData['user-variables'] || {};
+    const jobId = userVars.jobId;
+    const messageId = eventData.message?.headers?.['message-id'];
+    let emailJob: EmailJobDoc = jobId ? await EmailQueueJob.findById(jobId) : null;
+    if (!emailJob && messageId) {
+      emailJob = await EmailQueueJob.findByMessageId(messageId) as EmailJobDoc;
+    }
+    if (emailJob?.sequenceId && emailJob.sequenceEmailOrder !== undefined) {
+      await updateSequenceEmailMetrics(
+        emailJob.sequenceId.toString(),
+        emailJob.sequenceEmailOrder,
+        'unsubscribed'
+      );
+    }
+
+    // Track conversion event
+    await trackEmailEvent(ConversionEventType.EMAIL_UNSUBSCRIBED, lead, eventData);
+
     logger.info(`Lead unsubscribed via Mailgun webhook`, {
       leadId: lead._id.toString(),
       email: recipient,
@@ -326,6 +363,9 @@ async function handleComplained(
 
     // Cancel pending emails
     await EmailQueueJob.cancelPendingForLead(lead._id);
+
+    // Track conversion event
+    await trackEmailEvent(ConversionEventType.EMAIL_COMPLAINED, lead, eventData);
 
     logger.warn(`Lead complained (spam)`, {
       leadId: lead._id.toString(),
@@ -367,24 +407,33 @@ async function handleBounce(
     }
   }
 
-  // Update lead status for hard bounces
-  if (recipient && bounceType === 'hard') {
+  // Track conversion event for all bounces (soft + hard)
+  if (recipient) {
     const lead = await Lead.findOne({ email: recipient.toLowerCase() });
     if (lead) {
-      lead.updateStatus(LeadStatus.BOUNCED, `Hard bounce: ${bounceReason}`);
-      lead.emailConsent = false;
-      await lead.save();
-
-      // Cancel pending emails
-      await EmailQueueJob.cancelPendingForLead(lead._id);
-
-      logger.warn(`Lead marked as bounced`, {
-        leadId: lead._id.toString(),
-        email: recipient,
+      await trackEmailEvent(ConversionEventType.EMAIL_BOUNCED, lead, eventData, {
         bounceType,
         bounceReason,
         bounceCode,
       });
+
+      // Update lead status for hard bounces only
+      if (bounceType === 'hard') {
+        lead.updateStatus(LeadStatus.BOUNCED, `Hard bounce: ${bounceReason}`);
+        lead.emailConsent = false;
+        await lead.save();
+
+        // Cancel pending emails
+        await EmailQueueJob.cancelPendingForLead(lead._id);
+
+        logger.warn(`Lead marked as bounced`, {
+          leadId: lead._id.toString(),
+          email: recipient,
+          bounceType,
+          bounceReason,
+          bounceCode,
+        });
+      }
     }
   }
 }
@@ -441,8 +490,9 @@ async function trackEmailEvent(
       eventType,
       leadId: lead._id,
       userId: lead.conversion?.userId,
+      sessionId: 'webhook-' + eventData.id,
       emailId: eventData.message?.headers?.['message-id'],
-      funnelId: userVars.sequenceId, // Using sequenceId as context
+      emailSequenceId: userVars.sequenceId,
       metadata: {
         templateId: userVars.templateId,
         sequenceId: userVars.sequenceId,

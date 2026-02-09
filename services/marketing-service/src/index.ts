@@ -19,6 +19,7 @@ import workflowRoutes from './routes/workflowRoutes';
 import trackingRoutes from './routes/trackingRoutes';
 import tagRoutes from './routes/tagRoutes';
 import webhookRoutes from './routes/webhookRoutes';
+import analyticsRoutes from './routes/analyticsRoutes';
 import { sequenceScheduler } from './services/sequenceScheduler';
 import { workflowProcessor } from './services/workflowProcessor';
 import { paymentEventSubscriber } from './services/paymentEventSubscriber';
@@ -97,8 +98,7 @@ app.use('/admin/mailing-lists', mailingListRoutes);
 app.use('/admin/leads', leadRoutes);
 app.use('/admin/workflows', workflowRoutes);
 app.use('/admin/tags', tagRoutes);
-// These will be implemented in subsequent phases:
-// app.use('/admin/analytics', analyticsRoutes);
+app.use('/admin/analytics', analyticsRoutes);
 
 // ============================================
 // Internal Routes (service-to-service, no auth)
@@ -245,7 +245,14 @@ app.get('/', (req, res) => {
           merge: 'POST /admin/tags/:id/merge',
           sync: 'POST /admin/tags/sync',
         },
-        analytics: '/admin/analytics (coming soon)',
+        analytics: {
+          overview: 'GET /admin/analytics/overview',
+          email: 'GET /admin/analytics/email',
+          sequences: 'GET /admin/analytics/sequences',
+          sequenceById: 'GET /admin/analytics/sequences/:id',
+          lifecycle: 'GET /admin/analytics/lifecycle',
+          funnelSteps: 'GET /admin/analytics/funnels/:id',
+        },
       },
       public: {
         funnels: 'GET /f/:slug',

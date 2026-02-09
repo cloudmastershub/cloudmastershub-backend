@@ -1,4 +1,5 @@
-import { Funnel, IFunnel, FunnelStatus, FunnelType, DeliveryMode } from '../models';
+import { Funnel, IFunnel, FunnelStatus, FunnelType, DeliveryMode, ConversionEvent, ConversionEventType } from '../models';
+import { FunnelParticipant } from '../models/FunnelParticipant';
 import logger from '../utils/logger';
 import { ApiError } from '../middleware/errorHandler';
 import mongoose from 'mongoose';
@@ -660,13 +661,36 @@ class FunnelService {
       return null;
     }
 
-    // Calculate step analytics (placeholder - will be populated from ConversionEvents)
-    const stepAnalytics = funnel.steps.map(step => ({
-      stepId: step.id,
-      views: 0,
-      completions: 0,
-      conversionRate: 0,
-    }));
+    // Calculate step analytics from ConversionEvents
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const now = new Date();
+
+    const stepRates = await (ConversionEvent as any).getStepConversionRates(id, thirtyDaysAgo, now);
+
+    // Build a map of stepOrder → { views, completions }
+    const stepDataMap: Record<number, { views: number; completions: number }> = {};
+    for (const row of stepRates) {
+      if (!stepDataMap[row.stepOrder]) {
+        stepDataMap[row.stepOrder] = { views: 0, completions: 0 };
+      }
+      if (row.eventType === ConversionEventType.STEP_VIEW) {
+        stepDataMap[row.stepOrder].views = row.count;
+      } else if (row.eventType === ConversionEventType.STEP_COMPLETE) {
+        stepDataMap[row.stepOrder].completions = row.count;
+      }
+    }
+
+    const stepAnalytics = funnel.steps.map(step => {
+      const data = stepDataMap[step.order] || { views: 0, completions: 0 };
+      return {
+        stepId: step.id,
+        views: data.views,
+        completions: data.completions,
+        conversionRate: data.views > 0
+          ? Math.round((data.completions / data.views) * 10000) / 100
+          : 0,
+      };
+    });
 
     return {
       metrics: funnel.metrics,
