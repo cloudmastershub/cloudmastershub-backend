@@ -11,6 +11,7 @@ declare global {
       userEmail?: string;
       userRoles?: string[];
       isAdmin?: boolean;
+      authMethod?: 'jwt' | 'gateway-headers';
     }
   }
 }
@@ -25,7 +26,38 @@ interface JWTPayload {
 }
 
 /**
- * Extract and verify JWT token from Authorization header
+ * Try to authenticate via gateway-forwarded X-User-* headers.
+ * Returns true if headers were present and user context was set.
+ */
+function tryGatewayHeaders(req: Request): boolean {
+  const userId = req.headers['x-user-id'] as string | undefined;
+  const email = req.headers['x-user-email'] as string | undefined;
+  const rolesRaw = req.headers['x-user-roles'] as string | undefined;
+
+  if (!userId || !email) return false;
+
+  let roles: string[] = [];
+  if (rolesRaw) {
+    try {
+      roles = JSON.parse(rolesRaw);
+    } catch {
+      roles = [rolesRaw];
+    }
+  }
+
+  req.userId = userId;
+  req.userEmail = email;
+  req.userRoles = roles;
+  req.isAdmin = roles.includes('admin');
+  req.authMethod = 'gateway-headers';
+  return true;
+}
+
+/**
+ * Extract and verify JWT token from Authorization header.
+ * Falls back to gateway-forwarded X-User-* headers if the
+ * Bearer token is missing or malformed (belt-and-suspenders
+ * approach for http-proxy-middleware header forwarding issues).
  */
 export const authenticate = async (
   req: Request,
@@ -34,59 +66,66 @@ export const authenticate = async (
 ): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
+    const requestId = req.headers['x-request-id'] || 'unknown';
 
-    // Debug logging for auth issues
-    logger.debug('Auth middleware called', {
+    // --- Path 1: JWT Bearer token (preferred) ---
+    if (authHeader && authHeader.startsWith('Bearer ') && authHeader.length > 7) {
+      const token = authHeader.split(' ')[1];
+      const secret = process.env.JWT_SECRET || 'cloudmastershub-jwt-secret-2024-production-key';
+
+      const decoded = jwt.verify(token, secret) as JWTPayload;
+
+      req.userId = decoded.userId;
+      req.userEmail = decoded.email;
+      req.userRoles = decoded.roles || [];
+      req.isAdmin = decoded.roles?.includes('admin') || false;
+      req.authMethod = 'jwt';
+
+      logger.debug('Authenticated via JWT', {
+        requestId,
+        path: req.path,
+        userId: decoded.userId,
+      });
+
+      return next();
+    }
+
+    // --- Path 2: Gateway-forwarded X-User-* headers (fallback) ---
+    if (tryGatewayHeaders(req)) {
+      logger.debug('Authenticated via gateway headers', {
+        requestId,
+        path: req.path,
+        userId: req.userId,
+      });
+      return next();
+    }
+
+    // --- Neither path succeeded ---
+    logger.warn('Auth failed: no valid credentials', {
+      requestId,
       path: req.path,
       method: req.method,
       hasAuthHeader: !!authHeader,
-      authHeaderPrefix: authHeader?.substring(0, 20)
+      authHeaderLength: authHeader?.length,
+      hasGatewayHeaders: !!req.headers['x-user-id'],
+      ip: req.ip,
+      headers: Object.keys(req.headers),
     });
+    throw ApiError.unauthorized('No token provided');
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      logger.warn('No Bearer token in Authorization header', {
-        path: req.path,
-        headers: Object.keys(req.headers)
-      });
-      throw ApiError.unauthorized('No token provided');
+  } catch (error: any) {
+    if (error.statusCode) {
+      return next(error); // already an ApiError
     }
 
-    const token = authHeader.split(' ')[1];
-    const secret = process.env.JWT_SECRET || 'cloudmastershub-jwt-secret-2024-production-key';
-
-    logger.debug('Verifying JWT token', {
-      path: req.path,
-      tokenLength: token.length,
-      tokenPrefix: token.substring(0, 30),
-      secretLength: secret.length,
-      secretPrefix: secret.substring(0, 10)
-    });
-
-    const decoded = jwt.verify(token, secret) as JWTPayload;
-
-    logger.debug('JWT verified successfully', {
-      path: req.path,
-      userId: decoded.userId,
-      email: decoded.email,
-      roles: decoded.roles,
-      exp: decoded.exp,
-      iat: decoded.iat
-    });
-
-    req.userId = decoded.userId;
-    req.userEmail = decoded.email;
-    req.userRoles = decoded.roles || [];
-    req.isAdmin = decoded.roles?.includes('admin') || false;
-
-    next();
-  } catch (error: any) {
-    logger.error('JWT verification failed', {
+    const requestId = req.headers['x-request-id'] || 'unknown';
+    logger.warn('Auth verification failed', {
+      requestId,
       path: req.path,
       method: req.method,
       errorName: error.name,
       errorMessage: error.message,
-      hasAuthHeader: !!req.headers.authorization,
-      authHeaderLength: req.headers.authorization?.length
+      ip: req.ip,
     });
 
     if (error.name === 'JsonWebTokenError') {
@@ -94,7 +133,7 @@ export const authenticate = async (
     } else if (error.name === 'TokenExpiredError') {
       next(ApiError.unauthorized('Token expired'));
     } else {
-      next(error);
+      next(ApiError.unauthorized('Authentication failed'));
     }
   }
 };
@@ -108,6 +147,12 @@ export const requireAdmin = async (
   next: NextFunction
 ): Promise<void> => {
   if (!req.isAdmin) {
+    logger.warn('Admin access denied', {
+      requestId: req.headers['x-request-id'] || 'unknown',
+      path: req.path,
+      userId: req.userId,
+      roles: req.userRoles,
+    });
     next(ApiError.forbidden('Admin access required'));
     return;
   }
@@ -125,23 +170,23 @@ export const optionalAuth = async (
   try {
     const authHeader = req.headers.authorization;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (authHeader && authHeader.startsWith('Bearer ') && authHeader.length > 7) {
+      const token = authHeader.split(' ')[1];
+      const secret = process.env.JWT_SECRET || 'cloudmastershub-jwt-secret-2024-production-key';
+      const decoded = jwt.verify(token, secret) as JWTPayload;
+
+      req.userId = decoded.userId;
+      req.userEmail = decoded.email;
+      req.userRoles = decoded.roles || [];
+      req.isAdmin = decoded.roles?.includes('admin') || false;
+      req.authMethod = 'jwt';
       return next();
     }
 
-    const token = authHeader.split(' ')[1];
-    const secret = process.env.JWT_SECRET || 'cloudmastershub-jwt-secret-2024-production-key';
-
-    const decoded = jwt.verify(token, secret) as JWTPayload;
-
-    req.userId = decoded.userId;
-    req.userEmail = decoded.email;
-    req.userRoles = decoded.roles || [];
-    req.isAdmin = decoded.roles?.includes('admin') || false;
-
+    // Try gateway headers as fallback
+    tryGatewayHeaders(req);
     next();
   } catch (error) {
-    // Silently continue without auth for optional routes
     logger.debug('Optional auth failed, continuing without user context');
     next();
   }
@@ -153,8 +198,10 @@ export const optionalAuth = async (
 export const logAdminAction = (actionName: string) => {
   return (req: Request, res: Response, next: NextFunction): void => {
     logger.info(`Admin action: ${actionName}`, {
+      requestId: req.headers['x-request-id'] || 'unknown',
       adminId: req.userId,
       adminEmail: req.userEmail,
+      authMethod: req.authMethod,
       action: actionName,
       path: req.path,
       method: req.method,

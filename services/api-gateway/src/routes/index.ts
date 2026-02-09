@@ -1,8 +1,38 @@
-import { Router } from 'express';
+import { Router, Request } from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
+import { ClientRequest } from 'http';
 import logger from '../utils/logger';
+import crypto from 'crypto';
 
 const router = Router();
+
+/**
+ * Forward auth + security headers from the incoming Express request
+ * to the outgoing proxy ClientRequest.
+ *
+ * http-proxy-middleware v2.x does not reliably forward the Authorization
+ * header through Express middleware chains. Explicitly copying it onto
+ * proxyReq guarantees end-to-end Bearer token propagation.
+ */
+function forwardHeaders(proxyReq: ClientRequest, req: Request, serviceName: string): void {
+  // 1. Forward Authorization header (the critical fix)
+  const authHeader = req.headers.authorization;
+  if (authHeader) {
+    proxyReq.setHeader('Authorization', authHeader);
+  }
+
+  // 2. Forward gateway-extracted user context headers
+  if (req.headers['x-user-id'])          proxyReq.setHeader('X-User-Id', req.headers['x-user-id'] as string);
+  if (req.headers['x-user-email'])       proxyReq.setHeader('X-User-Email', req.headers['x-user-email'] as string);
+  if (req.headers['x-user-roles'])       proxyReq.setHeader('X-User-Roles', req.headers['x-user-roles'] as string);
+  if (req.headers['x-subscription-tier']) proxyReq.setHeader('X-Subscription-Tier', req.headers['x-subscription-tier'] as string);
+
+  // 3. Security / observability headers
+  const requestId = (req.headers['x-request-id'] as string) || crypto.randomUUID();
+  proxyReq.setHeader('X-Request-ID', requestId);
+  proxyReq.setHeader('X-Service-Name', 'api-gateway');
+  proxyReq.setHeader('X-Forwarded-Service', serviceName);
+}
 
 const serviceRoutes = {
   '/auth': {
@@ -500,192 +530,87 @@ const serviceRoutes = {
   },
 };
 
-// Handle specific routes first with exact path matching
-// Admin stats route - must go to user-service
-router.use('/admin/stats', createProxyMiddleware({
-  target: process.env.USER_SERVICE_URL || 'http://user-service:3001',
-  changeOrigin: true,
-  timeout: 30000,
-  proxyTimeout: 30000,
-  pathRewrite: {
-    '^/api/admin/stats': '/admin/stats'
-  },
-  secure: false,
-  ws: true,
-  logLevel: 'debug',
-  onError: (err, req, res) => {
-    logger.error(`Proxy error for /admin/stats:`, err);
-    if (!res.headersSent) {
-      res.status(502).json({
-        success: false,
-        error: {
-          message: 'Service temporarily unavailable',
-          service: 'user-service',
-        },
-      });
-    }
-  },
-  onProxyReq: (proxyReq, req, res) => {
-    logger.debug(`Proxying EXACT ${req.method} ${req.originalUrl} to user-service:3001${req.path}`);
-    if (req.body && Object.keys(req.body).length > 0) {
-      const bodyData = JSON.stringify(req.body);
-      proxyReq.setHeader('Content-Type', 'application/json');
-      proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
-      proxyReq.write(bodyData);
-    }
-  },
-  onProxyRes: (proxyRes, req, res) => {
-    logger.debug(`Received response ${proxyRes.statusCode} for EXACT ${req.method} ${req.originalUrl}`);
-  },
-}));
+// Explicit admin routes (most specific first, order matters)
+const explicitAdminRoutes: Array<{ path: string; target: string; service: string; rewrite: Record<string, string> }> = [
+  { path: '/admin/stats', target: process.env.USER_SERVICE_URL || 'http://user-service:3001', service: 'user-service', rewrite: { '^/api/admin/stats': '/admin/stats' } },
+  { path: '/admin/users', target: process.env.USER_SERVICE_URL || 'http://user-service:3001', service: 'user-service', rewrite: { '^/api/admin/users': '/admin/users' } },
+  { path: '/admin/instructors', target: process.env.COURSE_SERVICE_URL || 'http://course-service:3002', service: 'course-service', rewrite: { '^/api/admin/instructors': '/admin/instructors' } },
+  { path: '/admin/courses', target: process.env.COURSE_SERVICE_URL || 'http://course-service:3002', service: 'course-service', rewrite: { '^/api/admin/courses': '/admin/courses' } },
+];
 
-// Admin users route - must go to user-service
-router.use('/admin/users', createProxyMiddleware({
-  target: process.env.USER_SERVICE_URL || 'http://user-service:3001',
-  changeOrigin: true,
-  timeout: 30000,
-  proxyTimeout: 30000,
-  pathRewrite: {
-    '^/api/admin/users': '/admin/users'
-  },
-  secure: false,
-  ws: true,
-  logLevel: 'debug',
-  onError: (err, req, res) => {
-    logger.error(`Proxy error for /admin/users:`, err);
-    if (!res.headersSent) {
-      res.status(502).json({
-        success: false,
-        error: {
-          message: 'Service temporarily unavailable',
-          service: 'user-service',
-        },
+for (const route of explicitAdminRoutes) {
+  router.use(route.path, createProxyMiddleware({
+    target: route.target,
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: route.rewrite,
+    secure: false,
+    ws: true,
+    logLevel: 'debug',
+    onError: (err, req, res) => {
+      logger.error(`Proxy error for ${route.path}:`, err);
+      if (!res.headersSent) {
+        res.status(502).json({
+          success: false,
+          error: { message: 'Service temporarily unavailable', service: route.service },
+        });
+      }
+    },
+    onProxyReq: (proxyReq, req, res) => {
+      forwardHeaders(proxyReq, req as Request, route.service);
+      logger.debug(`Proxying ${req.method} ${req.originalUrl} → ${route.service}`, {
+        requestId: proxyReq.getHeader('x-request-id'),
       });
-    }
-  },
-  onProxyReq: (proxyReq, req, res) => {
-    logger.debug(`Proxying EXACT ${req.method} ${req.originalUrl} to user-service:3001${req.path}`);
-    if (req.body && Object.keys(req.body).length > 0) {
-      const bodyData = JSON.stringify(req.body);
-      proxyReq.setHeader('Content-Type', 'application/json');
-      proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
-      proxyReq.write(bodyData);
-    }
-  },
-  onProxyRes: (proxyRes, req, res) => {
-    logger.debug(`Received response ${proxyRes.statusCode} for EXACT ${req.method} ${req.originalUrl}`);
-  },
-}));
-
-// Admin instructors route - must go to course-service  
-router.use('/admin/instructors', createProxyMiddleware({
-  target: process.env.COURSE_SERVICE_URL || 'http://course-service:3002',
-  changeOrigin: true,
-  timeout: 30000,
-  proxyTimeout: 30000,
-  pathRewrite: {
-    '^/api/admin/instructors': '/admin/instructors'
-  },
-  secure: false,
-  ws: true,
-  logLevel: 'debug',
-  onError: (err, req, res) => {
-    logger.error(`Proxy error for /admin/instructors:`, err);
-    if (!res.headersSent) {
-      res.status(502).json({
-        success: false,
-        error: {
-          message: 'Service temporarily unavailable',
-          service: 'course-service',
-        },
-      });
-    }
-  },
-  onProxyReq: (proxyReq, req, res) => {
-    logger.debug(`Proxying EXACT ${req.method} ${req.originalUrl} to course-service:3002${req.path}`);
-    if (req.body && Object.keys(req.body).length > 0) {
-      const bodyData = JSON.stringify(req.body);
-      proxyReq.setHeader('Content-Type', 'application/json');
-      proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
-      proxyReq.write(bodyData);
-    }
-  },
-  onProxyRes: (proxyRes, req, res) => {
-    logger.debug(`Received response ${proxyRes.statusCode} for EXACT ${req.method} ${req.originalUrl}`);
-  },
-}));
-
-// Admin courses route - must go to course-service
-router.use('/admin/courses', createProxyMiddleware({
-  target: process.env.COURSE_SERVICE_URL || 'http://course-service:3002',
-  changeOrigin: true,
-  timeout: 30000,
-  proxyTimeout: 30000,
-  pathRewrite: {
-    '^/api/admin/courses': '/admin/courses'
-  },
-  secure: false,
-  ws: true,
-  logLevel: 'debug',
-  onError: (err, req, res) => {
-    logger.error(`Proxy error for /admin/courses:`, err);
-    if (!res.headersSent) {
-      res.status(502).json({
-        success: false,
-        error: {
-          message: 'Service temporarily unavailable',
-          service: 'course-service',
-        },
-      });
-    }
-  },
-  onProxyReq: (proxyReq, req, res) => {
-    logger.debug(`Proxying EXACT ${req.method} ${req.originalUrl} to course-service:3002${req.path}`);
-    if (req.body && Object.keys(req.body).length > 0) {
-      const bodyData = JSON.stringify(req.body);
-      proxyReq.setHeader('Content-Type', 'application/json');
-      proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
-      proxyReq.write(bodyData);
-    }
-  },
-  onProxyRes: (proxyRes, req, res) => {
-    logger.debug(`Received response ${proxyRes.statusCode} for EXACT ${req.method} ${req.originalUrl}`);
-  },
-}));
+      if (req.body && Object.keys(req.body).length > 0) {
+        const bodyData = JSON.stringify(req.body);
+        proxyReq.setHeader('Content-Type', 'application/json');
+        proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+        proxyReq.write(bodyData);
+      }
+    },
+    onProxyRes: (proxyRes, req, res) => {
+      logger.debug(`Response ${proxyRes.statusCode} for ${req.method} ${req.originalUrl}`);
+    },
+  }));
+}
 
 // Learning paths are now handled by course service with admin role restrictions
 
 // Removed /admin/paths routing - learning paths are managed by course service only
 
 // Handle general routes with prefix matching
-Object.entries(serviceRoutes).forEach(([path, config]) => {
+Object.entries(serviceRoutes).forEach(([routePath, config]) => {
   // Skip specific admin routes as they're handled above
-  if (['/admin/stats', '/admin/users', '/admin/instructors', '/admin/courses'].includes(path)) return;
-  
+  if (['/admin/stats', '/admin/users', '/admin/instructors', '/admin/courses'].includes(routePath)) return;
+
+  // Derive service name from target URL for logging
+  const serviceName = config.target.replace(/https?:\/\//, '').replace(/:\d+$/, '');
+
   router.use(
-    path,
+    routePath,
     createProxyMiddleware({
       ...config,
       secure: false,
       ws: true,
       logLevel: 'debug',
       onError: (err, req, res) => {
-        logger.error(`Proxy error for ${path}:`, err);
+        logger.error(`Proxy error for ${routePath}:`, err);
         if (!res.headersSent) {
           res.status(502).json({
             success: false,
             error: {
               message: 'Service temporarily unavailable',
-              service: path.substring(1),
+              service: routePath.substring(1),
             },
           });
         }
       },
       onProxyReq: (proxyReq, req, res) => {
-        // Log the original request
-        logger.debug(`Proxying ${req.method} ${req.originalUrl} to ${config.target}${req.path}`);
-        
-        // If there's a body, ensure it's properly forwarded
+        forwardHeaders(proxyReq, req as Request, serviceName);
+        logger.debug(`Proxying ${req.method} ${req.originalUrl} → ${serviceName}`, {
+          requestId: proxyReq.getHeader('x-request-id'),
+        });
         if (req.body && Object.keys(req.body).length > 0) {
           const bodyData = JSON.stringify(req.body);
           proxyReq.setHeader('Content-Type', 'application/json');
@@ -694,7 +619,7 @@ Object.entries(serviceRoutes).forEach(([path, config]) => {
         }
       },
       onProxyRes: (proxyRes, req, res) => {
-        logger.debug(`Received response ${proxyRes.statusCode} for ${req.method} ${req.originalUrl}`);
+        logger.debug(`Response ${proxyRes.statusCode} for ${req.method} ${req.originalUrl}`);
       },
     })
   );

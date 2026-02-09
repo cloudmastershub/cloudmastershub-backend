@@ -27,6 +27,7 @@ import { userEventSubscriber } from './services/userEventSubscriber';
 
 // Import middleware
 import { authenticate, requireAdmin } from './middleware/auth';
+import { internalAuth } from './middleware/internalAuth';
 
 dotenv.config();
 
@@ -101,9 +102,9 @@ app.use('/admin/tags', tagRoutes);
 app.use('/admin/analytics', analyticsRoutes);
 
 // ============================================
-// Internal Routes (service-to-service, no auth)
+// Internal Routes (service-to-service, token or cluster-IP auth)
 // ============================================
-app.use('/internal', emailRoutes);             // Internal email sending
+app.use('/internal', internalAuth, emailRoutes);  // Internal email sending
 
 // ============================================
 // Public Routes (no auth required)
