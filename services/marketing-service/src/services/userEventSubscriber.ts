@@ -1,6 +1,8 @@
 import { createClient } from 'redis';
 import Queue from 'bull';
 import emailService from './emailService';
+import { sequenceScheduler } from './sequenceScheduler';
+import { SequenceTrigger } from '../models/EmailSequence';
 import { Lead, LeadStatus } from '../models';
 import logger from '../utils/logger';
 
@@ -181,6 +183,23 @@ class UserEventSubscriber {
           email,
           leadId: lead._id.toString(),
         });
+
+        // Trigger nurture sequence (welcome-email-sent tag was just added)
+        try {
+          const triggerResult = await sequenceScheduler.triggerSequence(
+            SequenceTrigger.TAG_ADDED,
+            lead._id,
+            { tagName: 'welcome-email-sent', firstName: first_name, email }
+          );
+          if (triggerResult.enrolled.length > 0) {
+            logger.info('Triggered nurture sequence after welcome email', {
+              leadId: lead._id.toString(),
+              sequences: triggerResult.enrolled,
+            });
+          }
+        } catch (seqErr: any) {
+          logger.warn('Failed to trigger nurture sequence', { error: seqErr.message });
+        }
 
         return { success: true };
       } catch (err: any) {

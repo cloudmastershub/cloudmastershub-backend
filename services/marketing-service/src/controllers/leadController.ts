@@ -362,11 +362,15 @@ export const addTag = async (
       return;
     }
 
-    // Add each tag and trigger workflow
+    // Add each tag and trigger workflow + sequences
     for (const tag of tags) {
       lead = await leadService.addTag(id, tag);
       // Trigger workflow for tag added
       workflowTriggerService.onTagAdded(id, tag);
+      // Trigger email sequences for tag added
+      sequenceScheduler.triggerSequence(SequenceTrigger.TAG_ADDED, id, { tagName: tag }).catch(err => {
+        logger.warn('Failed to trigger sequence for tag_added', { leadId: id, tag, error: err.message });
+      });
     }
 
     res.json({

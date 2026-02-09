@@ -1,5 +1,8 @@
 import mongoose from 'mongoose';
 import emailService from './emailService';
+import { sequenceScheduler } from './sequenceScheduler';
+import { SequenceTrigger } from '../models/EmailSequence';
+import { Lead } from '../models/Lead';
 import {
   Challenge,
   IChallenge,
@@ -730,6 +733,35 @@ class ChallengeService {
     } catch (emailError) {
       // Don't fail registration if email fails - log and continue
       logger.error(`Failed to send welcome email to ${input.email}:`, emailError);
+    }
+
+    // Trigger email sequences for challenge start
+    try {
+      const lead = await Lead.findOne({ email: input.email.toLowerCase() });
+      if (lead && lead.emailConsent) {
+        const triggerResult = await sequenceScheduler.triggerSequence(
+          SequenceTrigger.CHALLENGE_START,
+          lead._id,
+          {
+            challengeId: challenge._id.toString(),
+            challengeName: challenge.name,
+            challengeSlug: challenge.slug,
+            firstName: input.firstName,
+            lastName: input.lastName,
+            email: input.email,
+          }
+        );
+
+        if (triggerResult.enrolled.length > 0) {
+          logger.info(`Triggered ${triggerResult.enrolled.length} email sequences for challenge start`, {
+            leadId: lead._id.toString(),
+            challengeId: challenge._id.toString(),
+            sequences: triggerResult.enrolled,
+          });
+        }
+      }
+    } catch (seqError) {
+      logger.error('Failed to trigger challenge email sequences:', seqError);
     }
 
     logger.info(`Participant registered: ${input.email} for challenge ${challenge.name}`);
