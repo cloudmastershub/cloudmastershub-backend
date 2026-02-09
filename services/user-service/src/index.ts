@@ -8,6 +8,7 @@ import authRoutes from './routes/authRoutes';
 import referralRoutes from './routes/referralRoutes';
 import instructorRoutes from './routes/instructorRoutes';
 import adminRoutes from './routes/adminRoutes';
+import internalRoutes from './routes/internalRoutes';
 import { errorHandler } from './middleware/errorHandler';
 import { initializePaymentEventSubscriber } from './events/paymentEventSubscriber';
 import { initializeDatabase, getDatabaseHealth } from './services/userService';
@@ -85,6 +86,7 @@ app.use('/users', userRoutes);
 app.use('/referrals', referralRoutes);
 app.use('/instructor', instructorRoutes);
 app.use('/admin', adminRoutes);
+app.use('/internal', internalRoutes);
 
 app.use(errorHandler);
 

@@ -1085,6 +1085,99 @@ class EmailService {
       });
     }
   }
+  // ==========================================
+  // Bootcamp & Payment Email Helpers
+  // ==========================================
+
+  /**
+   * Send bootcamp enrollment confirmation email
+   */
+  async sendBootcampEnrolledEmail(
+    email: string,
+    bootcampName: string,
+    firstName?: string,
+    templateId?: string
+  ): Promise<void> {
+    const context: TemplateContext = {
+      firstName: firstName || 'there',
+      email,
+      bootcampName,
+      dashboardLink: `${process.env.APP_URL}/dashboard`,
+    };
+
+    if (templateId) {
+      await this.sendTemplatedEmail(templateId, email, context, {
+        tags: ['bootcamp', 'enrollment'],
+      });
+    } else {
+      await this.sendEmail({
+        to: email,
+        toName: firstName,
+        subject: `You're enrolled in ${bootcampName}!`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h1 style="color: #40E0D0;">Welcome to ${bootcampName}!</h1>
+            <p>Hi ${firstName || 'there'},</p>
+            <p>Great news — you're officially enrolled in <strong>${bootcampName}</strong>!</p>
+            <div style="background: #f8f9fa; border-left: 4px solid #40E0D0; padding: 16px; margin: 24px 0;">
+              <p style="margin: 0;"><strong>What's next?</strong></p>
+              <p style="margin: 8px 0 0 0; color: #666;">Head to your dashboard to access the bootcamp materials, schedule, and community.</p>
+            </div>
+            <p><a href="${context.dashboardLink}" style="background: linear-gradient(135deg, #40E0D0 0%, #4682B4 100%); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: bold;">Go to Dashboard</a></p>
+            <p>We're excited to have you on board!</p>
+            <p>The CloudMastersHub Team</p>
+          </div>
+        `,
+        tags: ['bootcamp', 'enrollment'],
+      });
+    }
+  }
+
+  /**
+   * Send payment failed alert email
+   */
+  async sendPaymentFailedEmail(
+    email: string,
+    planName: string,
+    firstName?: string,
+    templateId?: string
+  ): Promise<void> {
+    const context: TemplateContext = {
+      firstName: firstName || 'there',
+      email,
+      planName,
+      subscriptionLink: `${process.env.APP_URL}/profile/subscription`,
+      supportLink: `${process.env.APP_URL}/support`,
+    };
+
+    if (templateId) {
+      await this.sendTemplatedEmail(templateId, email, context, {
+        tags: ['payment', 'failed'],
+      });
+    } else {
+      await this.sendEmail({
+        to: email,
+        toName: firstName,
+        subject: `Action needed: Your payment could not be processed`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h1 style="color: #E53E3E;">Payment Issue</h1>
+            <p>Hi ${firstName || 'there'},</p>
+            <p>We were unable to process the payment for your <strong>${planName}</strong> subscription.</p>
+            <div style="background: #FFF5F5; border: 1px solid #FEB2B2; padding: 16px; border-radius: 8px; margin: 16px 0;">
+              <p style="margin: 0; color: #C53030;"><strong>Your access may be interrupted</strong> if the payment issue isn't resolved soon. Please update your payment method to avoid any disruption.</p>
+            </div>
+            <p><a href="${context.subscriptionLink}" style="background: #E53E3E; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; display: inline-block; font-weight: bold;">Update Payment Method</a></p>
+            <p style="color: #666; font-size: 14px; margin-top: 24px;">
+              If you believe this is an error, please <a href="${context.supportLink}">contact support</a>.
+            </p>
+            <p>The CloudMastersHub Team</p>
+          </div>
+        `,
+        tags: ['payment', 'failed'],
+      });
+    }
+  }
 }
 
 export const emailService = new EmailService();

@@ -21,6 +21,7 @@ import tagRoutes from './routes/tagRoutes';
 import webhookRoutes from './routes/webhookRoutes';
 import { sequenceScheduler } from './services/sequenceScheduler';
 import { workflowProcessor } from './services/workflowProcessor';
+import { paymentEventSubscriber } from './services/paymentEventSubscriber';
 
 // Import middleware
 import { authenticate, requireAdmin } from './middleware/auth';
@@ -312,6 +313,14 @@ const startServer = async () => {
       // Continue without processor - workflows can still be managed but won't auto-execute
     }
 
+    // Initialize payment event subscriber (cross-service email bridge)
+    try {
+      await paymentEventSubscriber.initialize();
+      logger.info('Payment event subscriber initialized');
+    } catch (error) {
+      logger.warn('Failed to initialize payment event subscriber (Redis may not be available):', error);
+    }
+
     // Start server
     app.listen(PORT, () => {
       logger.info(`Marketing Service running on port ${PORT}`);
@@ -338,6 +347,10 @@ const gracefulShutdown = async (signal: string) => {
     // Shutdown workflow processor (close Bull queues)
     await workflowProcessor.shutdown();
     logger.info('Workflow processor shutdown complete');
+
+    // Shutdown payment event subscriber (close Redis sub + Bull queue)
+    await paymentEventSubscriber.shutdown();
+    logger.info('Payment event subscriber shutdown complete');
 
     // Close MongoDB connection
     const mongoConnection = MongoConnection.getInstance();
