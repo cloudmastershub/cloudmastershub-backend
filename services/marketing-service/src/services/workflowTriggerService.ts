@@ -1,5 +1,4 @@
-import { EventEmitter } from 'events';
-import { v4 as uuidv4 } from 'uuid';
+import Queue from 'bull';
 import {
   Workflow,
   IWorkflow,
@@ -15,6 +14,8 @@ import { Lead, ILead } from '../models/Lead';
 import { workflowEngine } from './workflowEngine';
 import logger from '../utils/logger';
 
+const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+
 /**
  * Event types for workflow triggers
  */
@@ -27,40 +28,64 @@ export interface TriggerEvent {
 
 /**
  * Workflow Trigger Service
- * Listens for events and enrolls leads in matching workflows
+ *
+ * Distributes workflow trigger events via a Bull queue for multi-pod safety.
+ *
+ * Previous implementation used Node.js EventEmitter, which is local to a single
+ * process — triggers fired on Pod A were invisible to Pod B, causing silent
+ * failures when workflows needed to be evaluated.
+ *
+ * This version uses a Bull queue ('workflow-triggers'):
+ * - trigger() adds a job to the Bull queue
+ * - Any pod's worker picks up the job and processes it
+ * - Bull provides durability (jobs survive pod restarts) and retry
+ * - Enrollment dedup is handled at the business logic level (existing participant checks)
+ * - Workflow execution after enrollment uses the workflow-processing Bull queue
  */
-class WorkflowTriggerService extends EventEmitter {
+class WorkflowTriggerService {
+  private queue: Queue.Queue | null = null;
   private isInitialized = false;
 
   /**
-   * Initialize trigger listeners
+   * Initialize the trigger service with a Bull queue
    */
-  initialize(): void {
+  async initialize(): Promise<void> {
     if (this.isInitialized) {
       logger.warn('Workflow trigger service already initialized');
       return;
     }
 
-    // Register event listeners for each trigger type
-    this.on('lead_created', (event: TriggerEvent) => this.handleTrigger(event));
-    this.on('tag_added', (event: TriggerEvent) => this.handleTrigger(event));
-    this.on('tag_removed', (event: TriggerEvent) => this.handleTrigger(event));
-    this.on('score_changed', (event: TriggerEvent) => this.handleTrigger(event));
-    this.on('email_opened', (event: TriggerEvent) => this.handleTrigger(event));
-    this.on('email_clicked', (event: TriggerEvent) => this.handleTrigger(event));
-    this.on('page_visited', (event: TriggerEvent) => this.handleTrigger(event));
-    this.on('form_submitted', (event: TriggerEvent) => this.handleTrigger(event));
-    this.on('purchase_made', (event: TriggerEvent) => this.handleTrigger(event));
-    this.on('funnel_step_completed', (event: TriggerEvent) => this.handleTrigger(event));
-    this.on('challenge_day_completed', (event: TriggerEvent) => this.handleTrigger(event));
-    this.on('custom_event', (event: TriggerEvent) => this.handleTrigger(event));
+    this.queue = new Queue('workflow-triggers', REDIS_URL, {
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+        removeOnComplete: 200,
+        removeOnFail: 500,
+      },
+    });
+
+    // Worker: process trigger events (concurrency 5)
+    this.queue.process(5, async (job) => {
+      const event = job.data as TriggerEvent;
+      // Deserialize timestamp (Bull serializes Date as string)
+      event.timestamp = new Date(event.timestamp);
+      await this.handleTrigger(event);
+    });
+
+    this.queue.on('failed', (job, err) => {
+      logger.error(`Workflow trigger job failed: ${job.id}`, {
+        type: (job.data as TriggerEvent).type,
+        leadId: (job.data as TriggerEvent).leadId,
+        error: err.message,
+      });
+    });
 
     this.isInitialized = true;
-    logger.info('Workflow trigger service initialized');
+    logger.info('Workflow trigger service initialized (Bull queue: workflow-triggers)');
   }
 
   /**
-   * Handle a trigger event
+   * Handle a trigger event — finds matching workflows and enrolls the lead.
    */
   private async handleTrigger(event: TriggerEvent): Promise<void> {
     try {
@@ -74,7 +99,10 @@ class WorkflowTriggerService extends EventEmitter {
         return;
       }
 
-      logger.info(`Found ${workflows.length} matching workflows for trigger ${event.type}`);
+      logger.info(`Found ${workflows.length} matching workflows for trigger ${event.type}`, {
+        leadId: event.leadId,
+        workflows: workflows.map(w => w.name),
+      });
 
       // Enroll lead in each matching workflow
       for (const workflow of workflows) {
@@ -86,6 +114,7 @@ class WorkflowTriggerService extends EventEmitter {
       }
     } catch (error) {
       logger.error(`Error handling trigger event:`, error);
+      throw error; // Let Bull retry
     }
   }
 
@@ -301,20 +330,32 @@ class WorkflowTriggerService extends EventEmitter {
       $inc: { 'metrics.totalEntered': 1, 'metrics.currentlyActive': 1 },
     });
 
-    logger.info(`Lead ${lead.email} enrolled in workflow ${workflow.name}`);
+    logger.info(`Lead ${lead.email} enrolled in workflow ${workflow.name}`, {
+      workflowId: workflow._id.toString(),
+      participantId: participant.id,
+    });
 
-    // Start workflow execution
-    setImmediate(async () => {
+    // Queue workflow execution via workflowProcessor's Bull queue (durable, survives pod restart)
+    // Lazy import to avoid circular dependency (workflowProcessor imports this service)
+    try {
+      const processor = require('./workflowProcessor').workflowProcessor;
+      await processor.queueNodeExecution(participant.id);
+    } catch (error) {
+      // Fallback to direct execution if queue unavailable
+      logger.warn('Failed to queue workflow execution, executing directly', {
+        participantId: participant.id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
       try {
         await workflowEngine.executeNextNode(participant.id);
-      } catch (error) {
-        logger.error(`Error starting workflow execution for participant ${participant.id}:`, error);
+      } catch (execError) {
+        logger.error(`Error starting workflow execution for participant ${participant.id}:`, execError);
       }
-    });
+    }
   }
 
   /**
-   * Emit a trigger event - called by other services when events occur
+   * Dispatch a trigger event via Bull queue — called by other services when events occur
    */
   trigger(type: WorkflowTriggerType, leadId: string, data: Record<string, any> = {}): void {
     const event: TriggerEvent = {
@@ -324,8 +365,20 @@ class WorkflowTriggerService extends EventEmitter {
       timestamp: new Date(),
     };
 
-    logger.debug(`Emitting trigger event: ${type} for lead ${leadId}`);
-    this.emit(type, event);
+    if (!this.queue) {
+      logger.warn('Workflow trigger service not initialized, dropping event', { type, leadId });
+      return;
+    }
+
+    logger.debug(`Dispatching trigger event: ${type} for lead ${leadId}`);
+
+    this.queue.add(event).catch((err) => {
+      logger.error('Failed to enqueue workflow trigger', {
+        type,
+        leadId,
+        error: err.message,
+      });
+    });
   }
 
   /**
@@ -378,6 +431,18 @@ class WorkflowTriggerService extends EventEmitter {
 
   onCustomEvent(leadId: string, eventName: string, data: Record<string, any> = {}): void {
     this.trigger(WorkflowTriggerType.CUSTOM_EVENT, leadId, { ...data, eventName });
+  }
+
+  /**
+   * Shutdown the trigger service
+   */
+  async shutdown(): Promise<void> {
+    if (this.queue) {
+      await this.queue.close();
+      this.queue = null;
+    }
+    this.isInitialized = false;
+    logger.info('Workflow trigger service shut down');
   }
 }
 

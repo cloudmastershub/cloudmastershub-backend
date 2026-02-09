@@ -85,8 +85,8 @@ class WorkflowProcessor {
       // Initialize scheduled workflow triggers
       await this.initializeScheduledTriggers();
 
-      // Initialize workflow trigger service
-      workflowTriggerService.initialize();
+      // Initialize workflow trigger service (Bull queue for distributed triggers)
+      await workflowTriggerService.initialize();
 
       this.isInitialized = true;
       logger.info('Workflow processor initialized successfully');
@@ -286,6 +286,9 @@ class WorkflowProcessor {
    * Shutdown the processor
    */
   async shutdown(): Promise<void> {
+    // Shutdown trigger service first (it depends on this processor for execution queueing)
+    await workflowTriggerService.shutdown();
+
     if (this.queue) {
       await this.queue.close();
       this.queue = null;
