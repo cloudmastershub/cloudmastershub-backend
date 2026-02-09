@@ -12,6 +12,7 @@ declare global {
       userRoles?: string[];
       isAdmin?: boolean;
       authMethod?: 'jwt' | 'gateway-headers';
+      tenantId?: string;
     }
   }
 }

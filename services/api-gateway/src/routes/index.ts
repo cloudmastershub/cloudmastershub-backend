@@ -27,7 +27,10 @@ function forwardHeaders(proxyReq: ClientRequest, req: Request, serviceName: stri
   if (req.headers['x-user-roles'])       proxyReq.setHeader('X-User-Roles', req.headers['x-user-roles'] as string);
   if (req.headers['x-subscription-tier']) proxyReq.setHeader('X-Subscription-Tier', req.headers['x-subscription-tier'] as string);
 
-  // 3. Security / observability headers
+  // 3. Tenant context
+  if (req.headers['x-tenant-id'])  proxyReq.setHeader('X-Tenant-Id', req.headers['x-tenant-id'] as string);
+
+  // 4. Security / observability headers
   const requestId = (req.headers['x-request-id'] as string) || crypto.randomUUID();
   proxyReq.setHeader('X-Request-ID', requestId);
   proxyReq.setHeader('X-Service-Name', 'api-gateway');

@@ -28,6 +28,7 @@ import { userEventSubscriber } from './services/userEventSubscriber';
 // Import middleware
 import { authenticate, requireAdmin } from './middleware/auth';
 import { internalAuth } from './middleware/internalAuth';
+import { tenantResolver } from './middleware/tenantResolver';
 
 dotenv.config();
 
@@ -83,6 +84,9 @@ app.use((req, res, next) => {
   });
   next();
 });
+
+// Tenant context (wraps all downstream handlers in AsyncLocalStorage)
+app.use(tenantResolver);
 
 // Health check routes (no auth required)
 app.use('/health', healthRoutes);

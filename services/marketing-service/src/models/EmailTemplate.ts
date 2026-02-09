@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import { tenantPlugin } from '../plugins/tenantPlugin';
 
 /**
  * Email Template Categories
@@ -200,6 +201,9 @@ const EmailTemplateSchema = new Schema<IEmailTemplate>({
     },
   },
 });
+
+// Tenant plugin (adds tenantId field + auto-scoped queries)
+EmailTemplateSchema.plugin(tenantPlugin);
 
 // Indexes
 EmailTemplateSchema.index({ category: 1 });

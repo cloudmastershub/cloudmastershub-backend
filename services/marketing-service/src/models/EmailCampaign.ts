@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import { tenantPlugin } from '../plugins/tenantPlugin';
 
 /**
  * Campaign Status
@@ -303,6 +304,9 @@ const EmailCampaignSchema = new Schema<IEmailCampaign>({
     },
   },
 });
+
+// Tenant plugin (adds tenantId field + auto-scoped queries)
+EmailCampaignSchema.plugin(tenantPlugin);
 
 // Indexes
 EmailCampaignSchema.index({ createdAt: -1 });

@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import { tenantPlugin } from '../plugins/tenantPlugin';
 
 /**
  * Workflow Status
@@ -488,6 +489,9 @@ const WorkflowSchema = new Schema<IWorkflow>({
     },
   },
 });
+
+// Tenant plugin (adds tenantId field + auto-scoped queries)
+WorkflowSchema.plugin(tenantPlugin);
 
 // Indexes
 WorkflowSchema.index({ createdAt: -1 });

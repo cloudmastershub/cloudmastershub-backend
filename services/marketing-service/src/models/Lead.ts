@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
+import { tenantPlugin } from '../plugins/tenantPlugin';
 
 /**
  * Lead Source Types
@@ -209,10 +210,8 @@ const LeadSchema = new Schema<ILead>({
   email: {
     type: String,
     required: true,
-    unique: true,
     trim: true,
     lowercase: true,
-    index: true,
   },
   firstName: {
     type: String,
@@ -364,7 +363,11 @@ const LeadSchema = new Schema<ILead>({
   },
 });
 
+// Tenant plugin (adds tenantId field + auto-scoped queries)
+LeadSchema.plugin(tenantPlugin);
+
 // Indexes
+LeadSchema.index({ email: 1, tenantId: 1 }, { unique: true });
 LeadSchema.index({ capturedAt: -1 });
 LeadSchema.index({ 'source.utmCampaign': 1 });
 LeadSchema.index({ 'conversion.convertedAt': 1 });

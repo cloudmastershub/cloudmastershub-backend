@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import { tenantPlugin } from '../plugins/tenantPlugin';
 
 /**
  * Email Sequence Status
@@ -279,6 +280,9 @@ const EmailSequenceSchema = new Schema<IEmailSequence>({
     },
   },
 });
+
+// Tenant plugin (adds tenantId field + auto-scoped queries)
+EmailSequenceSchema.plugin(tenantPlugin);
 
 // Indexes
 EmailSequenceSchema.index({ status: 1 });
