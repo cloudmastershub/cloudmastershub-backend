@@ -16,6 +16,8 @@ export interface IUserDocument extends Omit<IUser, 'id'>, Document {
   lastLogin?: Date;
   passwordResetToken?: string; // Token for password reset
   passwordResetExpires?: Date; // When the reset token expires
+  emailVerificationToken?: string;
+  emailVerificationExpires?: Date;
 }
 
 const UserSchema = new Schema<IUserDocument>({
@@ -89,6 +91,14 @@ const UserSchema = new Schema<IUserDocument>({
     index: true
   },
   passwordResetExpires: {
+    type: Date
+  },
+  // Email verification fields
+  emailVerificationToken: {
+    type: String,
+    index: true
+  },
+  emailVerificationExpires: {
     type: Date
   }
 }, {

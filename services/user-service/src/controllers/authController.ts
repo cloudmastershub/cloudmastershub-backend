@@ -4,11 +4,13 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import axios from 'axios';
 import logger from '../utils/logger';
+import { sendVerificationEmail } from '../utils/email';
 import { getUserEventPublisher } from '../events/userEventPublisher';
 import { userSignupPublisher } from '../events/userSignupPublisher';
 import * as userService from '../services/userService';
 import { referralService } from '../services/referralService';
 import User from '../models/User';
+import { AuthRequest } from '../middleware/authenticate';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'cloudmastershub-jwt-secret-2024-production-key';
 const JWT_EXPIRES_IN = '15m';
@@ -560,6 +562,141 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
     });
   } catch (error) {
     logger.error('Reset password error:', error);
+    next(error);
+  }
+};
+
+// Email Verification - Verify email with token
+export const verifyEmail = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { token } = req.body;
+
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    const user = await User.findOne({
+      emailVerificationToken: hashedToken,
+      emailVerificationExpires: { $gt: new Date() },
+    });
+
+    if (!user) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Invalid or expired verification token. Please request a new one.' },
+      });
+      return;
+    }
+
+    user.emailVerified = true;
+    user.emailVerificationToken = undefined;
+    user.emailVerificationExpires = undefined;
+    await user.save();
+
+    logger.info('Email verified successfully', { userId: user._id.toString(), email: user.email });
+
+    res.json({
+      success: true,
+      data: { email: user.email, verified: true },
+    });
+  } catch (error) {
+    logger.error('Verify email error:', error);
+    next(error);
+  }
+};
+
+// Email Verification - Resend verification email
+export const resendVerification = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const authReq = req as AuthRequest;
+    let user;
+
+    if (authReq.userId) {
+      user = await User.findById(authReq.userId);
+    } else {
+      const { email } = req.body;
+      if (!email) {
+        res.status(400).json({
+          success: false,
+          error: { message: 'Email is required' },
+        });
+        return;
+      }
+      user = await User.findOne({ email: email.toLowerCase() });
+    }
+
+    // Prevent enumeration
+    if (!user) {
+      res.json({ success: true, message: 'If an account with that email exists, a verification email has been sent.' });
+      return;
+    }
+
+    if (user.emailVerified) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Email is already verified' },
+      });
+      return;
+    }
+
+    // Rate limit: 60s cooldown
+    if (user.emailVerificationExpires) {
+      const tokenAge = Date.now() - (user.emailVerificationExpires.getTime() - 24 * 60 * 60 * 1000);
+      if (tokenAge < 60 * 1000) {
+        res.status(429).json({
+          success: false,
+          error: { message: 'Please wait before requesting another verification email.' },
+        });
+        return;
+      }
+    }
+
+    await sendVerificationEmail(user);
+
+    res.json({
+      success: true,
+      message: 'Verification email sent.',
+    });
+  } catch (error) {
+    logger.error('Resend verification error:', error);
+    next(error);
+  }
+};
+
+// Email Verification - Get verification status (authenticated)
+export const getVerificationStatus = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const authReq = req as AuthRequest;
+    const user = await User.findById(authReq.userId);
+
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        error: { message: 'User not found' },
+      });
+      return;
+    }
+
+    let canResend = true;
+    let resendCooldownSeconds = 0;
+
+    if (user.emailVerificationExpires) {
+      const tokenAge = Date.now() - (user.emailVerificationExpires.getTime() - 24 * 60 * 60 * 1000);
+      if (tokenAge < 60 * 1000) {
+        canResend = false;
+        resendCooldownSeconds = Math.ceil((60 * 1000 - tokenAge) / 1000);
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        emailVerified: user.emailVerified || false,
+        email: user.email,
+        canResend,
+        resendCooldownSeconds,
+      },
+    });
+  } catch (error) {
+    logger.error('Get verification status error:', error);
     next(error);
   }
 };
