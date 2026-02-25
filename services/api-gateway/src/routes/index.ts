@@ -440,6 +440,15 @@ const serviceRoutes = {
       '^/api/marketing/track': '/track'
     }
   },
+  '/marketing/contact': {
+    target: process.env.MARKETING_SERVICE_URL || 'http://marketing-service:3006',
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/marketing/contact': '/contact'
+    }
+  },
   // Community Service routes
   '/community/forums': {
     target: process.env.COMMUNITY_SERVICE_URL || 'http://community-service:3007',

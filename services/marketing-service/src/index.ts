@@ -20,6 +20,7 @@ import trackingRoutes from './routes/trackingRoutes';
 import tagRoutes from './routes/tagRoutes';
 import webhookRoutes from './routes/webhookRoutes';
 import analyticsRoutes from './routes/analyticsRoutes';
+import contactRoutes from './routes/contactRoutes';
 import { sequenceScheduler } from './services/sequenceScheduler';
 import { workflowProcessor } from './services/workflowProcessor';
 import { paymentEventSubscriber } from './services/paymentEventSubscriber';
@@ -117,6 +118,7 @@ app.use('/f', publicFunnelRouter);             // /f/:funnelSlug
 app.use('/challenge', publicChallengeRouter);  // /challenge/:slug
 app.use('/track', trackingRoutes);             // Conversion tracking
 app.use('/webhooks', webhookRoutes);           // Mailgun webhooks
+app.use('/contact', contactRoutes);            // Public contact form
 // These will be implemented for public funnel pages:
 // app.use('/leads', publicLeadRoutes);         // Lead capture endpoints
 
