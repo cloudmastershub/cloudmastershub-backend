@@ -10,6 +10,9 @@ const router = Router();
 const MARKETING_PLATFORM_URL = process.env.MARKETING_PLATFORM_URL ||
   'http://marketing-backend.elites-marketing-dev.svc.cluster.local:3006';
 
+// Tag ObjectIds from ES marketing platform (system tags seeded on startup)
+const CONTACT_FORM_TAG_ID = process.env.CONTACT_FORM_TAG_ID || '69a69986ee810745b25bc3ff';
+
 /**
  * Forward auth + security headers from the incoming Express request
  * to the outgoing proxy ClientRequest.
@@ -500,8 +503,8 @@ router.use('/marketing/contact', createProxyMiddleware({
         lastName,
         email,
         message: fullMessage,
-        source: 'contact-form',
-        tags: ['contact-form'],
+        source: { type: 'contact_form' },
+        tags: [CONTACT_FORM_TAG_ID],
       };
       const bodyData = JSON.stringify(transformed);
       proxyReq.setHeader('Content-Type', 'application/json');
@@ -535,12 +538,7 @@ router.use('/marketing/leads/bootcamp-interest', createProxyMiddleware({
   onProxyReq: (proxyReq, req, res) => {
     forwardHeaders(proxyReq, req as Request, 'es-marketing');
     if (req.body && Object.keys(req.body).length > 0) {
-      const body = { ...req.body };
-      if (body.bootcamp_slug) {
-        body.bootcampSlug = body.bootcamp_slug;
-        delete body.bootcamp_slug;
-      }
-      const bodyData = JSON.stringify(body);
+      const bodyData = JSON.stringify(req.body);
       proxyReq.setHeader('Content-Type', 'application/json');
       proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
       proxyReq.write(bodyData);
