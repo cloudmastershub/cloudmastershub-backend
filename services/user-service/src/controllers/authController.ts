@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import axios from 'axios';
 import logger from '../utils/logger';
-import { sendVerificationEmail } from '../utils/email';
+import { sendVerificationEmail, sendTransactionalEmail } from '../utils/email';
 import { getUserEventPublisher } from '../events/userEventPublisher';
 import { userSignupPublisher } from '../events/userSignupPublisher';
 import * as userService from '../services/userService';
@@ -446,50 +446,16 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
     const frontendUrl = process.env.FRONTEND_URL || 'https://cloudmastershub.com';
     const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
 
-    // Send reset email via marketing service
+    // Send reset email via ES marketing platform
     try {
-      const marketingServiceUrl = process.env.MARKETING_SERVICE_URL || 'http://marketing-service:3006';
-      await axios.post(`${marketingServiceUrl}/internal/send`, {
+      await sendTransactionalEmail({
         to: user.email,
         toName: user.firstName,
-        subject: 'Reset Your CloudMastersHub Password',
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h1 style="color: #1a1a2e; margin-bottom: 24px;">Reset Your Password</h1>
-            <p style="color: #444; font-size: 16px; line-height: 1.6;">Hi ${user.firstName || 'there'},</p>
-            <p style="color: #444; font-size: 16px; line-height: 1.6;">
-              You requested to reset your password. Click the button below to set a new password:
-            </p>
-            <div style="text-align: center; margin: 32px 0;">
-              <a href="${resetUrl}"
-                 style="background: linear-gradient(to right, #06b6d4, #3b82f6);
-                        color: white;
-                        padding: 14px 32px;
-                        border-radius: 8px;
-                        text-decoration: none;
-                        font-weight: 600;
-                        display: inline-block;">
-                Reset Password
-              </a>
-            </div>
-            <p style="color: #666; font-size: 14px; line-height: 1.6;">
-              This link will expire in 1 hour. If you didn't request this, you can safely ignore this email.
-            </p>
-            <p style="color: #666; font-size: 14px; line-height: 1.6;">
-              If the button doesn't work, copy and paste this URL into your browser:
-              <br/>
-              <a href="${resetUrl}" style="color: #3b82f6;">${resetUrl}</a>
-            </p>
-            <hr style="border: none; border-top: 1px solid #eee; margin: 32px 0;"/>
-            <p style="color: #999; font-size: 12px;">
-              &copy; ${new Date().getFullYear()} CloudMastersHub. All rights reserved.
-            </p>
-          </div>
-        `,
-        tags: ['password-reset', 'transactional'],
-      }, {
-        headers: { 'x-internal-service': 'true' },
-        timeout: 10000,
+        templateKey: 'RESET_PASSWORD',
+        variables: {
+          firstName: user.firstName || 'there',
+          resetUrl,
+        },
       });
 
       logger.info('Password reset email sent', { userId: user._id.toString(), email: user.email });

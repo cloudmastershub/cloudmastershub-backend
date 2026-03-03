@@ -35,7 +35,6 @@ RUN npm run build --workspace=@cloudmastershub/course-service
 RUN npm run build --workspace=@cloudmastershub/lab-service
 RUN npm run build --workspace=@cloudmastershub/admin-service
 RUN npm run build --workspace=@cloudmastershub/payment-service
-RUN npm run build --workspace=@cloudmastershub/marketing-service
 RUN npm run build --workspace=@cloudmastershub/community-service
 
 FROM base AS production
@@ -63,8 +62,6 @@ COPY --from=builder /app/services/admin-service/dist ./services/admin-service/di
 COPY --from=builder /app/services/admin-service/package.json ./services/admin-service/
 COPY --from=builder /app/services/payment-service/dist ./services/payment-service/dist
 COPY --from=builder /app/services/payment-service/package.json ./services/payment-service/
-COPY --from=builder /app/services/marketing-service/dist ./services/marketing-service/dist
-COPY --from=builder /app/services/marketing-service/package.json ./services/marketing-service/
 COPY --from=builder /app/services/community-service/dist ./services/community-service/dist
 COPY --from=builder /app/services/community-service/package.json ./services/community-service/
 
