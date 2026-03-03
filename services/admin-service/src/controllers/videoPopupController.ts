@@ -15,8 +15,10 @@ import axios from 'axios';
 // Backward compatibility alias
 const VideoPopup = Popup;
 
-// Marketing service URL for lead creation
-const MARKETING_SERVICE_URL = process.env.MARKETING_SERVICE_URL || 'http://marketing-service:3006';
+// ES Marketing Platform (centralized marketing service)
+const MARKETING_PLATFORM_URL = process.env.MARKETING_PLATFORM_URL ||
+  'http://marketing-backend.elites-marketing-dev.svc.cluster.local:3006';
+const INTERNAL_SERVICE_SECRET = process.env.INTERNAL_SERVICE_SECRET || '';
 
 /**
  * List all popups with pagination and type filtering
@@ -796,8 +798,8 @@ export const submitPopupForm = async (req: Request, res: Response): Promise<void
         }
       }
 
-      // Call marketing service public endpoint to create lead
-      await axios.post(`${MARKETING_SERVICE_URL}/api/leads/popup`, leadData, {
+      // Call ES marketing platform public endpoint to capture lead
+      await axios.post(`${MARKETING_PLATFORM_URL}/leads/capture/form`, leadData, {
         headers: {
           'Content-Type': 'application/json',
         },
@@ -808,7 +810,7 @@ export const submitPopupForm = async (req: Request, res: Response): Promise<void
     } catch (leadError: any) {
       // Log but don't fail the request - lead creation is best-effort
       // The submission is still recorded
-      logger.warn(`Failed to create lead in marketing service: ${leadError.message}`);
+      logger.warn(`Failed to create lead in ES marketing platform: ${leadError.message}`);
     }
 
     // Record submission
@@ -818,14 +820,14 @@ export const submitPopupForm = async (req: Request, res: Response): Promise<void
     // Trigger workflow if configured
     if (popup.workflowId) {
       try {
-        await axios.post(`${MARKETING_SERVICE_URL}/api/workflows/${popup.workflowId}/trigger`, {
+        await axios.post(`${MARKETING_PLATFORM_URL}/internal/workflows/${popup.workflowId}/trigger`, {
           email: formData.email,
           popupId: popup._id.toString(),
           formData
         }, {
           headers: {
             'Content-Type': 'application/json',
-            'X-Internal-Request': 'true'
+            'X-Internal-Token': INTERNAL_SERVICE_SECRET,
           },
           timeout: 5000
         });

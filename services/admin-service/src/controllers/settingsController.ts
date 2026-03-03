@@ -370,7 +370,7 @@ export const getSystemConfiguration = async (
         labService: process.env.LAB_SERVICE_URL || 'http://lab-service:3003',
         paymentService: process.env.PAYMENT_SERVICE_URL || 'http://payment-service:3004',
         adminService: process.env.ADMIN_SERVICE_URL || 'http://admin-service:3005',
-        marketingService: process.env.MARKETING_SERVICE_URL || 'http://marketing-service:3006',
+        marketingPlatform: process.env.MARKETING_PLATFORM_URL || 'http://marketing-backend.elites-marketing-dev.svc.cluster.local:3006',
       },
       database: {
         mongodb: {
