@@ -6,6 +6,10 @@ import crypto from 'crypto';
 
 const router = Router();
 
+// ES Marketing Platform (centralized marketing service)
+const MARKETING_PLATFORM_URL = process.env.MARKETING_PLATFORM_URL ||
+  'http://marketing-backend.elites-marketing-dev.svc.cluster.local:3006';
+
 /**
  * Forward auth + security headers from the incoming Express request
  * to the outgoing proxy ClientRequest.
@@ -295,6 +299,34 @@ const serviceRoutes = {
       '^/api/popups': '/popups'
     }
   },
+  // ES Marketing Platform routes (simple proxies)
+  '/marketing/track': {
+    target: MARKETING_PLATFORM_URL,
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/marketing/track': '/track'
+    }
+  },
+  '/marketing/f': {
+    target: MARKETING_PLATFORM_URL,
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/marketing/f': '/f'
+    }
+  },
+  '/marketing/health': {
+    target: MARKETING_PLATFORM_URL,
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/marketing/health': '/health'
+    }
+  },
   // Community Service routes
   '/community/forums': {
     target: process.env.COMMUNITY_SERVICE_URL || 'http://community-service:3007',
@@ -436,6 +468,88 @@ for (const route of explicitAdminRoutes) {
 // Learning paths are now handled by course service with admin role restrictions
 
 // Removed /admin/paths routing - learning paths are managed by course service only
+
+// ES Marketing Platform: Contact form (body transformation required)
+router.use('/marketing/contact', createProxyMiddleware({
+  target: MARKETING_PLATFORM_URL,
+  changeOrigin: true,
+  timeout: 30000,
+  proxyTimeout: 30000,
+  pathRewrite: { '^/api/marketing/contact': '/leads/capture/form' },
+  secure: false,
+  logLevel: 'debug',
+  onError: (err, req, res) => {
+    logger.error('Proxy error for /marketing/contact:', err);
+    if (!res.headersSent) {
+      res.status(502).json({
+        success: false,
+        error: { message: 'Marketing platform temporarily unavailable', service: 'es-marketing' },
+      });
+    }
+  },
+  onProxyReq: (proxyReq, req, res) => {
+    forwardHeaders(proxyReq, req as Request, 'es-marketing');
+    if (req.body && Object.keys(req.body).length > 0) {
+      const { name, email, subject, message } = req.body;
+      const nameParts = (name || '').trim().split(/\s+/);
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      const fullMessage = subject ? `[${subject}] ${message || ''}` : (message || '');
+      const transformed = {
+        firstName,
+        lastName,
+        email,
+        message: fullMessage,
+        source: 'contact-form',
+        tags: ['contact-form'],
+      };
+      const bodyData = JSON.stringify(transformed);
+      proxyReq.setHeader('Content-Type', 'application/json');
+      proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+      proxyReq.write(bodyData);
+    }
+  },
+  onProxyRes: (proxyRes, req) => {
+    logger.debug(`Response ${proxyRes.statusCode} for ${req.method} ${req.originalUrl}`);
+  },
+}));
+
+// ES Marketing Platform: Bootcamp interest (body transformation required)
+router.use('/marketing/leads/bootcamp-interest', createProxyMiddleware({
+  target: MARKETING_PLATFORM_URL,
+  changeOrigin: true,
+  timeout: 30000,
+  proxyTimeout: 30000,
+  pathRewrite: { '^/api/marketing/leads/bootcamp-interest': '/leads/capture/bootcamp-interest' },
+  secure: false,
+  logLevel: 'debug',
+  onError: (err, req, res) => {
+    logger.error('Proxy error for /marketing/leads/bootcamp-interest:', err);
+    if (!res.headersSent) {
+      res.status(502).json({
+        success: false,
+        error: { message: 'Marketing platform temporarily unavailable', service: 'es-marketing' },
+      });
+    }
+  },
+  onProxyReq: (proxyReq, req, res) => {
+    forwardHeaders(proxyReq, req as Request, 'es-marketing');
+    if (req.body && Object.keys(req.body).length > 0) {
+      const body = { ...req.body };
+      if (body.bootcamp_slug) {
+        body.bootcampSlug = body.bootcamp_slug;
+        delete body.bootcamp_slug;
+      }
+      const bodyData = JSON.stringify(body);
+      proxyReq.setHeader('Content-Type', 'application/json');
+      proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+      proxyReq.write(bodyData);
+    }
+  },
+  onProxyRes: (proxyRes, req) => {
+    logger.debug(`Response ${proxyRes.statusCode} for ${req.method} ${req.originalUrl}`);
+  },
+}));
 
 // Handle general routes with prefix matching
 Object.entries(serviceRoutes).forEach(([routePath, config]) => {
