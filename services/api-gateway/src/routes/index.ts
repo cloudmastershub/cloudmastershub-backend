@@ -42,6 +42,14 @@ function forwardHeaders(proxyReq: ClientRequest, req: Request, serviceName: stri
   proxyReq.setHeader('X-Request-ID', requestId);
   proxyReq.setHeader('X-Service-Name', 'api-gateway');
   proxyReq.setHeader('X-Forwarded-Service', serviceName);
+
+  // 5. Strip browser Origin header for server-to-server proxy calls
+  //    CORS is handled at the gateway level — downstream services should
+  //    not see the browser Origin and reject with their own CORS policy.
+  if (serviceName === 'es-marketing') {
+    proxyReq.removeHeader('Origin');
+    proxyReq.removeHeader('Referer');
+  }
 }
 
 const serviceRoutes = {
