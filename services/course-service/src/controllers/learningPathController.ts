@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { isValidObjectId } from 'mongoose';
 import logger from '../utils/logger';
-import { LearningPath } from '../models';
+import { LearningPath, LearningPathProgress as LearningPathProgressModel } from '../models';
 import { isValidSlug, isLegacyId } from '../utils/slugValidation';
 import {
   LearningPath as LearningPathType,
@@ -253,16 +253,16 @@ export const getLearningPathById = async (
       const response: LearningPathDetailsResponse = {
         ...transformedPath,
         instructor: {
-          id: path.instructorId || 'default-instructor',
-          name: 'Learning Path Instructor',
-          bio: 'Expert instructor for this learning path',
+          id: path.instructorId || '',
+          name: '',
+          bio: '',
           avatar: '',
           expertise: [],
           rating: 0
         },
         prerequisites: [],
-        recommendations: [], // Will be populated with actual data when needed
-        reviews: [] // Will be populated with actual review data when implemented
+        recommendations: [],
+        reviews: []
       };
 
       res.status(200).json({
@@ -784,14 +784,38 @@ export const getLearningPathProgress = async (
 
     logger.info('Fetching learning path progress', { pathId: id, userId });
 
-    // TODO: Fetch from MongoDB - for now return 501 Not Implemented
-    
-    res.status(501).json({
-      success: false,
-      message: 'Learning path progress tracking not yet implemented',
-      error: {
-        code: 'NOT_IMPLEMENTED',
-        details: 'Progress tracking for learning paths will be implemented in a future update'
+    const progress = await LearningPathProgressModel.findOne({ userId, pathId: id }).lean();
+
+    if (!progress) {
+      res.status(200).json({
+        success: true,
+        data: {
+          enrolled: false,
+          progress: 0,
+          completedSteps: [],
+          totalTimeSpentMinutes: 0,
+          isCompleted: false,
+        }
+      });
+      return;
+    }
+
+    const learningPath = await LearningPath.findById(id).select('pathway').lean();
+    const totalSteps = learningPath?.pathway?.length || 0;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        enrolled: true,
+        progress: progress.progress || 0,
+        completedSteps: progress.completedSteps || [],
+        skippedSteps: progress.skippedSteps || [],
+        totalSteps,
+        totalTimeSpentMinutes: progress.totalTimeSpentMinutes || 0,
+        isCompleted: progress.isCompleted || false,
+        enrolledAt: progress.enrolledAt,
+        lastAccessedAt: progress.lastAccessedAt,
+        completedAt: progress.completedAt,
       }
     });
     return;

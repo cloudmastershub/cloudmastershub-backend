@@ -243,33 +243,22 @@ export const getProgress = async (
   }
 };
 
+/**
+ * Subscription management is handled by the payment service.
+ * This endpoint returns the user's current subscription state from the database.
+ */
 export const updateSubscription = async (
   req: AuthRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
-  try {
-    const userId = req.userId;
-    const { plan } = req.body;
-    // TODO: Use paymentMethodId from req.body when implementing actual Stripe payment processing
-    // const { paymentMethodId } = req.body;
-
-    logger.info(`Updating subscription for user ${userId} to ${plan}`);
-
-    res.json({
-      success: true,
-      data: {
-        subscription: {
-          plan,
-          status: 'active',
-          startDate: new Date(),
-          nextBillingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        },
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
+  res.status(501).json({
+    success: false,
+    error: {
+      message: 'Subscription changes are managed through the payment service. Use /api/subscriptions endpoints.',
+      code: 'USE_PAYMENT_SERVICE',
+    },
+  });
 };
 
 export const getStreaks = async (

@@ -392,14 +392,14 @@ export const getRealTimeMetrics = async (
         labSessions: 0, // Would need lab service real-time endpoint
       },
       errorRates: {
-        api: healthData.overallStatus === 'healthy' ? 0.5 : healthData.overallStatus === 'degraded' ? 2.5 : 5.0,
-        payments: 0.2,
-        labs: 1.0,
+        api: 0,
+        payments: 0,
+        labs: 0,
       },
       responseTime: {
-        averageMs: healthData.overallStatus === 'healthy' ? 180 : 350,
-        p95Ms: healthData.overallStatus === 'healthy' ? 450 : 800,
-        p99Ms: healthData.overallStatus === 'healthy' ? 900 : 1500,
+        averageMs: 0,
+        p95Ms: 0,
+        p99Ms: 0,
       },
       services: {
         total: totalServices,

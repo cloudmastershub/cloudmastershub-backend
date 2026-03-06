@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
 import logger from '../utils/logger';
-import { LearningPathProgress, LearningPathEnrollment } from '@cloudmastershub/types';
 import { Certificate } from '../models/Certificate';
 import { LearningPath, LearningPathProgress as LearningPathProgressModel } from '../models/LearningPath';
 
@@ -10,33 +9,27 @@ export const enrollInLearningPath = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { id } = req.params; // Learning path ID
+    const { id } = req.params;
     const userId = (req as any).user?.userId;
     const { enrollmentType = 'free', paymentId, subscriptionId } = req.body;
 
     logger.info('Enrolling user in learning path', { pathId: id, userId, enrollmentType });
 
-    // Fetch learning path from MongoDB
-    const { LearningPath } = require('../models');
     const learningPath = await LearningPath.findById(id);
 
     if (!learningPath) {
       res.status(404).json({
         success: false,
         message: 'Learning path not found',
-        error: {
-          code: 'PATH_NOT_FOUND',
-          details: `No learning path exists with ID: ${id}`
-        }
+        error: { code: 'PATH_NOT_FOUND', details: `No learning path exists with ID: ${id}` }
       });
       return;
     }
 
-    // Check if user is already enrolled - real database check needed
-    // For now, return not implemented error
-    const existingEnrollment = false;
+    // Check if user is already enrolled
+    const existingProgress = await LearningPathProgressModel.findOne({ userId, pathId: id });
 
-    if (existingEnrollment) {
+    if (existingProgress) {
       res.status(400).json({
         success: false,
         message: 'User is already enrolled in this learning path',
@@ -44,81 +37,22 @@ export const enrollInLearningPath = async (
       return;
     }
 
-    // Validate enrollment type and payment
-    if (enrollmentType === 'purchased') {
-      if (!paymentId) {
-        res.status(400).json({
-          success: false,
-          message: 'Payment ID is required for purchased enrollment',
-        });
-        return;
-      }
-
-      // TODO: Call payment service to validate payment
-      try {
-        // Mock payment service call
-        // const paymentServiceUrl = process.env.PAYMENT_SERVICE_URL || 'http://localhost:3004';
-        // const paymentResponse = await fetch(`${paymentServiceUrl}/api/purchases/${paymentId}/status`);
-
-        // For now, assume payment is valid
-        logger.info('Payment validated for learning path enrollment', { paymentId, pathId: id });
-      } catch (paymentError) {
-        logger.error('Payment validation failed:', paymentError);
-        res.status(400).json({
-          success: false,
-          message: 'Invalid payment. Please complete payment first.',
-        });
-        return;
-      }
-    } else if (enrollmentType === 'subscription') {
-      if (!subscriptionId) {
-        res.status(400).json({
-          success: false,
-          message: 'Subscription ID is required for subscription-based enrollment',
-        });
-        return;
-      }
-
-      // TODO: Call payment service to validate active subscription
-      try {
-        // Mock subscription validation
-        logger.info('Subscription validated for learning path enrollment', {
-          subscriptionId,
-          pathId: id,
-        });
-      } catch (subscriptionError) {
-        logger.error('Subscription validation failed:', subscriptionError);
-        res.status(400).json({
-          success: false,
-          message: 'Invalid or inactive subscription',
-        });
-        return;
-      }
-    } else if (enrollmentType === 'free') {
-      if (!learningPath.isFree) {
-        res.status(400).json({
-          success: false,
-          message: 'This learning path requires payment or subscription',
-        });
-        return;
-      }
+    // Validate enrollment type
+    if (enrollmentType === 'purchased' && !paymentId) {
+      res.status(400).json({ success: false, message: 'Payment ID is required for purchased enrollment' });
+      return;
+    }
+    if (enrollmentType === 'subscription' && !subscriptionId) {
+      res.status(400).json({ success: false, message: 'Subscription ID is required for subscription-based enrollment' });
+      return;
+    }
+    if (enrollmentType === 'free' && !learningPath.isFree) {
+      res.status(400).json({ success: false, message: 'This learning path requires payment or subscription' });
+      return;
     }
 
-    // Create enrollment record
-    const enrollment: LearningPathEnrollment = {
-      id: `enrollment-${Date.now()}`,
-      pathId: id,
-      userId,
-      enrollmentType,
-      paymentId,
-      enrolledAt: new Date(),
-      isActive: true,
-      createdAt: new Date(),
-    };
-
-    // Initialize progress tracking
-    const progress: LearningPathProgress = {
-      id: `progress-${Date.now()}`,
+    // Create progress record in MongoDB
+    const progress = new LearningPathProgressModel({
       userId,
       pathId: id,
       enrolledAt: new Date(),
@@ -132,24 +66,33 @@ export const enrollInLearningPath = async (
       strengths: [],
       weaknesses: [],
       recommendedNextPaths: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+    });
 
-    // TODO: Save enrollment and progress to MongoDB
-    // TODO: Send welcome email or notification
-    // TODO: Update user access permissions
+    await progress.save();
+
+    const progressId = (progress as any)._id.toString();
+    logger.info('User enrolled in learning path', { pathId: id, userId, progressId });
 
     res.status(201).json({
       success: true,
       message: 'Successfully enrolled in learning path',
       data: {
-        enrollment,
-        progress,
-        nextSteps: {
-          message: 'Welcome to your learning journey! Start with the first course.',
-          firstStepUrl: `/paths/${id}/steps/step-1`,
-          resourcesUrl: `/paths/${id}/resources`,
+        enrollment: {
+          id: progressId,
+          pathId: id,
+          userId,
+          enrollmentType,
+          enrolledAt: progress.enrolledAt,
+          isActive: true,
+        },
+        progress: {
+          id: progressId,
+          userId,
+          pathId: id,
+          progress: 0,
+          completedSteps: [],
+          totalTimeSpentMinutes: 0,
+          isCompleted: false,
         },
       },
     });
@@ -169,43 +112,68 @@ export const updateStepProgress = async (
     const userId = (req as any).user?.userId;
     const { isCompleted, timeSpent = 0, score, notes, skipReason } = req.body;
 
-    logger.info('Updating step progress', {
-      pathId: id,
-      stepId,
-      userId,
-      isCompleted,
-      timeSpent,
-    });
+    logger.info('Updating step progress', { pathId: id, stepId, userId, isCompleted, timeSpent });
 
-    // TODO: Validate user enrollment
-    // TODO: Fetch current progress from MongoDB
-    // TODO: Update step completion status
-    // TODO: Recalculate overall progress percentage
-    // TODO: Check for milestone completions
-    // TODO: Update recommendations based on performance
+    // Fetch the learning path to know total steps
+    const learningPath = await LearningPath.findById(id);
+    if (!learningPath) {
+      res.status(404).json({ success: false, message: 'Learning path not found' });
+      return;
+    }
 
-    // Mock response for now
-    const updatedProgress = {
-      stepId,
-      isCompleted,
-      timeSpent,
-      score,
-      completedAt: isCompleted ? new Date() : undefined,
-      notes,
-      skipReason,
-    };
+    // Find user's progress record
+    const progress = await LearningPathProgressModel.findOne({ userId, pathId: id });
+    if (!progress) {
+      res.status(404).json({
+        success: false,
+        message: 'User is not enrolled in this learning path',
+        error: { code: 'NOT_ENROLLED' }
+      });
+      return;
+    }
 
-    // Calculate new overall progress (mock calculation)
-    const overallProgress = 47.5; // TODO: Calculate based on completed steps
+    // Update step completion
+    if (isCompleted && !progress.completedSteps.includes(stepId)) {
+      progress.completedSteps.push(stepId);
+    }
+    if (skipReason && !progress.skippedSteps.includes(stepId)) {
+      progress.skippedSteps.push(stepId);
+    }
+
+    // Update time spent
+    progress.totalTimeSpentMinutes += timeSpent;
+    progress.lastAccessedAt = new Date();
+
+    // Recalculate overall progress
+    const totalSteps = learningPath.pathway?.length || 1;
+    const overallProgress = Math.round((progress.completedSteps.length / totalSteps) * 100 * 10) / 10;
+    progress.progress = overallProgress;
+
+    // Check if path is completed
+    if (overallProgress >= 100) {
+      progress.isCompleted = true;
+      progress.completedAt = new Date();
+    }
+
+    await progress.save();
 
     res.status(200).json({
       success: true,
       message: 'Step progress updated successfully',
       data: {
-        stepProgress: updatedProgress,
+        stepProgress: {
+          stepId,
+          isCompleted,
+          timeSpent,
+          score,
+          completedAt: isCompleted ? new Date() : undefined,
+          notes,
+          skipReason,
+        },
         overallProgress,
-        nextStep: 'step-3', // TODO: Calculate next recommended step
-        achievements: [], // TODO: Check for new achievements
+        completedSteps: progress.completedSteps.length,
+        totalSteps,
+        isPathCompleted: progress.isCompleted,
       },
     });
   } catch (error: any) {
@@ -221,56 +189,57 @@ export const getUserLearningPaths = async (
 ): Promise<void> => {
   try {
     const userId = (req as any).user?.userId;
-    const { status = 'all' } = req.query; // 'enrolled', 'completed', 'in_progress', 'all'
+    const { status = 'all' } = req.query;
 
     logger.info('Fetching user learning paths', { userId, status });
 
-    // TODO: Fetch user's learning path enrollments and progress from MongoDB
+    // Fetch all progress records for this user
+    const progressRecords = await LearningPathProgressModel.find({ userId }).lean();
 
-    // Mock data
-    const userPaths = [
-      {
-        pathId: 'aws-solutions-architect-path',
-        title: 'AWS Solutions Architect Journey',
-        thumbnail: 'https://cloudmastershub.com/images/paths/aws-architect.jpg',
-        enrollmentType: 'purchased',
-        enrolledAt: new Date('2024-11-01'),
-        progress: 45.5,
-        isCompleted: false,
-        currentStep: 'EC2 Advanced Configuration',
-        totalSteps: 8,
-        completedSteps: 3,
-        estimatedTimeRemaining: '12 hours',
-        lastAccessedAt: new Date(),
-        achievements: ['AWS Beginner Badge'],
-        nextMilestone: 'VPC Mastery',
-      },
-      {
-        pathId: 'azure-devops-engineer-path',
-        title: 'Azure DevOps Engineer Professional',
-        thumbnail: 'https://cloudmastershub.com/images/paths/azure-devops.jpg',
-        enrollmentType: 'subscription',
-        enrolledAt: new Date('2024-10-15'),
-        progress: 78.2,
-        isCompleted: false,
-        currentStep: 'Advanced Pipeline Strategies',
-        totalSteps: 10,
-        completedSteps: 7,
-        estimatedTimeRemaining: '6 hours',
-        lastAccessedAt: new Date('2024-12-20'),
-        achievements: ['DevOps Fundamentals', 'Pipeline Expert'],
-        nextMilestone: 'Infrastructure as Code Master',
-      },
-    ];
+    if (progressRecords.length === 0) {
+      res.status(200).json({
+        success: true,
+        data: {
+          paths: [],
+          summary: { total: 0, completed: 0, inProgress: 0, enrolled: 0 },
+        },
+      });
+      return;
+    }
+
+    // Fetch the associated learning paths
+    const pathIds = progressRecords.map(p => p.pathId);
+    const learningPaths = await LearningPath.find({ _id: { $in: pathIds } }).lean();
+    const pathMap = new Map(learningPaths.map(p => [p._id.toString(), p]));
+
+    // Build user paths with real data
+    const userPaths = progressRecords.map(record => {
+      const path = pathMap.get(record.pathId?.toString());
+      const totalSteps = path?.pathway?.length || 0;
+
+      return {
+        pathId: record.pathId?.toString(),
+        title: path?.title || 'Unknown Path',
+        thumbnail: path?.thumbnail || '',
+        enrollmentType: record.enrollmentType || 'free',
+        enrolledAt: record.enrolledAt,
+        progress: record.progress || 0,
+        isCompleted: record.isCompleted || false,
+        totalSteps,
+        completedSteps: record.completedSteps?.length || 0,
+        totalTimeSpentMinutes: record.totalTimeSpentMinutes || 0,
+        lastAccessedAt: record.lastAccessedAt,
+      };
+    });
 
     // Filter based on status
     let filteredPaths = userPaths;
     if (status === 'completed') {
-      filteredPaths = userPaths.filter((path) => path.isCompleted);
+      filteredPaths = userPaths.filter(p => p.isCompleted);
     } else if (status === 'in_progress') {
-      filteredPaths = userPaths.filter((path) => !path.isCompleted && path.progress > 0);
+      filteredPaths = userPaths.filter(p => !p.isCompleted && p.progress > 0);
     } else if (status === 'enrolled') {
-      filteredPaths = userPaths.filter((path) => path.progress === 0);
+      filteredPaths = userPaths.filter(p => p.progress === 0);
     }
 
     res.status(200).json({
@@ -279,9 +248,9 @@ export const getUserLearningPaths = async (
         paths: filteredPaths,
         summary: {
           total: userPaths.length,
-          completed: userPaths.filter((p) => p.isCompleted).length,
-          inProgress: userPaths.filter((p) => !p.isCompleted && p.progress > 0).length,
-          enrolled: userPaths.filter((p) => p.progress === 0).length,
+          completed: userPaths.filter(p => p.isCompleted).length,
+          inProgress: userPaths.filter(p => !p.isCompleted && p.progress > 0).length,
+          enrolled: userPaths.filter(p => p.progress === 0).length,
         },
       },
     });
@@ -360,7 +329,6 @@ export const getLearningPathCertificate = async (
       return;
     }
 
-    // Require userName for certificate generation
     if (!userName) {
       res.status(400).json({
         success: false,
@@ -440,60 +408,35 @@ export const getRecommendations = async (
 
     logger.info('Generating learning path recommendations', { userId });
 
-    // TODO: Implement recommendation algorithm based on:
-    // - Completed paths and skills
-    // - User preferences and goals
-    // - Industry trends
-    // - Peer learning patterns
-    // - Job market demands
+    // Get user's enrolled/completed path IDs
+    const userProgress = await LearningPathProgressModel.find({ userId }).select('pathId').lean();
+    const enrolledPathIds = userProgress.map(p => p.pathId?.toString()).filter(Boolean);
 
-    // Mock recommendations
-    const recommendations = [
-      {
-        pathId: 'gcp-cloud-architect-path',
-        title: 'Google Cloud Platform Architect',
-        reason: 'Complement your AWS skills with multi-cloud expertise',
-        category: 'gcp',
-        level: 'intermediate',
-        estimatedDuration: '28 hours',
-        skills: ['GCP Architecture', 'Cloud Migration', 'Hybrid Cloud'],
-        relevanceScore: 92,
-        enrollmentCount: 1456,
-        rating: 4.7,
-      },
-      {
-        pathId: 'kubernetes-expert-path',
-        title: 'Kubernetes Expert Certification',
-        reason: 'Perfect next step for container orchestration mastery',
-        category: 'devops',
-        level: 'advanced',
-        estimatedDuration: '35 hours',
-        skills: ['Kubernetes', 'Container Orchestration', 'Service Mesh'],
-        relevanceScore: 89,
-        enrollmentCount: 2341,
-        rating: 4.8,
-      },
-      {
-        pathId: 'terraform-infrastructure-path',
-        title: 'Terraform Infrastructure as Code',
-        reason: 'Essential for modern cloud infrastructure management',
-        category: 'devops',
-        level: 'intermediate',
-        estimatedDuration: '22 hours',
-        skills: ['Infrastructure as Code', 'Terraform', 'Automation'],
-        relevanceScore: 87,
-        enrollmentCount: 1890,
-        rating: 4.6,
-      },
-    ];
+    // Recommend paths the user hasn't enrolled in, sorted by popularity
+    const recommendations = await LearningPath.find({
+      _id: { $nin: enrolledPathIds },
+      status: { $in: ['published', 'active'] },
+    })
+      .sort({ enrollmentCount: -1, rating: -1 })
+      .limit(Number(limit))
+      .select('title category level estimatedDurationHours skills enrollmentCount rating thumbnail')
+      .lean();
 
     res.status(200).json({
       success: true,
       data: {
-        recommendations: recommendations.slice(0, Number(limit)),
+        recommendations: recommendations.map(path => ({
+          pathId: path._id.toString(),
+          title: path.title,
+          category: path.category || 'general',
+          level: path.level || 'beginner',
+          estimatedDuration: path.estimatedDurationHours ? `${path.estimatedDurationHours} hours` : null,
+          skills: path.skills || [],
+          enrollmentCount: path.enrollmentCount || 0,
+          rating: path.rating || 0,
+          thumbnail: path.thumbnail || '',
+        })),
         generatedAt: new Date(),
-        algorithm: 'collaborative_filtering_v2',
-        basedOn: ['completed_paths', 'skill_gaps', 'industry_trends'],
       },
     });
   } catch (error: any) {
@@ -509,60 +452,41 @@ export const getLearningAnalytics = async (
 ): Promise<void> => {
   try {
     const userId = (req as any).user?.userId;
-    const { timeframe = '30d' } = req.query; // '7d', '30d', '90d', '1y'
+    const { timeframe = '30d' } = req.query;
 
     logger.info('Fetching learning analytics', { userId, timeframe });
 
-    // TODO: Aggregate user learning data from MongoDB
-    // TODO: Calculate learning velocity, consistency, and patterns
-    // TODO: Generate insights and recommendations
+    // Aggregate real user learning data from MongoDB
+    const progressRecords = await LearningPathProgressModel.find({ userId }).lean();
+    const certificates = await Certificate.find({ userId, type: 'learning_path', status: 'issued' }).lean();
 
-    // Mock analytics data
+    const totalPathsEnrolled = progressRecords.length;
+    const totalPathsCompleted = progressRecords.filter(p => p.isCompleted).length;
+    const totalLearningMinutes = progressRecords.reduce((sum, p) => sum + (p.totalTimeSpentMinutes || 0), 0);
+    const totalLearningHours = Math.round(totalLearningMinutes / 60 * 10) / 10;
+
+    // Calculate average progress across all paths
+    const avgProgress = totalPathsEnrolled > 0
+      ? Math.round(progressRecords.reduce((sum, p) => sum + (p.progress || 0), 0) / totalPathsEnrolled * 10) / 10
+      : 0;
+
     const analytics = {
       summary: {
-        totalPathsEnrolled: 5,
-        totalPathsCompleted: 2,
-        totalLearningHours: 47.5,
-        averageSessionDuration: 45, // minutes
-        longestStreak: 12, // days
-        currentStreak: 3,
-        skillsAcquired: 15,
-        certificatesEarned: 2,
+        totalPathsEnrolled,
+        totalPathsCompleted,
+        totalLearningHours,
+        certificatesEarned: certificates.length,
+        averageProgress: avgProgress,
       },
-      progress: {
-        weeklyHours: [4.5, 6.2, 3.8, 7.1, 5.5, 8.2, 4.9], // Last 7 weeks
-        completionRate: 78.5,
-        averageQuizScore: 87.3,
-        strongAreas: ['AWS Fundamentals', 'Cloud Security', 'DevOps Basics'],
-        improvementAreas: ['Advanced Networking', 'Cost Optimization', 'Monitoring'],
-      },
-      engagement: {
-        mostActiveHours: ['9-10 AM', '7-8 PM'],
-        preferredContentTypes: ['video', 'hands-on labs', 'quizzes'],
-        averageSessionsPerWeek: 4.2,
-        totalLabsCompleted: 23,
-      },
-      achievements: [
-        {
-          title: 'Consistent Learner',
-          description: 'Studied for 7 consecutive days',
-          earnedAt: new Date('2024-12-15'),
-          icon: 'streak-badge',
-        },
-        {
-          title: 'Lab Master',
-          description: 'Completed 20+ hands-on labs',
-          earnedAt: new Date('2024-12-10'),
-          icon: 'lab-badge',
-        },
-      ],
-      recommendations: {
-        studySchedule:
-          'Consider extending your Tuesday sessions by 30 minutes for better retention',
-        contentType:
-          'You perform 15% better with hands-on labs - look for paths with more practical exercises',
-        nextGoal: 'Complete one more intermediate path to unlock advanced level content',
-      },
+      paths: progressRecords.map(record => ({
+        pathId: record.pathId?.toString(),
+        progress: record.progress || 0,
+        isCompleted: record.isCompleted || false,
+        completedSteps: record.completedSteps?.length || 0,
+        timeSpentMinutes: record.totalTimeSpentMinutes || 0,
+        enrolledAt: record.enrolledAt,
+        lastAccessedAt: record.lastAccessedAt,
+      })),
     };
 
     res.status(200).json({

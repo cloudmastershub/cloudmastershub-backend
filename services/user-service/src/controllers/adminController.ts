@@ -84,7 +84,7 @@ export interface AdminStatsResponse {
   payoutPending: number;     // $ awaiting approval
   activeSubscriptions: number;
   
-  // Support metrics (placeholder for future support-service)
+  // Support metrics (not yet implemented - returns 0)
   openSupportTickets: number;
   
   // Referral metrics
@@ -219,20 +219,20 @@ export const getAdminStats = async (req: AuthenticatedRequest, res: Response): P
       studentCount,
       activeUsers: userStatsResult.activeUsers,
       
-      // Course metrics (placeholder - to be implemented)
+      // Course metrics (fetched from course-service, 0 if unavailable)
       courseCount: courseStats.courseCount,
       pendingCourses: courseStats.pendingCourses,
-      
-      // Revenue metrics (placeholder - to be implemented)
+
+      // Revenue metrics (fetched from payment-service, 0 if unavailable)
       revenue: paymentStats.revenue,
       monthlyRevenue: paymentStats.monthlyRevenue,
       monthlyGrowth: paymentStats.monthlyGrowth,
-      
-      // Payment metrics (partial real data)
+
+      // Payment metrics
       payoutPending: paymentStats.payoutPending,
       activeSubscriptions: paymentStats.activeSubscriptions,
-      
-      // Support metrics (placeholder)
+
+      // Support metrics (not yet implemented)
       openSupportTickets: supportStats.openSupportTickets,
       
       // Referral metrics (real data)

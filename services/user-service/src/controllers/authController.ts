@@ -16,98 +16,34 @@ const JWT_SECRET = process.env.JWT_SECRET || 'cloudmastershub-jwt-secret-2024-pr
 const JWT_EXPIRES_IN = '15m';
 const REFRESH_TOKEN_EXPIRES_IN = '30d';
 
-export const register = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  try {
-    const { email, firstName, lastName } = req.body;
-    // TODO: Use password from req.body for actual user registration
-    // const { password } = req.body;
-
-    // TODO: Check if user exists in database
-    // TODO: Hash password and save user to database
-
-    // TODO: Hash password and save user to database when implementing actual user registration
-    // const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Mock user creation
-    const user = {
-      id: '1234',
-      email,
-      firstName,
-      lastName,
-      createdAt: new Date(),
-    };
-
-    const accessToken = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, {
-      expiresIn: JWT_EXPIRES_IN,
-    });
-
-    const refreshToken = jwt.sign({ userId: user.id, type: 'refresh' }, JWT_SECRET, {
-      expiresIn: REFRESH_TOKEN_EXPIRES_IN,
-    });
-
-    res.status(201).json({
-      success: true,
-      data: {
-        user,
-        accessToken,
-        refreshToken,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
+/**
+ * Email/password registration is not supported.
+ * Authentication is social-only (Google OAuth, with GitHub/LinkedIn/Facebook/Apple planned).
+ */
+export const register = async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+  res.status(410).json({
+    success: false,
+    error: {
+      message: 'Email/password registration is not available. Please sign in with Google.',
+      code: 'AUTH_METHOD_NOT_SUPPORTED',
+      availableMethods: ['google'],
+    },
+  });
 };
 
-export const login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  try {
-    const { email } = req.body;
-    // TODO: Use password from req.body to verify user credentials when implementing actual authentication
-    // const { password } = req.body;
-
-    // Mock user login
-    const user = {
-      id: '1234',
-      email,
-      firstName: 'John',
-      lastName: 'Doe',
-    };
-
-    const accessToken = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, {
-      expiresIn: JWT_EXPIRES_IN,
-    });
-
-    const refreshToken = jwt.sign({ userId: user.id, type: 'refresh' }, JWT_SECRET, {
-      expiresIn: REFRESH_TOKEN_EXPIRES_IN,
-    });
-
-    // Publish login event (non-blocking to prevent auth failures)
-    const eventPublisher = getUserEventPublisher();
-    eventPublisher.publishUserLogin(user.id, {
-      email: user.email,
-      loginMethod: 'email_password',
-      ipAddress: req.ip || req.connection.remoteAddress,
-      userAgent: req.get('User-Agent')
-    }).catch(error => {
-      // Log error but don't fail authentication
-      logger.warn('Failed to publish login event', { 
-        error: error.message, 
-        userId: user.id,
-        email: user.email,
-        loginMethod: 'email_password'
-      });
-    });
-
-    res.json({
-      success: true,
-      data: {
-        user,
-        accessToken,
-        refreshToken,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
+/**
+ * Email/password login is not supported.
+ * Authentication is social-only (Google OAuth, with GitHub/LinkedIn/Facebook/Apple planned).
+ */
+export const login = async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+  res.status(410).json({
+    success: false,
+    error: {
+      message: 'Email/password login is not available. Please sign in with Google.',
+      code: 'AUTH_METHOD_NOT_SUPPORTED',
+      availableMethods: ['google'],
+    },
+  });
 };
 
 export const logout = async (req: Request, res: Response, next: NextFunction): Promise<void> => {

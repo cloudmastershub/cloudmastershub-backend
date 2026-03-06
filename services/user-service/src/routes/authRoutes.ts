@@ -3,26 +3,13 @@ import { body, param } from 'express-validator';
 import { register, login, logout, refreshToken, googleAuth, forgotPassword, resetPassword, verifyResetToken } from '../controllers/authController';
 import { validateRequest } from '../middleware/validateRequest';
 
+
 const router = Router();
 
-router.post(
-  '/register',
-  [
-    body('email').isEmail().normalizeEmail(),
-    body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
-    body('firstName').notEmpty().trim(),
-    body('lastName').notEmpty().trim(),
-  ],
-  validateRequest,
-  register
-);
-
-router.post(
-  '/login',
-  [body('email').isEmail().normalizeEmail(), body('password').notEmpty()],
-  validateRequest,
-  login
-);
+// Email/password auth is disabled - social auth only (Google OAuth)
+// These routes return 410 Gone to inform clients
+router.post('/register', register);
+router.post('/login', login);
 
 router.post('/logout', logout);
 router.post('/refresh', refreshToken);
