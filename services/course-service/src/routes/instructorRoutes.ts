@@ -335,8 +335,75 @@ router.delete('/courses/:id', async (req: AuthRequest, res: Response, next: Next
 // Publish course
 router.post('/courses/:id/publish', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    // This would typically set the course status to 'published' or 'under_review'
-    // For now, we'll use the update course controller with status change
+    const { id: slug } = req.params;
+
+    // Pre-publish validation: check course meets minimum requirements
+    const { Course } = await import('../models/Course');
+    const course = await Course.findOne({ slug });
+
+    if (!course) {
+      res.status(404).json({
+        success: false,
+        message: 'Course not found',
+        error: { code: 'COURSE_NOT_FOUND' }
+      });
+      return;
+    }
+
+    const errors: string[] = [];
+
+    // Must have at least one section with at least one lesson
+    if (!course.curriculum || course.curriculum.length === 0) {
+      errors.push('Course must have at least one section');
+    } else {
+      const totalLessons = course.curriculum.reduce((sum, s) => sum + (s.lessons?.length || 0), 0);
+      if (totalLessons === 0) {
+        errors.push('Course must have at least one lesson');
+      }
+    }
+
+    // Must have a description
+    if (!course.description || course.description.trim().length < 50) {
+      errors.push('Course description must be at least 50 characters');
+    }
+
+    // Must have a thumbnail
+    if (!course.thumbnail) {
+      errors.push('Course must have a thumbnail image');
+    }
+
+    // Must have a title
+    if (!course.title || course.title.trim().length < 5) {
+      errors.push('Course title must be at least 5 characters');
+    }
+
+    // Must have a category
+    if (!course.category) {
+      errors.push('Course must have a category');
+    }
+
+    // Must have a level
+    if (!course.level) {
+      errors.push('Course must have a difficulty level');
+    }
+
+    // Must have a price set (0 is valid for free courses)
+    if (course.price == null) {
+      errors.push('Course must have a price set');
+    }
+
+    if (errors.length > 0) {
+      res.status(400).json({
+        success: false,
+        message: 'Course does not meet publishing requirements',
+        error: {
+          code: 'PUBLISH_REQUIREMENTS_NOT_MET',
+          details: errors
+        }
+      });
+      return;
+    }
+
     req.body = { status: 'published' };
     await updateCourse(req, res, next);
   } catch (error: any) {

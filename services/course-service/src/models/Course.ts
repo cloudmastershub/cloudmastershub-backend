@@ -49,8 +49,8 @@ const LessonSchema = new Schema({
   id: { type: String, required: true },
   sectionId: { type: String, required: true },
   title: { type: String, required: true },
-  description: { type: String, required: true },
-  videoUrl: { type: String, required: true },
+  description: { type: String, default: '' },
+  videoUrl: { type: String, default: '' },
   duration: { type: Number, required: true, min: 0 },
   order: { type: Number, required: true, min: 0 },
   resources: [ResourceSchema],
@@ -80,29 +80,27 @@ const CourseSchema = new Schema<ICourse>({
     lowercase: true,
     index: true
   },
-  description: { 
-    type: String, 
-    required: true,
+  description: {
+    type: String,
+    default: '',
     maxlength: 5000 // Increased for detailed course descriptions
   },
-  category: { 
-    type: String, 
-    required: true, 
+  category: {
+    type: String,
     enum: Object.values(CourseCategory)
   },
-  level: { 
-    type: String, 
-    required: true, 
+  level: {
+    type: String,
     enum: Object.values(DifficultyLevel)
   },
-  duration: { 
-    type: Number, 
-    required: true, 
+  duration: {
+    type: Number,
+    default: 0,
     min: 0
   },
-  thumbnail: { 
-    type: String, 
-    required: true
+  thumbnail: {
+    type: String,
+    default: ''
   },
   preview: { 
     type: String 
@@ -111,9 +109,9 @@ const CourseSchema = new Schema<ICourse>({
     type: InstructorSchema, 
     required: true 
   },
-  price: { 
-    type: Number, 
-    required: true, 
+  price: {
+    type: Number,
+    default: 0,
     min: 0
   },
   rating: { 

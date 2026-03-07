@@ -593,17 +593,24 @@ export const updateCourse = async (
       changes: Object.keys(updates)
     });
 
-    // Publish course updated event
-    const eventPublisher = getCourseEventPublisher();
-    await eventPublisher.publishCourseUpdated(updatedCourse._id.toString(), updates, instructorId.toString());
+    // Publish course updated event (non-blocking — don't fail the response if event bus is down)
+    try {
+      const eventPublisher = getCourseEventPublisher();
+      await eventPublisher.publishCourseUpdated(updatedCourse._id.toString(), updates, instructorId.toString());
 
-    // Check if status was changed
-    if (oldStatus !== updatedCourse.status) {
-      if (updatedCourse.status === CourseStatus.PUBLISHED) {
-        await eventPublisher.publishCoursePublished(updatedCourse._id.toString(), instructorId.toString());
-      } else if (oldStatus === CourseStatus.PUBLISHED) {
-        await eventPublisher.publishCourseUnpublished(updatedCourse._id.toString(), instructorId.toString(), updates.reason || 'Course unpublished');
+      // Check if status was changed
+      if (oldStatus !== updatedCourse.status) {
+        if (updatedCourse.status === CourseStatus.PUBLISHED) {
+          await eventPublisher.publishCoursePublished(updatedCourse._id.toString(), instructorId.toString());
+        } else if (oldStatus === CourseStatus.PUBLISHED) {
+          await eventPublisher.publishCourseUnpublished(updatedCourse._id.toString(), instructorId.toString(), updates.reason || 'Course unpublished');
+        }
       }
+    } catch (eventError: any) {
+      logger.error('Failed to publish course event (non-blocking)', {
+        courseId: updatedCourse._id.toString(),
+        error: eventError.message
+      });
     }
 
     // Transform course to include 'id' field for frontend compatibility
