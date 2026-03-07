@@ -11,6 +11,7 @@ import learningPathRoutes from './routes/learningPathRoutes';
 import curriculumRoutes from './routes/curriculumRoutes';
 import bookmarkRoutes from './routes/bookmarkRoutes';
 import certificateRoutes from './routes/certificateRoutes';
+import reviewRoutes from './routes/reviewRoutes';
 import { errorHandler } from './middleware/errorHandler';
 import { initializeCoursePaymentEventSubscriber } from './events/paymentEventSubscriber';
 import DatabaseConnection from './database/connection';
@@ -83,6 +84,8 @@ app.use('/curriculum', curriculumRoutes);
 app.use('/bookmarks', bookmarkRoutes);
 // Certificates - includes public verification endpoint
 app.use('/certificates', certificateRoutes);
+// Course reviews and ratings
+app.use('/courses/:id/reviews', reviewRoutes);
 
 app.use(errorHandler);
 

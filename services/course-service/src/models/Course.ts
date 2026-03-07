@@ -208,7 +208,6 @@ CourseSchema.methods.incrementEnrollment = function() {
 };
 
 CourseSchema.methods.updateRating = function(newRating: number) {
-  // This is a simplified rating update - in practice you'd calculate from all reviews
   this.rating = newRating;
   return this.save();
 };
