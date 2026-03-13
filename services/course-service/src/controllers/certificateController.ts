@@ -101,7 +101,7 @@ export const getUserCertificates = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const userId = (req as any).user?.userId;
+    const userId = (req as any).userId || (req as any).user?.id;
 
     if (!userId) {
       res.status(401).json({
@@ -135,7 +135,7 @@ export const getCertificateById = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const userId = (req as any).user?.userId;
+    const userId = (req as any).userId || (req as any).user?.id;
     const { certificateId } = req.params;
 
     const certificate = await Certificate.findOne({ certificateId }).lean();
@@ -184,7 +184,7 @@ export const generateCourseCertificate = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const userId = (req as any).user?.userId;
+    const userId = (req as any).userId || (req as any).user?.id;
     const { courseId } = req.params;
     const { userName, userEmail } = req.body;
 
@@ -317,7 +317,7 @@ export const generatePathCertificate = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const userId = (req as any).user?.userId;
+    const userId = (req as any).userId || (req as any).user?.id;
     const { pathId } = req.params;
     const { userName, userEmail } = req.body;
 
@@ -428,7 +428,7 @@ export const getLinkedInShareUrl = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const userId = (req as any).user?.userId;
+    const userId = (req as any).userId || (req as any).user?.id;
     const { certificateId } = req.params;
 
     const certificate = await Certificate.findOne({ certificateId, userId });
