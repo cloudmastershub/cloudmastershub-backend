@@ -32,21 +32,15 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(origin => ori
 
 app.use(cors({
   origin: (origin, callback) => {
-    console.log(`🌐 USER-SERVICE CORS: Request from origin: ${origin || 'NO_ORIGIN'}`);
-    console.log(`🌐 USER-SERVICE CORS: Allowed origins: ${allowedOrigins.join(', ')}`);
-    
-    // Allow requests with no origin (like mobile apps or Postman)
+    // Allow requests with no origin (internal service-to-service, Postman)
     if (!origin) {
-      console.log('🌐 USER-SERVICE CORS: Allowing request with no origin');
       return callback(null, true);
     }
-    
+
     if (allowedOrigins.includes(origin)) {
-      console.log(`🌐 USER-SERVICE CORS: Allowing request from ${origin}`);
       callback(null, true);
     } else {
-      console.warn(`🌐 USER-SERVICE CORS: BLOCKED request from origin: ${origin}`);
-      console.warn(`🌐 USER-SERVICE CORS: Available origins: ${allowedOrigins.join(', ')}`);
+      logger.warn(`CORS blocked request from origin: ${origin}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -64,18 +58,25 @@ app.use(express.urlencoded({ extended: true }));
 app.get('/health', async (req, res) => {
   try {
     const dbHealth = await getDatabaseHealth();
-    res.json({ 
-      status: dbHealth.status === 'healthy' ? 'healthy' : 'unhealthy',
-      service: 'user-service', 
+    const mongoState = mongoose.connection.readyState;
+    const mongoHealthy = mongoState === 1; // 1 = connected
+    const overallHealthy = dbHealth.status === 'healthy' && mongoHealthy;
+
+    res.json({
+      status: overallHealthy ? 'healthy' : 'unhealthy',
+      service: 'user-service',
       timestamp: new Date().toISOString(),
-      version: 'v2.1-cors-fix',
-      corsUpdate: 'Applied dynamic origin validation including cloudmastershub.com',
-      database: dbHealth
+      version: 'v2.2-mongo-resilience',
+      database: dbHealth,
+      mongodb: {
+        status: mongoHealthy ? 'healthy' : 'unhealthy',
+        readyState: mongoState
+      }
     });
   } catch (error) {
-    res.status(503).json({ 
-      status: 'unhealthy', 
-      service: 'user-service', 
+    res.status(503).json({
+      status: 'unhealthy',
+      service: 'user-service',
       timestamp: new Date().toISOString(),
       error: 'Database health check failed'
     });
@@ -97,8 +98,33 @@ app.listen(PORT, async () => {
   try {
     // Initialize MongoDB connection for referral system
     const mongoUrl = process.env.MONGODB_URL || 'mongodb://mongodb:27017/cloudmastershub';
-    await mongoose.connect(mongoUrl);
-    logger.info('MongoDB connected successfully for referral system');
+    mongoose.set('strictQuery', false);
+    await mongoose.connect(mongoUrl, {
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      heartbeatFrequencyMS: 10000,
+      family: 4,
+      authSource: 'admin'
+    });
+    logger.info('MongoDB connected successfully for referral system', {
+      database: mongoose.connection.db?.databaseName,
+      host: mongoose.connection.host,
+      port: mongoose.connection.port
+    });
+
+    // MongoDB connection event handlers for resilience
+    mongoose.connection.on('error', (error) => {
+      logger.error('MongoDB connection error:', error);
+    });
+
+    mongoose.connection.on('disconnected', () => {
+      logger.warn('MongoDB disconnected - Mongoose will attempt to reconnect');
+    });
+
+    mongoose.connection.on('reconnected', () => {
+      logger.info('MongoDB reconnected successfully');
+    });
     
     // Initialize PostgreSQL database connection
     await initializeDatabase();
