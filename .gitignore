@@ -8,6 +8,7 @@ lerna-debug.log*
 # Build output
 dist/
 build/
+.next/
 *.tsbuildinfo
 
 # Environment files
