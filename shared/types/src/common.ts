@@ -48,10 +48,10 @@ export interface EventPayload {
   metadata?: Record<string, any>;
 }
 
+// AuthRequest: req.user is VerifiedToken from @elites-systems/auth (global Express augmentation)
+// Access user ID via req.user.sub, email via req.user.email, role via req.user.role
 export interface AuthRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-    roles: string[];
-  };
+  userId?: string;
+  userEmail?: string;
+  userRoles?: string[];
 }

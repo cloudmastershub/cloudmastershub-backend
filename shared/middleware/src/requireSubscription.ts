@@ -9,11 +9,7 @@ import { createPaymentServiceClient } from '@cloudmastershub/utils';
 import logger from '@cloudmastershub/utils/dist/logger';
 
 export interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-    roles: string[];
-  };
+  // req.user is VerifiedToken from @elites-systems/auth (set by createAuthMiddleware)
   subscription?: SubscriptionStatus;
 }
 
@@ -43,7 +39,7 @@ export const requireSubscription = (requirement: SubscriptionRequirement = {}) =
   return async (request: AuthenticatedRequest, response: Response, next: NextFunction): Promise<void> => {
     try {
       // Check if user is authenticated
-      if (!request.user?.id) {
+      if (!request.user?.sub) {
         logger.warn('Subscription middleware: No authenticated user');
         response.status(401).json({
           success: false,
@@ -55,7 +51,7 @@ export const requireSubscription = (requirement: SubscriptionRequirement = {}) =
         return;
       }
 
-      const userId = request.user.id;
+      const userId = request.user.sub;
 
       // Check cache first
       const cached = subscriptionCache.get(userId);

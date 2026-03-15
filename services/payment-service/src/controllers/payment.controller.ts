@@ -10,7 +10,7 @@ import Stripe from 'stripe';
 export const getPaymentHistory = async (req: AuthRequest, res: Response) => {
   try {
     const { userId } = req.params;
-    const authenticatedUserId = req.user?.id;
+    const authenticatedUserId = req.user?.sub;
     
     // Verify user can access this data
     if (authenticatedUserId !== userId) {
@@ -53,7 +53,7 @@ export const getPaymentHistory = async (req: AuthRequest, res: Response) => {
 export const getPaymentMethods = async (req: AuthRequest, res: Response) => {
   try {
     const { userId } = req.params;
-    const authenticatedUserId = req.user?.id;
+    const authenticatedUserId = req.user?.sub;
     
     // Verify user can access this data
     if (authenticatedUserId !== userId) {
@@ -95,7 +95,7 @@ export const getPaymentMethods = async (req: AuthRequest, res: Response) => {
 export const addPaymentMethod = async (req: AuthRequest, res: Response) => {
   try {
     const { payment_method_id } = req.body;
-    const userId = req.user?.id;
+    const userId = req.user?.sub;
 
     if (!userId) {
       return res.status(401).json({
@@ -207,7 +207,7 @@ export const addPaymentMethod = async (req: AuthRequest, res: Response) => {
 export const removePaymentMethod = async (req: AuthRequest, res: Response) => {
   try {
     const { paymentMethodId } = req.params;
-    const userId = req.user?.id;
+    const userId = req.user?.sub;
 
     if (!userId) {
       return res.status(401).json({
@@ -272,7 +272,7 @@ export const removePaymentMethod = async (req: AuthRequest, res: Response) => {
 export const setDefaultPaymentMethod = async (req: AuthRequest, res: Response) => {
   try {
     const { paymentMethodId } = req.params;
-    const userId = req.user?.id;
+    const userId = req.user?.sub;
 
     if (!userId) {
       return res.status(401).json({
@@ -357,7 +357,7 @@ export const setDefaultPaymentMethod = async (req: AuthRequest, res: Response) =
 
 export const createSetupIntent = async (req: AuthRequest, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user?.sub;
 
     if (!userId) {
       return res.status(401).json({

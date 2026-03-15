@@ -1,51 +1,36 @@
 import Stripe from 'stripe';
 import { logger } from '@cloudmastershub/utils';
+import {
+  createStripeClient,
+  createCustomer as libCreateCustomer,
+  createCheckoutSession as libCreateCheckoutSession,
+  createSubscription as libCreateSubscription,
+  getSubscription as libGetSubscription,
+  cancelSubscription as libCancelSubscription,
+  pauseSubscription as libPauseSubscription,
+  resumeSubscription as libResumeSubscription,
+  extendTrial as libExtendTrial,
+  verifyWebhookSignature,
+} from '@elites-systems/payments';
 
-let stripe: Stripe | null = null;
+// Initialize client once — replaces the old singleton
+const stripe = createStripeClient({
+  apiKey: process.env.STRIPE_SECRET_KEY!,
+});
 
-export const initializeStripe = (): Stripe => {
-  if (!stripe) {
-    const secretKey = process.env.STRIPE_SECRET_KEY;
-    if (!secretKey) {
-      throw new Error('STRIPE_SECRET_KEY environment variable is required');
-    }
+logger.info('Stripe service initialized via @elites-systems/payments');
 
-    stripe = new Stripe(secretKey, {
-      apiVersion: '2023-10-16',
-      typescript: true,
-    });
+export const getStripe = (): Stripe => stripe;
 
-    logger.info('Stripe service initialized');
-  }
-  return stripe;
-};
-
-export const getStripe = (): Stripe => {
-  if (!stripe) {
-    return initializeStripe();
-  }
-  return stripe;
-};
+// Thin wrappers that inject the stripe client and map parameter names
+// to preserve the existing API surface for all controllers
 
 export const createCustomer = async (params: {
   email: string;
   name?: string;
   metadata?: Record<string, string>;
 }): Promise<Stripe.Customer> => {
-  try {
-    const stripeClient = getStripe();
-    const customer = await stripeClient.customers.create({
-      email: params.email,
-      name: params.name,
-      metadata: params.metadata || {},
-    });
-    
-    logger.info(`Created Stripe customer: ${customer.id}`);
-    return customer;
-  } catch (error) {
-    logger.error('Failed to create Stripe customer:', error);
-    throw error;
-  }
+  return libCreateCustomer(stripe, params);
 };
 
 export const createCheckoutSession = async (params: {
@@ -57,42 +42,15 @@ export const createCheckoutSession = async (params: {
   mode?: 'payment' | 'subscription';
   trial_period_days?: number;
 }): Promise<Stripe.Checkout.Session> => {
-  try {
-    const stripeClient = getStripe();
-
-    const sessionParams: Stripe.Checkout.SessionCreateParams = {
-      customer: params.customer_id,
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price: params.price_id,
-          quantity: 1,
-        },
-      ],
-      mode: params.mode || 'subscription',
-      success_url: params.success_url,
-      cancel_url: params.cancel_url,
-      metadata: params.metadata || {},
-      billing_address_collection: 'required',
-      automatic_tax: { enabled: false },
-    };
-
-    // Add trial period for subscription mode
-    if (params.mode === 'subscription' && params.trial_period_days && params.trial_period_days > 0) {
-      sessionParams.subscription_data = {
-        trial_period_days: params.trial_period_days,
-      };
-      logger.info(`Adding ${params.trial_period_days} day trial to checkout session`);
-    }
-
-    const session = await stripeClient.checkout.sessions.create(sessionParams);
-
-    logger.info(`Created Stripe checkout session: ${session.id}`);
-    return session;
-  } catch (error) {
-    logger.error('Failed to create Stripe checkout session:', error);
-    throw error;
-  }
+  return libCreateCheckoutSession(stripe, {
+    customerId: params.customer_id || '',
+    priceId: params.price_id,
+    successUrl: params.success_url,
+    cancelUrl: params.cancel_url,
+    mode: params.mode || 'subscription',
+    metadata: params.metadata,
+    trialPeriodDays: params.trial_period_days,
+  });
 };
 
 export const createSubscription = async (params: {
@@ -100,105 +58,44 @@ export const createSubscription = async (params: {
   price_id: string;
   metadata?: Record<string, string>;
 }): Promise<Stripe.Subscription> => {
-  try {
-    const stripeClient = getStripe();
-    const subscription = await stripeClient.subscriptions.create({
-      customer: params.customer_id,
-      items: [{ price: params.price_id }],
-      metadata: params.metadata || {},
-      payment_behavior: 'default_incomplete',
-      payment_settings: { save_default_payment_method: 'on_subscription' },
-      expand: ['latest_invoice.payment_intent'],
-    });
-
-    logger.info(`Created Stripe subscription: ${subscription.id}`);
-    return subscription;
-  } catch (error) {
-    logger.error('Failed to create Stripe subscription:', error);
-    throw error;
-  }
+  return libCreateSubscription(stripe, {
+    customerId: params.customer_id,
+    priceId: params.price_id,
+    metadata: params.metadata,
+  });
 };
 
 export const cancelSubscription = async (
   subscriptionId: string
 ): Promise<Stripe.Subscription> => {
-  try {
-    const stripeClient = getStripe();
-    const subscription = await stripeClient.subscriptions.cancel(subscriptionId);
-    
-    logger.info(`Cancelled Stripe subscription: ${subscriptionId}`);
-    return subscription;
-  } catch (error) {
-    logger.error('Failed to cancel Stripe subscription:', error);
-    throw error;
-  }
+  return libCancelSubscription(stripe, subscriptionId);
 };
 
 export const retrieveSubscription = async (
   subscriptionId: string
 ): Promise<Stripe.Subscription> => {
-  try {
-    const stripeClient = getStripe();
-    return await stripeClient.subscriptions.retrieve(subscriptionId);
-  } catch (error) {
-    logger.error('Failed to retrieve Stripe subscription:', error);
-    throw error;
-  }
+  return libGetSubscription(stripe, subscriptionId);
 };
 
 export const pauseSubscription = async (
   subscriptionId: string,
   behavior: 'keep_as_draft' | 'mark_uncollectible' | 'void' = 'mark_uncollectible'
 ): Promise<Stripe.Subscription> => {
-  try {
-    const stripeClient = getStripe();
-    const subscription = await stripeClient.subscriptions.update(subscriptionId, {
-      pause_collection: {
-        behavior,
-      },
-    });
-
-    logger.info(`Paused Stripe subscription: ${subscriptionId}`);
-    return subscription;
-  } catch (error) {
-    logger.error('Failed to pause Stripe subscription:', error);
-    throw error;
-  }
+  return libPauseSubscription(stripe, subscriptionId, behavior);
 };
 
 export const resumeSubscription = async (
   subscriptionId: string
 ): Promise<Stripe.Subscription> => {
-  try {
-    const stripeClient = getStripe();
-    const subscription = await stripeClient.subscriptions.update(subscriptionId, {
-      pause_collection: null,
-    });
-
-    logger.info(`Resumed Stripe subscription: ${subscriptionId}`);
-    return subscription;
-  } catch (error) {
-    logger.error('Failed to resume Stripe subscription:', error);
-    throw error;
-  }
+  return libResumeSubscription(stripe, subscriptionId);
 };
 
 export const extendTrialPeriod = async (
   subscriptionId: string,
   newTrialEnd: number | 'now'
 ): Promise<Stripe.Subscription> => {
-  try {
-    const stripeClient = getStripe();
-    const subscription = await stripeClient.subscriptions.update(subscriptionId, {
-      trial_end: newTrialEnd,
-    });
-
-    logger.info(`Extended trial period for subscription: ${subscriptionId}`);
-    return subscription;
-  } catch (error) {
-    logger.error('Failed to extend trial period:', error);
-    throw error;
-  }
+  const trialEndDate = newTrialEnd === 'now' ? new Date() : new Date(newTrialEnd * 1000);
+  return libExtendTrial(stripe, subscriptionId, trialEndDate);
 };
 
 export const constructWebhookEvent = (
@@ -209,12 +106,5 @@ export const constructWebhookEvent = (
   if (!webhookSecret) {
     throw new Error('STRIPE_WEBHOOK_SECRET environment variable is required');
   }
-
-  try {
-    const stripeClient = getStripe();
-    return stripeClient.webhooks.constructEvent(payload, signature, webhookSecret);
-  } catch (error) {
-    logger.error('Failed to construct Stripe webhook event:', error);
-    throw error;
-  }
+  return verifyWebhookSignature(stripe, payload, signature, webhookSecret);
 };

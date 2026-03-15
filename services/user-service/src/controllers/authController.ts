@@ -1,8 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
-import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import jwt from 'jsonwebtoken';
 import axios from 'axios';
+import {
+  createAccessToken,
+  createRefreshToken,
+  verifyToken,
+  hashPassword,
+} from '@elites-systems/auth';
 import logger from '../utils/logger';
 import { sendVerificationEmail, sendTransactionalEmail } from '../utils/email';
 import { getUserEventPublisher } from '../events/userEventPublisher';
@@ -13,8 +17,8 @@ import User from '../models/User';
 import { AuthRequest } from '../middleware/authenticate';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'cloudmastershub-jwt-secret-2024-production-key';
-const JWT_EXPIRES_IN = '15m';
-const REFRESH_TOKEN_EXPIRES_IN = '30d';
+const ACCESS_TOKEN_EXPIRY = 900; // 15 minutes in seconds
+const REFRESH_TOKEN_EXPIRY = 2592000; // 30 days in seconds
 
 /**
  * Email/password registration is not supported.
@@ -57,21 +61,21 @@ export const logout = async (req: Request, res: Response, next: NextFunction): P
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.substring(7);
       try {
-        const decoded = jwt.verify(token, JWT_SECRET) as any;
-        
+        const decoded = verifyToken(token, JWT_SECRET);
+
         // Publish logout event (non-blocking)
         const eventPublisher = getUserEventPublisher();
-        eventPublisher.publishUserLogout(decoded.userId, {
+        eventPublisher.publishUserLogout(decoded.sub, {
           email: decoded.email
         }).catch(error => {
-          logger.warn('Failed to publish logout event', { 
-            error: error.message, 
-            userId: decoded.userId,
+          logger.warn('Failed to publish logout event', {
+            error: error.message,
+            userId: decoded.sub,
             email: decoded.email
           });
         });
-        
-        logger.info('User logged out', { userId: decoded.userId, email: decoded.email });
+
+        logger.info('User logged out', { userId: decoded.sub, email: decoded.email });
       } catch (tokenError) {
         // Token might be expired or invalid, but that's okay for logout
         logger.debug('Token verification failed during logout:', tokenError);
@@ -235,23 +239,27 @@ export const googleAuth = async (req: Request, res: Response, next: NextFunction
     });
 
     const userId = user._id.toString();
-    const accessToken = jwt.sign(
-      { 
-        userId: userId, 
-        email: user.email, 
+    const accessToken = createAccessToken(
+      {
+        sub: userId,
+        email: user.email,
+        role: user.roles[0] || 'student',
+        iss: 'cloudmastershub',
         roles: user.roles,
-        subscriptionTier: user.subscription || 'free',
-        subscriptionStatus: 'active',
-        authProvider: 'google'
-      }, 
-      JWT_SECRET, 
-      { expiresIn: JWT_EXPIRES_IN }
+      } as any,
+      JWT_SECRET,
+      { expiresIn: ACCESS_TOKEN_EXPIRY }
     );
 
-    const refreshToken = jwt.sign(
-      { userId: userId, type: 'refresh' }, 
-      JWT_SECRET, 
-      { expiresIn: REFRESH_TOKEN_EXPIRES_IN }
+    const refreshToken = createRefreshToken(
+      {
+        sub: userId,
+        email: user.email,
+        role: user.roles[0] || 'student',
+        iss: 'cloudmastershub',
+      },
+      JWT_SECRET,
+      { expiresIn: REFRESH_TOKEN_EXPIRY }
     );
 
     // Publish login event (non-blocking to prevent auth failures)
@@ -321,19 +329,29 @@ export const refreshToken = async (
       return;
     }
 
-    const decoded = jwt.verify(refreshToken, JWT_SECRET) as any;
+    const decoded = verifyToken(refreshToken, JWT_SECRET);
 
-    if (decoded.type !== 'refresh') {
+    // Look up current user to issue a token with up-to-date claims
+    const user = await User.findById(decoded.sub);
+    if (!user) {
       res.status(401).json({
         success: false,
-        error: { message: 'Invalid token type' },
+        error: { message: 'User not found' },
       });
       return;
     }
 
-    const accessToken = jwt.sign({ userId: decoded.userId }, JWT_SECRET, {
-      expiresIn: JWT_EXPIRES_IN,
-    });
+    const accessToken = createAccessToken(
+      {
+        sub: decoded.sub,
+        email: user.email,
+        role: user.roles[0] || 'student',
+        iss: 'cloudmastershub',
+        roles: user.roles,
+      } as any,
+      JWT_SECRET,
+      { expiresIn: ACCESS_TOKEN_EXPIRY }
+    );
 
     res.json({
       success: true,
@@ -436,9 +454,8 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
       return;
     }
 
-    // Hash the new password
-    const saltRounds = 12;
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
+    // Hash the new password using shared auth library (bcrypt, 12 rounds)
+    const hashedPassword = await hashPassword(password);
 
     // Update user with new password and clear reset token
     user.password = hashedPassword;

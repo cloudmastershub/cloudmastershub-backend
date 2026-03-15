@@ -15,6 +15,7 @@ import {
   extendTrialPeriod
 } from '../services/stripe.service';
 import { publishEvent } from '../services/redis.service';
+import { PaymentEventChannels } from '@elites-systems/payments';
 import {
   SubscriptionPlan,
   Subscription,
@@ -162,7 +163,7 @@ export const getSubscriptionStatus = async (req: Request, res: Response) => {
 export const createCheckoutSession = async (req: AuthRequest, res: Response) => {
   try {
     const body = req.body as CreateCheckoutSessionRequest;
-    const userId = req.user?.id;
+    const userId = req.user?.sub;
     
     if (!userId) {
       return res.status(401).json({
@@ -332,7 +333,7 @@ export const createCheckoutSession = async (req: AuthRequest, res: Response) => 
 export const createSubscription = async (req: AuthRequest, res: Response) => {
   try {
     const body = req.body as CreateSubscriptionRequest;
-    const userId = req.user?.id;
+    const userId = req.user?.sub;
     
     if (!userId) {
       return res.status(401).json({
@@ -434,7 +435,7 @@ export const createSubscription = async (req: AuthRequest, res: Response) => {
 export const cancelSubscription = async (req: AuthRequest, res: Response) => {
   try {
     const { subscriptionId } = req.params;
-    const userId = req.user?.id;
+    const userId = req.user?.sub;
 
     if (!userId) {
       return res.status(401).json({
@@ -534,7 +535,7 @@ export const updateSubscription = async (req: AuthRequest, res: Response) => {
   try {
     const { subscriptionId } = req.params;
     const { plan_id } = req.body;
-    const userId = req.user?.id;
+    const userId = req.user?.sub;
 
     if (!userId) {
       return res.status(401).json({
@@ -654,7 +655,7 @@ export const pauseSubscription = async (req: AuthRequest, res: Response) => {
   try {
     const { subscriptionId } = req.params;
     const { reason } = req.body;
-    const userId = req.user?.id;
+    const userId = req.user?.sub;
 
     if (!userId) {
       return res.status(401).json({
@@ -718,7 +719,7 @@ export const pauseSubscription = async (req: AuthRequest, res: Response) => {
       await deleteCache(`subscription_status:${userId}`);
 
       // Publish event
-      await publishEvent('subscription.paused', {
+      await publishEvent(PaymentEventChannels.SUBSCRIPTION_PAUSED, {
         user_id: userId,
         subscription_id: subscriptionId,
         paused_at: pausedAt.toISOString(),
@@ -772,7 +773,7 @@ export const pauseSubscription = async (req: AuthRequest, res: Response) => {
 export const resumeSubscription = async (req: AuthRequest, res: Response) => {
   try {
     const { subscriptionId } = req.params;
-    const userId = req.user?.id;
+    const userId = req.user?.sub;
 
     if (!userId) {
       return res.status(401).json({
@@ -830,7 +831,7 @@ export const resumeSubscription = async (req: AuthRequest, res: Response) => {
       await deleteCache(`subscription_status:${userId}`);
 
       // Publish event
-      await publishEvent('subscription.resumed', {
+      await publishEvent(PaymentEventChannels.SUBSCRIPTION_RESUMED, {
         user_id: userId,
         subscription_id: subscriptionId,
         resumed_at: resumedAt.toISOString(),
@@ -877,7 +878,7 @@ export const resumeSubscription = async (req: AuthRequest, res: Response) => {
 export const getTrialStatus = async (req: AuthRequest, res: Response) => {
   try {
     const { subscriptionId } = req.params;
-    const userId = req.user?.id;
+    const userId = req.user?.sub;
 
     if (!userId) {
       return res.status(401).json({
@@ -937,7 +938,7 @@ export const extendTrial = async (req: AuthRequest, res: Response) => {
   try {
     const { subscriptionId } = req.params;
     const { days } = req.body;
-    const userId = req.user?.id;
+    const userId = req.user?.sub;
     const userRoles = req.user?.roles || [];
 
     if (!userId) {
@@ -1013,7 +1014,7 @@ export const extendTrial = async (req: AuthRequest, res: Response) => {
       await deleteCache(`subscription_status:${subscription.user_id}`);
 
       // Publish event
-      await publishEvent('subscription.trial_extended', {
+      await publishEvent(PaymentEventChannels.TRIAL_EXTENDED, {
         subscription_id: subscriptionId,
         user_id: subscription.user_id,
         extended_by: userId,

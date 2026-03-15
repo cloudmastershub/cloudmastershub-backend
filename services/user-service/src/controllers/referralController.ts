@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { referralService } from '../services/referralService';
-import { AuthRequest } from '@cloudmastershub/types';
+import { AuthRequest } from '../middleware/authenticate';
 import logger from '../utils/logger';
 import { body, param, query, validationResult } from 'express-validator';
 
@@ -14,13 +14,13 @@ export const getUserReferralDashboard = async (
 ): Promise<void> => {
   try {
     console.log('📊 Referral Dashboard - Request received:', {
-      userId: req.user?.id,
-      userEmail: req.user?.email,
-      userRoles: req.user?.roles,
-      hasUser: !!req.user
+      userId: req.userId,
+      userEmail: req.userEmail,
+      userRoles: req.userRoles,
+      hasUser: !!req.userId
     });
     
-    const userId = req.user!.id;
+    const userId = req.userId!;
 
     const [stats, referralLink, eligibleEarnings] = await Promise.all([
       referralService.getUserReferralStats(userId),
@@ -40,7 +40,7 @@ export const getUserReferralDashboard = async (
       }
     });
   } catch (error) {
-    logger.error('Failed to get user referral dashboard', { userId: req.user?.id, error });
+    logger.error('Failed to get user referral dashboard', { userId: req.userId, error });
     next(error);
   }
 };
@@ -64,7 +64,7 @@ export const getUserReferralEarnings = async (
       return;
     }
 
-    const userId = req.user!.id;
+    const userId = req.userId!;
     const { status, earningType, page = 1, limit = 20 } = req.query;
 
     const query: any = { referrerId: userId };
@@ -85,7 +85,7 @@ export const getUserReferralEarnings = async (
       data: result
     });
   } catch (error) {
-    logger.error('Failed to get user referral earnings', { userId: req.user?.id, error });
+    logger.error('Failed to get user referral earnings', { userId: req.userId, error });
     next(error);
   }
 };
@@ -109,7 +109,7 @@ export const createPayoutRequest = async (
       return;
     }
 
-    const userId = req.user!.id;
+    const userId = req.userId!;
     const payoutData = req.body;
 
     const payout = await referralService.createPayoutRequest(userId, payoutData);
@@ -120,7 +120,7 @@ export const createPayoutRequest = async (
       message: 'Payout request created successfully'
     });
   } catch (error) {
-    logger.error('Failed to create payout request', { userId: req.user?.id, error });
+    logger.error('Failed to create payout request', { userId: req.userId, error });
     
     if (error instanceof Error && error.message.includes('exceeds eligible earnings')) {
       res.status(400).json({
@@ -143,7 +143,7 @@ export const getUserPayoutRequests = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const userId = req.user!.id;
+    const userId = req.userId!;
     const { page = 1, limit = 10 } = req.query;
 
     const payouts = await referralService.getUserPayoutRequests(
@@ -157,7 +157,7 @@ export const getUserPayoutRequests = async (
       data: payouts
     });
   } catch (error) {
-    logger.error('Failed to get user payout requests', { userId: req.user?.id, error });
+    logger.error('Failed to get user payout requests', { userId: req.userId, error });
     next(error);
   }
 };
@@ -344,7 +344,7 @@ export const processPayoutRequest = async (
 
     const { payoutId } = req.params;
     const updates = req.body;
-    const adminUserId = req.user!.id;
+    const adminUserId = req.userId!;
 
     const payout = await referralService.updatePayoutRequest(payoutId, updates, adminUserId);
     
@@ -427,7 +427,7 @@ export const updateUserReferralId = async (
       return;
     }
 
-    const userId = req.user!.id;
+    const userId = req.userId!;
     const { newReferralId } = req.body;
 
     // Validate referral ID
@@ -468,7 +468,7 @@ export const updateUserReferralId = async (
       }
     });
   } catch (error) {
-    logger.error('Failed to update referral ID', { userId: req.user?.id, error });
+    logger.error('Failed to update referral ID', { userId: req.userId, error });
     
     if (error instanceof Error && error.message.includes('already taken')) {
       res.status(400).json({

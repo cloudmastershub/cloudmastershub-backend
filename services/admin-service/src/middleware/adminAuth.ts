@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { verify } from 'jsonwebtoken';
+import { verifyToken, type VerifiedToken } from '@elites-systems/auth';
 import { UserRole, AdminPermission } from '@cloudmastershub/types';
 import logger from '../utils/logger';
 import { AuditLog } from '../models/AuditLog';
@@ -9,13 +9,6 @@ export interface AdminRequest extends Request {
   adminEmail?: string;
   adminRoles?: UserRole[];
   adminPermissions?: AdminPermission[];
-}
-
-interface JWTPayload {
-  userId: string;
-  email: string;
-  roles: UserRole[];
-  permissions?: AdminPermission[];
 }
 
 export const requireAdmin = (req: AdminRequest, res: Response, next: NextFunction): void => {
@@ -46,14 +39,15 @@ export const requireAdmin = (req: AdminRequest, res: Response, next: NextFunctio
       return;
     }
 
-    const decoded = verify(token, jwtSecret) as JWTPayload;
+    const decoded: VerifiedToken = verifyToken(token, jwtSecret);
+    const roles = (decoded.roles || [decoded.role]) as UserRole[];
 
     // Check if user has admin role
-    if (!decoded.roles || !decoded.roles.includes(UserRole.ADMIN)) {
+    if (!roles.includes(UserRole.ADMIN)) {
       logger.warn('Non-admin user attempted to access admin endpoint', {
-        userId: decoded.userId,
+        userId: decoded.sub,
         email: decoded.email,
-        roles: decoded.roles,
+        roles,
         endpoint: req.originalUrl,
         ip: req.ip,
       });
@@ -67,12 +61,12 @@ export const requireAdmin = (req: AdminRequest, res: Response, next: NextFunctio
       return;
     }
 
-    // Attach admin info to request
-    req.adminId = decoded.userId;
+    // Attach admin info to request (sub mapped to adminId)
+    req.adminId = decoded.sub;
     req.adminEmail = decoded.email;
-    req.adminRoles = decoded.roles;
+    req.adminRoles = roles;
     // Grant all permissions to admin users by default if not explicitly set
-    req.adminPermissions = decoded.permissions || [
+    req.adminPermissions = (decoded as any).permissions || [
       AdminPermission.MANAGE_USERS,
       AdminPermission.MODERATE_CONTENT,
       AdminPermission.VIEW_ANALYTICS,
@@ -81,7 +75,7 @@ export const requireAdmin = (req: AdminRequest, res: Response, next: NextFunctio
     ];
 
     logger.info('Admin authenticated', {
-      adminId: decoded.userId,
+      adminId: decoded.sub,
       email: decoded.email,
       endpoint: req.originalUrl,
       method: req.method,

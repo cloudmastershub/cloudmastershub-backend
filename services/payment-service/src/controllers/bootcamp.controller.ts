@@ -101,7 +101,7 @@ export const getBootcampBySlug = async (req: Request, res: Response) => {
 
 export const createBootcampCheckout = async (req: AuthRequest, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user?.sub;
     if (!userId) {
       return res.status(401).json({
         success: false,
@@ -331,7 +331,7 @@ export const createBootcampCheckout = async (req: AuthRequest, res: Response) =>
 export const getUserEnrollments = async (req: AuthRequest, res: Response) => {
   try {
     const { userId } = req.params;
-    const requestingUserId = req.user?.id;
+    const requestingUserId = req.user?.sub;
 
     // Users can only view their own enrollments unless admin
     if (requestingUserId !== userId && !req.user?.roles?.includes('admin')) {

@@ -20,8 +20,14 @@ COPY services ./services
 
 FROM base AS builder
 
+ARG GITHUB_TOKEN
+
+# Configure GitHub Packages registry for @elites-systems scope
+RUN echo "@elites-systems:registry=https://npm.pkg.github.com" > .npmrc && \
+    echo "//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}" >> .npmrc
+
 # Install all dependencies (including dev dependencies for building)
-RUN npm ci
+RUN npm ci && rm -f .npmrc
 
 # Build shared packages first
 RUN npm run build --workspace=@cloudmastershub/types
@@ -39,8 +45,14 @@ RUN npm run build --workspace=@cloudmastershub/community-service
 
 FROM base AS production
 
+ARG GITHUB_TOKEN
+
+# Configure GitHub Packages registry for @elites-systems scope
+RUN echo "@elites-systems:registry=https://npm.pkg.github.com" > .npmrc && \
+    echo "//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}" >> .npmrc
+
 # Install only production dependencies
-RUN npm ci --omit=dev && npm cache clean --force
+RUN npm ci --omit=dev && npm cache clean --force && rm -f .npmrc
 
 # Copy built artifacts from builder stage
 COPY --from=builder /app/shared/types/dist ./shared/types/dist

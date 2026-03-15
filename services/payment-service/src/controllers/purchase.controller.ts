@@ -9,7 +9,7 @@ import { PoolClient } from 'pg';
 export const createPurchase = async (req: AuthRequest, res: Response) => {
   try {
     const body = req.body as CreatePurchaseRequest;
-    const userId = req.user?.id;
+    const userId = req.user?.sub;
     
     if (!userId) {
       return res.status(401).json({
@@ -163,7 +163,7 @@ export const createPurchase = async (req: AuthRequest, res: Response) => {
 export const getPurchaseHistory = async (req: AuthRequest, res: Response) => {
   try {
     const { userId } = req.params;
-    const authenticatedUserId = req.user?.id;
+    const authenticatedUserId = req.user?.sub;
     
     // Verify user can access this data
     if (authenticatedUserId !== userId) {
@@ -208,7 +208,7 @@ export const getPurchaseHistory = async (req: AuthRequest, res: Response) => {
 export const getPurchaseStatus = async (req: AuthRequest, res: Response) => {
   try {
     const { purchaseId } = req.params;
-    const userId = req.user?.id;
+    const userId = req.user?.sub;
 
     if (!userId) {
       return res.status(401).json({
@@ -260,7 +260,7 @@ export const refundPurchase = async (req: AuthRequest, res: Response) => {
   try {
     const { purchaseId } = req.params;
     const { reason } = req.body;
-    const userId = req.user?.id;
+    const userId = req.user?.sub;
 
     if (!userId) {
       return res.status(401).json({

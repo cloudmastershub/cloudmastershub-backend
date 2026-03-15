@@ -274,24 +274,31 @@ pipeline {
                 script {
                     echo "🐳 Building and pushing Docker image..."
                     
-                    withCredentials([usernamePassword(
-                        credentialsId: 'dockerhub-creds',
-                        usernameVariable: 'DOCKER_USERNAME',
-                        passwordVariable: 'DOCKER_PASSWORD'
-                    )]) {
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: 'dockerhub-creds',
+                            usernameVariable: 'DOCKER_USERNAME',
+                            passwordVariable: 'DOCKER_PASSWORD'
+                        ),
+                        usernamePassword(
+                            credentialsId: 'github-credentials',
+                            usernameVariable: 'GH_USER',
+                            passwordVariable: 'GH_TOKEN'
+                        )
+                    ]) {
                         sh '''
                             echo "🔐 Logging into Docker Hub..."
                             echo "${DOCKER_PASSWORD}" | docker login -u "${DOCKER_USERNAME}" --password-stdin
-                            
+
                             echo "🏗️  Building Docker image..."
                             # Use buildkit for better caching and performance
                             export DOCKER_BUILDKIT=1
-                            docker build --progress=plain -t ${IMAGE_NAME}:${IMAGE_TAG} -t ${IMAGE_NAME}:${IMAGE_TAG_LATEST} .
-                            
+                            docker build --progress=plain --build-arg GITHUB_TOKEN=${GH_TOKEN} -t ${IMAGE_NAME}:${IMAGE_TAG} -t ${IMAGE_NAME}:${IMAGE_TAG_LATEST} .
+
                             echo "📤 Pushing to Docker Hub..."
                             docker push ${IMAGE_NAME}:${IMAGE_TAG}
                             docker push ${IMAGE_NAME}:${IMAGE_TAG_LATEST}
-                            
+
                             echo "✅ Docker image pushed successfully"
                             echo "Image: ${IMAGE_NAME}:${IMAGE_TAG}"
                             echo "Build Image: ${IMAGE_NAME}:${BUILD_VERSION}"

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { logger } from '@cloudmastershub/utils';
 import { constructWebhookEvent, getStripe } from '../services/stripe.service';
 import { publishEvent } from '../services/redis.service';
+import { PaymentEventChannels } from '@elites-systems/payments';
 import { executeTransaction, executeQuery } from '../services/database.service';
 import { convertToUuid } from '../utils/userIdConverter';
 import { PoolClient } from 'pg';
@@ -161,7 +162,7 @@ const handleCheckoutSessionCompleted = async (event: Stripe.Event) => {
         await grantUserAccess(client, userId, 'subscription', subscriptionId, 'platform', null);
 
         // Publish event for other services
-        await publishEvent('subscription.created', {
+        await publishEvent(PaymentEventChannels.SUBSCRIPTION_CREATED, {
           user_id: userId,
           subscription_id: subscriptionId,
           plan_id: planId,
@@ -230,7 +231,7 @@ const handleCheckoutSessionCompleted = async (event: Stripe.Event) => {
         );
 
         // Publish event
-        await publishEvent('purchase.completed', {
+        await publishEvent(PaymentEventChannels.PURCHASE_COMPLETED, {
           user_id: userId,
           purchase_id: purchaseId,
           purchasable_type: purchasableType,
@@ -324,7 +325,7 @@ const handleInvoicePaymentSucceeded = async (event: Stripe.Event) => {
     });
 
     // Publish event
-    await publishEvent('payment.succeeded', {
+    await publishEvent(PaymentEventChannels.PAYMENT_SUCCEEDED, {
       invoice_id: invoice.id,
       subscription_id: invoice.subscription,
       amount: invoice.amount_paid,
@@ -380,7 +381,7 @@ const handleInvoicePaymentFailed = async (event: Stripe.Event) => {
     });
 
     // Publish event
-    await publishEvent('payment.failed', {
+    await publishEvent(PaymentEventChannels.PAYMENT_FAILED, {
       invoice_id: invoice.id,
       subscription_id: invoice.subscription,
       timestamp: new Date().toISOString()
@@ -486,7 +487,7 @@ const handleSubscriptionCreated = async (event: Stripe.Event) => {
         });
 
         // Publish trial started event
-        await publishEvent('trial.started', {
+        await publishEvent(PaymentEventChannels.TRIAL_STARTED, {
           user_id: userId,
           subscription_id: subscriptionId,
           plan_id: planId,
@@ -498,7 +499,7 @@ const handleSubscriptionCreated = async (event: Stripe.Event) => {
     });
 
     // Publish event
-    await publishEvent('subscription.created', {
+    await publishEvent(PaymentEventChannels.SUBSCRIPTION_CREATED, {
       subscription_id: subscription.id,
       customer_id: subscription.customer,
       status: subscription.status,
@@ -575,7 +576,7 @@ const handleSubscriptionUpdated = async (event: Stripe.Event) => {
     });
 
     // Publish event
-    await publishEvent('subscription.updated', {
+    await publishEvent(PaymentEventChannels.SUBSCRIPTION_UPDATED, {
       subscription_id: subscription.id,
       status: subscription.status,
       previous_status: previousAttributes?.status,
@@ -616,7 +617,7 @@ const handleSubscriptionDeleted = async (event: Stripe.Event) => {
     });
 
     // Publish event
-    await publishEvent('subscription.cancelled', {
+    await publishEvent(PaymentEventChannels.SUBSCRIPTION_CANCELLED, {
       subscription_id: subscription.id,
       timestamp: new Date().toISOString()
     });
@@ -716,7 +717,7 @@ const handleTrialWillEnd = async (event: Stripe.Event) => {
       `, [subscriptionId, userId, trialEndDate]);
 
       // Publish event for marketing service to send email
-      await publishEvent('trial.ending_soon', {
+      await publishEvent(PaymentEventChannels.TRIAL_ENDING_SOON, {
         user_id: userId,
         subscription_id: subscriptionId,
         plan_name: planName,
@@ -761,7 +762,7 @@ const handleSubscriptionPaused = async (event: Stripe.Event) => {
       const { id: subscriptionId, user_id: userId } = result.rows[0];
 
       // Publish event
-      await publishEvent('subscription.paused', {
+      await publishEvent(PaymentEventChannels.SUBSCRIPTION_PAUSED, {
         user_id: userId,
         subscription_id: subscriptionId,
         source: 'stripe_webhook',
@@ -809,7 +810,7 @@ const handleSubscriptionResumed = async (event: Stripe.Event) => {
       await grantUserAccess(client, userId, 'subscription', subscriptionId, 'platform', null);
 
       // Publish event
-      await publishEvent('subscription.resumed', {
+      await publishEvent(PaymentEventChannels.SUBSCRIPTION_RESUMED, {
         user_id: userId,
         subscription_id: subscriptionId,
         source: 'stripe_webhook',
@@ -910,7 +911,7 @@ async function handleBootcampCheckout(
     await grantBootcampAccess(client, userId, bootcampId, enrollmentId, bootcamp.includes_premium_access);
 
     // Publish event
-    await publishEvent('bootcamp.enrolled', {
+    await publishEvent(PaymentEventChannels.BOOTCAMP_ENROLLED, {
       user_id: userId,
       bootcamp_id: bootcampId,
       session_id: sessionId,
@@ -995,7 +996,7 @@ async function handleBootcampCheckout(
     await grantBootcampAccess(client, userId, bootcampId, enrollmentId, bootcamp.includes_premium_access);
 
     // Publish event
-    await publishEvent('bootcamp.enrolled', {
+    await publishEvent(PaymentEventChannels.BOOTCAMP_ENROLLED, {
       user_id: userId,
       bootcamp_id: bootcampId,
       session_id: sessionId,
@@ -1091,7 +1092,7 @@ async function handleBootcampInstallmentPayment(
   ]);
 
   // Publish event
-  await publishEvent('bootcamp.installment_paid', {
+  await publishEvent(PaymentEventChannels.BOOTCAMP_INSTALLMENT_PAID, {
     user_id: enrollment.user_id,
     bootcamp_id: enrollment.bootcamp_id,
     enrollment_id: enrollment.id,
