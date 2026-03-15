@@ -75,9 +75,15 @@ pipeline {
             // Run on Jenkins host directly - Node.js v20 is available
             // Removed Docker agent due to Alpine/durable-task-plugin compatibility issues
             steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'github-credentials',
+                    usernameVariable: 'GIT_USER',
+                    passwordVariable: 'GIT_PASS'
+                )]) {
                 script {
                     echo "📦 Installing dependencies for all services..."
                     sh '''
+                        export NODE_AUTH_TOKEN=$GIT_PASS
                         # Install dependencies for workspace root
                         echo "📦 Installing root dependencies..."
                         npm ci --prefer-offline --no-audit --no-fund
@@ -125,9 +131,10 @@ pipeline {
                         done
                     '''
                 }
+                }
             }
         }
-        
+
         stage('Code Quality') {
             // Run on Jenkins host directly - Node.js v20 is available
             // Removed Docker agents due to Alpine/durable-task-plugin compatibility issues

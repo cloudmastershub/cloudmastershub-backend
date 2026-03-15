@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@elites-systems/auth": "file:../../../../eliteslibs/packages/auth",
+    "@elites-systems/auth": "^0.1.0",
     "@types/jsonwebtoken": "^9.0.10",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
