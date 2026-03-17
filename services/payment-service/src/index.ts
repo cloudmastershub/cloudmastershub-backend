@@ -14,6 +14,7 @@ import purchaseRoutes from './routes/purchase.routes';
 import webhookRoutes from './routes/webhook.routes';
 import healthRoutes from './routes/health.routes';
 import bootcampRoutes from './routes/bootcamp.routes';
+import analyticsRoutes from './routes/analytics.routes';
 
 // Load environment variables
 dotenv.config();
@@ -94,6 +95,7 @@ app.use('/subscriptions', subscriptionRoutes);
 app.use('/payments', paymentRoutes);
 app.use('/purchases', purchaseRoutes);
 app.use('/bootcamps', bootcampRoutes);
+app.use('/admin/analytics', analyticsRoutes);
 
 // Error handling middleware
 app.use(errorHandler);
