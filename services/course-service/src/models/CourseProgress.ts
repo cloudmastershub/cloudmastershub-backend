@@ -60,7 +60,7 @@ const CourseProgressSchema = new Schema<ICourseProgress>({
 }, {
   timestamps: true,
   toJSON: { 
-    transform: function(doc, ret) {
+    transform: function(_doc: any, ret: any) {
       ret.courseId = ret.courseId.toString();
       return ret;
     }

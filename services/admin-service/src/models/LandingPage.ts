@@ -150,7 +150,7 @@ const LandingPageSchema = new Schema<ILandingPage>({
 }, {
   timestamps: true,
   toJSON: {
-    transform: function(doc, ret) {
+    transform: function(_doc: any, ret: any) {
       ret.id = ret._id.toString();
       delete ret._id;
       delete ret.__v;
@@ -158,7 +158,7 @@ const LandingPageSchema = new Schema<ILandingPage>({
     }
   },
   toObject: {
-    transform: function(doc, ret) {
+    transform: function(_doc: any, ret: any) {
       ret.id = ret._id.toString();
       delete ret._id;
       delete ret.__v;

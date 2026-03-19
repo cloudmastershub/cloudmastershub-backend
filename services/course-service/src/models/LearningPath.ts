@@ -2,8 +2,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 import { LearningPath, PathwayStep, PathwayStepType, LearningPathProgress, CourseCategory, DifficultyLevel, CourseStatus } from '@cloudmastershub/types';
 import { generateSlug, generateUniqueSlug } from '@cloudmastershub/utils';
 
-export interface ILearningPath extends Omit<LearningPath, 'id'>, Document {
-  _id: string;
+export interface ILearningPath extends Omit<LearningPath, 'id'>, Document<mongoose.Types.ObjectId> {
   slug: string;
 }
 
@@ -201,7 +200,7 @@ const LearningPathSchema = new Schema<ILearningPath>({
   timestamps: true,
   strict: false, // Allow fields not in schema to be saved
   toJSON: { 
-    transform: function(doc, ret) {
+    transform: function(_doc: any, ret: any) {
       // Use slug as the public ID instead of MongoDB ObjectId
       ret.id = ret.slug;
       ret.pathId = ret.slug; // For backward compatibility with existing APIs
@@ -210,8 +209,8 @@ const LearningPathSchema = new Schema<ILearningPath>({
       return ret;
     }
   },
-  toObject: { 
-    transform: function(doc, ret) {
+  toObject: {
+    transform: function(_doc: any, ret: any) {
       // Use slug as the public ID instead of MongoDB ObjectId
       ret.id = ret.slug;
       ret.pathId = ret.slug; // For backward compatibility with existing APIs
@@ -505,7 +504,7 @@ const LearningPathProgressSchema = new Schema<ILearningPathProgress>({
 }, {
   timestamps: true,
   toJSON: { 
-    transform: function(doc, ret) {
+    transform: function(_doc: any, ret: any) {
       ret.pathId = ret.pathId.toString();
       return ret;
     }

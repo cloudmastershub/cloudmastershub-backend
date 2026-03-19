@@ -73,7 +73,7 @@ const SecurityLogSchema = new Schema<ISecurityLog>({
 }, {
   timestamps: true,
   toJSON: {
-    transform: function(doc, ret) {
+    transform: function(_doc: any, ret: any) {
       ret.id = ret._id.toString();
       ret.timestamp = ret.createdAt;
       delete ret._id;

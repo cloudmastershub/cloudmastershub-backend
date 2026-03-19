@@ -3,8 +3,7 @@ import { Course, CourseCategory, DifficultyLevel, CourseStatus } from '@cloudmas
 import { generateSlug, generateUniqueSlug } from '@cloudmastershub/utils';
 
 // Extend the Course interface to include Mongoose Document methods
-export interface ICourse extends Omit<Course, 'id'>, Document {
-  _id: string;
+export interface ICourse extends Omit<Course, 'id'>, Document<mongoose.Types.ObjectId> {
   slug: string;
 }
 
@@ -150,8 +149,8 @@ const CourseSchema = new Schema<ICourse>({
 }, {
   timestamps: true, // This automatically adds createdAt and updatedAt
   strict: false, // Allow fields not in schema to be saved
-  toJSON: { 
-    transform: function(doc, ret) {
+  toJSON: {
+    transform: function(_doc: any, ret: any) {
       // Use slug as the public ID instead of MongoDB ObjectId
       ret.id = ret.slug;
       ret.courseId = ret.slug; // For backward compatibility with existing APIs
@@ -160,8 +159,8 @@ const CourseSchema = new Schema<ICourse>({
       return ret;
     }
   },
-  toObject: { 
-    transform: function(doc, ret) {
+  toObject: {
+    transform: function(_doc: any, ret: any) {
       // Use slug as the public ID instead of MongoDB ObjectId
       ret.id = ret.slug;
       ret.courseId = ret.slug; // For backward compatibility with existing APIs

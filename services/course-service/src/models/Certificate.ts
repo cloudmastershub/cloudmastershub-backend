@@ -130,7 +130,7 @@ const CertificateSchema = new Schema<ICertificate>({
 }, {
   timestamps: true,
   toJSON: {
-    transform: function(doc, ret) {
+    transform: function(_doc: any, ret: any) {
       ret.id = ret.certificateId;
       delete ret._id;
       delete ret.__v;

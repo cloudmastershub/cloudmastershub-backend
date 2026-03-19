@@ -325,7 +325,7 @@ const PopupSchema = new Schema<IPopup>({
 }, {
   timestamps: true,
   toJSON: {
-    transform: function(_doc, ret) {
+    transform: function(_doc: any, ret: any) {
       ret.id = ret._id.toString();
       delete ret._id;
       delete ret.__v;
@@ -333,7 +333,7 @@ const PopupSchema = new Schema<IPopup>({
     }
   },
   toObject: {
-    transform: function(_doc, ret) {
+    transform: function(_doc: any, ret: any) {
       ret.id = ret._id.toString();
       delete ret._id;
       delete ret.__v;
