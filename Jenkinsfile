@@ -31,11 +31,11 @@ pipeline {
         GITOPS_REPO = "cloudmastershub/cloudmastershub-gitop"
         GITOPS_BRANCH = "main"
 
-        // Optimize npm - use workspace cache to avoid permission issues
+        // Optimize npm — persistent cache survives workspace cleanup
         NPM_CONFIG_LOGLEVEL = 'error'
         NPM_CONFIG_AUDIT = 'false'
         NPM_CONFIG_FUND = 'false'
-        NPM_CONFIG_CACHE = "${WORKSPACE}/.npm-cache"
+        NPM_CONFIG_CACHE = '/var/jenkins_home/.npm-cache'
         HOME = "${WORKSPACE}"
     }
 
@@ -73,12 +73,14 @@ pipeline {
                 )]) {
                     script {
                         echo "Installing dependencies for all services..."
-                        sh '''
-                            export NODE_AUTH_TOKEN=$GIT_PASS
+                        timeout(time: 20, unit: 'MINUTES') {
+                            sh '''
+                                export NODE_AUTH_TOKEN=$GIT_PASS
 
-                            # Single npm ci at root installs all workspace dependencies
-                            npm ci --prefer-offline --no-audit --no-fund
-                        '''
+                                # Single npm ci at root installs all workspace dependencies
+                                npm ci --prefer-offline --no-audit --no-fund
+                            '''
+                        }
                     }
                 }
             }
@@ -237,8 +239,10 @@ pipeline {
                         docker rmi ${IMAGE_NAME}:${IMAGE_TAG} || true
                         docker system prune -f || true
                     fi
+
+                    # Selective cleanup — preserve npm cache (lives outside workspace)
+                    rm -rf node_modules/ gitops-temp/ 2>/dev/null || true
                 '''
-                deleteDir()
             }
         }
 
