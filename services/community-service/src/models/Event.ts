@@ -151,7 +151,7 @@ EventSchema.index({ startTime: 1, endTime: 1 });
 
 EventSchema.set('toJSON', {
   virtuals: true,
-  transform: function(_doc, ret) {
+  transform: function(_doc: any, ret: any) {
     ret.id = ret._id.toString();
     if (ret.groupId) ret.groupId = ret.groupId.toString();
     delete ret._id;

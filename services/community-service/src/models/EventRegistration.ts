@@ -79,7 +79,7 @@ EventRegistrationSchema.index({ userId: 1, status: 1 });
 
 EventRegistrationSchema.set('toJSON', {
   virtuals: true,
-  transform: function(_doc, ret) {
+  transform: function(_doc: any, ret: any) {
     ret.id = ret._id.toString();
     ret.eventId = ret.eventId.toString();
     delete ret._id;

@@ -75,7 +75,7 @@ GroupMemberSchema.index({ userId: 1, status: 1 });
 
 GroupMemberSchema.set('toJSON', {
   virtuals: true,
-  transform: function(_doc, ret) {
+  transform: function(_doc: any, ret: any) {
     ret.id = ret._id.toString();
     ret.groupId = ret.groupId.toString();
     delete ret._id;

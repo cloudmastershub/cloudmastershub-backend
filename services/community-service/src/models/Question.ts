@@ -129,7 +129,7 @@ QuestionSchema.virtual('score').get(function() {
 
 QuestionSchema.set('toJSON', {
   virtuals: true,
-  transform: function(_doc, ret) {
+  transform: function(_doc: any, ret: any) {
     ret.id = ret._id.toString();
     if (ret.acceptedAnswerId) ret.acceptedAnswerId = ret.acceptedAnswerId.toString();
     delete ret._id;

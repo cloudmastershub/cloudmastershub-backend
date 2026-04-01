@@ -54,7 +54,7 @@ ConnectionSchema.index({ followingId: 1, status: 1 });
 
 ConnectionSchema.set('toJSON', {
   virtuals: true,
-  transform: function(_doc, ret) {
+  transform: function(_doc: any, ret: any) {
     ret.id = ret._id.toString();
     delete ret._id;
     delete ret.__v;

@@ -98,7 +98,7 @@ ThreadSchema.index({ tags: 1 });
 
 ThreadSchema.set('toJSON', {
   virtuals: true,
-  transform: function(_doc, ret) {
+  transform: function(_doc: any, ret: any) {
     ret.id = ret._id.toString();
     ret.forumId = ret.forumId.toString();
     delete ret._id;

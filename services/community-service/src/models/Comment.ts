@@ -121,7 +121,7 @@ CommentSchema.index({ courseId: 1, isFlagged: 1 });
 
 CommentSchema.set('toJSON', {
   virtuals: true,
-  transform: function(_doc, ret) {
+  transform: function(_doc: any, ret: any) {
     ret.id = ret._id.toString();
     ret.targetId = ret.targetId.toString();
     if (ret.parentId) ret.parentId = ret.parentId.toString();

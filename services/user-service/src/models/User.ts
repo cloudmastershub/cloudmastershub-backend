@@ -128,7 +128,7 @@ UserSchema.virtual('id').get(function() {
 // Ensure virtual fields are serialized
 UserSchema.set('toJSON', {
   virtuals: true,
-  transform: function(doc, ret) {
+  transform: function(doc: any, ret: any) {
     delete ret._id;
     delete ret.__v;
     delete ret.password; // Never return password in JSON

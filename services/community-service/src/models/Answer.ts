@@ -76,7 +76,7 @@ AnswerSchema.virtual('score').get(function() {
 
 AnswerSchema.set('toJSON', {
   virtuals: true,
-  transform: function(_doc, ret) {
+  transform: function(_doc: any, ret: any) {
     ret.id = ret._id.toString();
     ret.questionId = ret.questionId.toString();
     delete ret._id;

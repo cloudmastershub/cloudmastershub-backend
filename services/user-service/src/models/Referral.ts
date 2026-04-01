@@ -172,8 +172,8 @@ const ReferralLinkSchema = new Schema<IReferralLink>({
     type: String, 
     unique: true,
     validate: {
-      validator: function(v: string) {
-        return v && v.length > 0;
+      validator: function(this: any, v: string): boolean {
+        return !!(v && v.length > 0);
       },
       message: 'Referral code must be generated and cannot be empty'
     }
@@ -191,7 +191,7 @@ ReferralLinkSchema.index({ userId: 1 });
 ReferralLinkSchema.index({ referralCode: 1 });
 
 // Pre-save middleware to generate unique referral code
-ReferralLinkSchema.pre('save', async function(next) {
+ReferralLinkSchema.pre('save', async function(this: any, next) {
   if (this.isNew && !this.referralCode) {
     try {
       // Generate a unique referral code based on user ID and timestamp
