@@ -37,21 +37,15 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(origin => ori
 
 app.use(cors({
   origin: (origin, callback) => {
-    console.log(`🌐 ADMIN-SERVICE CORS: Request from origin: ${origin || 'NO_ORIGIN'}`);
-    console.log(`🌐 ADMIN-SERVICE CORS: Allowed origins: ${allowedOrigins.join(', ')}`);
-    
-    // Allow requests with no origin (like mobile apps or Postman)
+    // Allow requests with no origin (internal service-to-service, Postman)
     if (!origin) {
-      console.log('🌐 ADMIN-SERVICE CORS: Allowing request with no origin');
       return callback(null, true);
     }
-    
+
     if (allowedOrigins.includes(origin)) {
-      console.log(`🌐 ADMIN-SERVICE CORS: Allowing request from ${origin}`);
       callback(null, true);
     } else {
-      console.warn(`🌐 ADMIN-SERVICE CORS: BLOCKED request from origin: ${origin}`);
-      console.warn(`🌐 ADMIN-SERVICE CORS: Available origins: ${allowedOrigins.join(', ')}`);
+      logger.warn(`CORS blocked request from origin: ${origin}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
