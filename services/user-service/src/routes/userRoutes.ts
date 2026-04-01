@@ -7,6 +7,8 @@ import {
   getStreaks,
   updateSubscription,
   getUserCourses,
+  getNotificationPreferences,
+  updateNotificationPreferences,
 } from '../controllers/userController';
 import {
   verifyEmail,
@@ -63,6 +65,9 @@ router.get('/progress', getProgress);
 router.get('/progress/streaks', getStreaks);
 
 router.post('/subscription', updateSubscription);
+
+router.get('/notification-preferences', getNotificationPreferences);
+router.put('/notification-preferences', updateNotificationPreferences);
 
 router.get('/courses', getUserCourses);
 

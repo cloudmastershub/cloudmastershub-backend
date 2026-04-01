@@ -375,3 +375,153 @@ export const getUserCourses = async (
     next(error);
   }
 };
+
+const DEFAULT_NOTIFICATION_PREFERENCES: {
+  emailPreferences: { marketing: boolean; transactional: boolean; courseUpdates: boolean; communityUpdates: boolean; securityAlerts: boolean; weeklyDigest: boolean };
+  pushPreferences: { enabled: boolean; courseReminders: boolean; messages: boolean; achievements: boolean };
+  emailFrequency: string;
+  unsubscribedAt?: Date;
+} = {
+  emailPreferences: {
+    marketing: true,
+    transactional: true,
+    courseUpdates: true,
+    communityUpdates: true,
+    securityAlerts: true,
+    weeklyDigest: true,
+  },
+  pushPreferences: {
+    enabled: false,
+    courseReminders: true,
+    messages: true,
+    achievements: true,
+  },
+  emailFrequency: 'instant',
+};
+
+export const getNotificationPreferences = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(400).json({ success: false, error: { message: 'User ID is required' } });
+      return;
+    }
+
+    const user = await User.findById(userId).select('notificationPreferences');
+    if (!user) {
+      res.status(404).json({ success: false, error: { message: 'User not found' } });
+      return;
+    }
+
+    const preferences = user.notificationPreferences || DEFAULT_NOTIFICATION_PREFERENCES;
+
+    res.json({
+      success: true,
+      data: {
+        emailPreferences: {
+          marketing: preferences.emailPreferences?.marketing ?? true,
+          transactional: preferences.emailPreferences?.transactional ?? true,
+          courseUpdates: preferences.emailPreferences?.courseUpdates ?? true,
+          communityUpdates: preferences.emailPreferences?.communityUpdates ?? true,
+          securityAlerts: preferences.emailPreferences?.securityAlerts ?? true,
+          weeklyDigest: preferences.emailPreferences?.weeklyDigest ?? true,
+        },
+        pushPreferences: {
+          enabled: preferences.pushPreferences?.enabled ?? false,
+          courseReminders: preferences.pushPreferences?.courseReminders ?? true,
+          messages: preferences.pushPreferences?.messages ?? true,
+          achievements: preferences.pushPreferences?.achievements ?? true,
+        },
+        emailFrequency: preferences.emailFrequency || 'instant',
+        unsubscribedAt: preferences.unsubscribedAt || undefined,
+      },
+    });
+  } catch (error) {
+    logger.error('Error in getNotificationPreferences:', error);
+    next(error);
+  }
+};
+
+export const updateNotificationPreferences = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(400).json({ success: false, error: { message: 'User ID is required' } });
+      return;
+    }
+
+    const { emailPreferences, pushPreferences, emailFrequency } = req.body;
+
+    const updateData: any = {};
+
+    if (emailPreferences) {
+      // Security alerts cannot be disabled
+      if (emailPreferences.securityAlerts === false) {
+        emailPreferences.securityAlerts = true;
+      }
+      Object.keys(emailPreferences).forEach((key) => {
+        updateData[`notificationPreferences.emailPreferences.${key}`] = emailPreferences[key];
+      });
+    }
+
+    if (pushPreferences) {
+      Object.keys(pushPreferences).forEach((key) => {
+        updateData[`notificationPreferences.pushPreferences.${key}`] = pushPreferences[key];
+      });
+    }
+
+    if (emailFrequency) {
+      const validFrequencies = ['instant', 'daily', 'weekly', 'never'];
+      if (!validFrequencies.includes(emailFrequency)) {
+        res.status(400).json({ success: false, error: { message: 'Invalid email frequency' } });
+        return;
+      }
+      updateData['notificationPreferences.emailFrequency'] = emailFrequency;
+    }
+
+    // Check if this is an unsubscribe-all action (all marketing prefs disabled)
+    if (emailPreferences &&
+        !emailPreferences.marketing &&
+        !emailPreferences.courseUpdates &&
+        !emailPreferences.communityUpdates &&
+        !emailPreferences.weeklyDigest) {
+      updateData['notificationPreferences.unsubscribedAt'] = new Date();
+    } else {
+      updateData['notificationPreferences.unsubscribedAt'] = null;
+    }
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    ).select('notificationPreferences');
+
+    if (!user) {
+      res.status(404).json({ success: false, error: { message: 'User not found' } });
+      return;
+    }
+
+    const prefs = user.notificationPreferences || DEFAULT_NOTIFICATION_PREFERENCES;
+
+    res.json({
+      success: true,
+      data: {
+        emailPreferences: prefs.emailPreferences,
+        pushPreferences: prefs.pushPreferences,
+        emailFrequency: prefs.emailFrequency,
+        unsubscribedAt: prefs.unsubscribedAt || undefined,
+      },
+    });
+  } catch (error) {
+    logger.error('Error in updateNotificationPreferences:', error);
+    next(error);
+  }
+};

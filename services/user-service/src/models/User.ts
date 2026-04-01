@@ -4,20 +4,40 @@ import { User as IUser, UserRole, SubscriptionPlanType } from '@cloudmastershub/
 // Re-export UserRole for use in other files
 export { UserRole } from '@cloudmastershub/types';
 
+export interface INotificationPreferences {
+  emailPreferences?: {
+    marketing?: boolean;
+    transactional?: boolean;
+    courseUpdates?: boolean;
+    communityUpdates?: boolean;
+    securityAlerts?: boolean;
+    weeklyDigest?: boolean;
+  };
+  pushPreferences?: {
+    enabled?: boolean;
+    courseReminders?: boolean;
+    messages?: boolean;
+    achievements?: boolean;
+  };
+  emailFrequency?: 'instant' | 'daily' | 'weekly' | 'never';
+  unsubscribedAt?: Date;
+}
+
 export interface IUserDocument extends Omit<IUser, 'id'>, Document {
   _id: mongoose.Types.ObjectId;
-  referredBy?: string; // ID of the user who referred this user
-  referralDate?: Date; // When this user was referred
-  referrerId?: string; // ID of the user who referred this user (alias for referredBy)
-  referralCode?: string; // The referral code used to signup
-  isActive?: boolean; // Whether the user is active
-  password?: string; // Hashed password (if using email/password auth)
+  referredBy?: string;
+  referralDate?: Date;
+  referrerId?: string;
+  referralCode?: string;
+  isActive?: boolean;
+  password?: string;
   emailVerified?: boolean;
   lastLogin?: Date;
-  passwordResetToken?: string; // Token for password reset
-  passwordResetExpires?: Date; // When the reset token expires
+  passwordResetToken?: string;
+  passwordResetExpires?: Date;
   emailVerificationToken?: string;
   emailVerificationExpires?: Date;
+  notificationPreferences?: INotificationPreferences;
 }
 
 const UserSchema = new Schema<IUserDocument>({
@@ -100,6 +120,29 @@ const UserSchema = new Schema<IUserDocument>({
   },
   emailVerificationExpires: {
     type: Date
+  },
+  // Notification preferences
+  notificationPreferences: {
+    emailPreferences: {
+      marketing: { type: Boolean, default: true },
+      transactional: { type: Boolean, default: true },
+      courseUpdates: { type: Boolean, default: true },
+      communityUpdates: { type: Boolean, default: true },
+      securityAlerts: { type: Boolean, default: true },
+      weeklyDigest: { type: Boolean, default: true },
+    },
+    pushPreferences: {
+      enabled: { type: Boolean, default: false },
+      courseReminders: { type: Boolean, default: true },
+      messages: { type: Boolean, default: true },
+      achievements: { type: Boolean, default: true },
+    },
+    emailFrequency: {
+      type: String,
+      enum: ['instant', 'daily', 'weekly', 'never'],
+      default: 'instant',
+    },
+    unsubscribedAt: { type: Date },
   }
 }, {
   timestamps: true,
