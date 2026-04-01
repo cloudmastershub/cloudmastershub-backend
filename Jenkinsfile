@@ -236,8 +236,10 @@ pipeline {
             script {
                 sh '''
                     if command -v docker > /dev/null; then
+                        # Remove only the build-specific image to free space
                         docker rmi ${IMAGE_NAME}:${IMAGE_TAG} || true
-                        docker system prune -f || true
+                        # Remove dangling images only (fast, no full prune)
+                        docker image prune -f || true
                     fi
 
                     # Selective cleanup — preserve npm cache (lives outside workspace)
