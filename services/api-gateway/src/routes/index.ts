@@ -566,6 +566,38 @@ router.use('/marketing/leads/bootcamp-interest', createProxyMiddleware({
   },
 }));
 
+// ES Marketing Platform: Newsletter subscribe (footer widget)
+router.use('/marketing/leads/newsletter', createProxyMiddleware({
+  target: MARKETING_PLATFORM_URL,
+  changeOrigin: true,
+  timeout: 30000,
+  proxyTimeout: 30000,
+  pathRewrite: { '^/api/marketing/leads/newsletter': '/leads/capture/newsletter' },
+  secure: false,
+  logLevel: 'debug',
+  onError: (err, req, res) => {
+    logger.error('Proxy error for /marketing/leads/newsletter:', err);
+    if (!res.headersSent) {
+      res.status(502).json({
+        success: false,
+        error: { message: 'Marketing platform temporarily unavailable', service: 'es-marketing' },
+      });
+    }
+  },
+  onProxyReq: (proxyReq, req, res) => {
+    forwardHeaders(proxyReq, req as Request, 'es-marketing');
+    if (req.body && Object.keys(req.body).length > 0) {
+      const bodyData = JSON.stringify(req.body);
+      proxyReq.setHeader('Content-Type', 'application/json');
+      proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+      proxyReq.write(bodyData);
+    }
+  },
+  onProxyRes: (proxyRes, req) => {
+    logger.debug(`Response ${proxyRes.statusCode} for ${req.method} ${req.originalUrl}`);
+  },
+}));
+
 // Handle general routes with prefix matching
 Object.entries(serviceRoutes).forEach(([routePath, config]) => {
   // Skip specific admin routes as they're handled above
