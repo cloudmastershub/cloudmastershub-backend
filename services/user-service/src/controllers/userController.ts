@@ -341,11 +341,20 @@ export const getUserCourses = async (
       userIdLength: userId?.length 
     });
 
-    // Call the course service to get user's enrolled courses
+    // Call the course service to get user's enrolled courses.
+    //
+    // Bug #2 (Apr 23 — enrollment exists, /users/courses returns []):
+    // this URL used to be `/user/${userId}/courses`. That 404'd: the route
+    // lives in `courseRoutes.ts`, which is mounted at `/courses` in
+    // course-service/src/index.ts, so the real path is
+    // `/courses/user/:userId/courses`. The axios call hit the bare root path,
+    // got a 404 HTML, and the catch block below silently returned an empty
+    // array — so every enrolled user saw "No Courses Yet" on /courses/my
+    // regardless of actual enrollment state.
+    const courseServiceUrl = process.env.COURSE_SERVICE_URL || 'http://course-service:3002';
+    const url = `${courseServiceUrl}/courses/user/${userId}/courses`;
     try {
-      // Use internal service communication URL
-      const courseServiceUrl = process.env.COURSE_SERVICE_URL || 'http://course-service:3002';
-      const response = await axios.get(`${courseServiceUrl}/user/${userId}/courses`, {
+      const response = await axios.get(url, {
         headers: {
           'x-user-id': userId,
           'x-internal-service': 'true'
@@ -361,13 +370,29 @@ export const getUserCourses = async (
         message: courseServiceError.message,
         status: courseServiceError.response?.status,
         data: courseServiceError.response?.data,
-        url: `${process.env.COURSE_SERVICE_URL || 'http://course-service:3002'}/user/${userId}/courses`
+        url,
       });
-      
-      // Return empty array if course service is unavailable
-      res.json({
-        success: true,
-        data: []
+
+      // Do NOT silently mask errors as "empty enrollment list".
+      // A 5xx / network failure is a real degraded state — the user's
+      // enrolled courses are not the same as "you have none". Surface it so
+      // the frontend can show a retry affordance instead of the misleading
+      // "No Courses Yet" empty state.
+      //
+      // Use 503 for both network failures and upstream 5xx (service is
+      // unavailable from our vantage point); pass through 4xx if the upstream
+      // returned one.
+      const upstreamStatus = courseServiceError.response?.status;
+      const status =
+        typeof upstreamStatus === 'number' && upstreamStatus >= 400 && upstreamStatus < 500
+          ? upstreamStatus
+          : 503;
+      res.status(status).json({
+        success: false,
+        error: {
+          code: 'COURSES_UPSTREAM_FAILURE',
+          message: 'Unable to load your enrolled courses right now. Please try again in a moment.',
+        },
       });
     }
   } catch (error) {
