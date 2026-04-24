@@ -902,9 +902,33 @@ export const enrollInCourse = async (
       enrollmentType
     });
 
-    // Publish course enrolled event
-    const eventPublisher = getCourseEventPublisher();
-    await eventPublisher.publishCourseEnrolled(course._id.toString(), userId, enrollmentType);
+    // Publish course.enrolled event.
+    //
+    // PLAYER-01 BUG-1 (Apr 23): the previous version let publishCourseEnrolled
+    // rethrow (see shared/utils/src/eventBus.ts — .publish() awaits Redis and
+    // rethrows on failure). If the shared event bus is unavailable (e.g. the
+    // recurring INF-014 Phase 2 Redis NFS fragility), a successful DB
+    // enrollment would still return HTTP 500 — the user IS enrolled but the
+    // frontend sees a failure. On retry they would hit a 409 "already
+    // enrolled" which looks just as broken.
+    //
+    // Event publishing is a fire-and-observe side-effect. It should not fail
+    // the HTTP response for a successful enrollment. Log the failure so the
+    // ops side still catches drift; downstream consumers (user-service for
+    // enrolled-courses mirroring, etc.) should have their own reconciliation
+    // path if they care about missed events.
+    try {
+      const eventPublisher = getCourseEventPublisher();
+      await eventPublisher.publishCourseEnrolled(course._id.toString(), userId, enrollmentType);
+    } catch (eventError) {
+      logger.error('Failed to publish course.enrolled event (enrollment still succeeded)', {
+        courseId: course._id.toString(),
+        userId,
+        enrollmentType,
+        error: eventError instanceof Error ? eventError.message : eventError,
+      });
+      // Intentionally do not rethrow — enrollment record is already persisted.
+    }
 
     res.json({
       success: true,
