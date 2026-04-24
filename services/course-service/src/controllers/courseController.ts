@@ -893,9 +893,39 @@ export const enrollInCourse = async (
 
     await courseProgress.save();
 
-    // Increment course enrollment count
-    course.enrollmentCount = (course.enrollmentCount || 0) + 1;
-    await course.save();
+    // Increment the course's enrollment counter.
+    //
+    // PLAYER-01 retest (Apr 23): the prior version did
+    //   course.enrollmentCount = (course.enrollmentCount || 0) + 1;
+    //   await course.save();
+    //
+    // That reloads the ENTIRE Course document and re-runs every Mongoose
+    // validator against every field. The `courses` collection has documents
+    // seeded at different times — some predate fields that are now
+    // `required: true`, and others have enum/regex constraints that were
+    // tightened later. A counter-only update should not re-validate the
+    // whole doc, but `.save()` does. Any course that fails validation
+    // throws a ValidationError from inside this handler, the next() handler
+    // serves a 500, and the user sees "Failed to enroll" — even though
+    // the enrollment record (courseProgress) was already persisted on the
+    // line above. A retry then hits 409 ALREADY_ENROLLED, which looks
+    // equally broken.
+    //
+    // Fix: atomic `$inc` via findByIdAndUpdate bypasses document validation
+    // entirely (only updates the one field we care about), and wrap in its
+    // own try/catch so even a genuinely catastrophic failure on the counter
+    // update doesn't mask a successful enrollment. A stale enrollment count
+    // is a minor display bug; a silent enrollment failure is a P1.
+    try {
+      await Course.findByIdAndUpdate(course._id, { $inc: { enrollmentCount: 1 } });
+    } catch (counterError) {
+      logger.error('Failed to increment course enrollment counter (enrollment still succeeded)', {
+        courseId: course._id.toString(),
+        userId,
+        error: counterError instanceof Error ? counterError.message : counterError,
+      });
+      // Intentionally do not rethrow — the enrollment record is persisted.
+    }
 
     logger.info(`User ${userId} enrolled in course: ${course.title}`, {
       courseId: course._id.toString(),
